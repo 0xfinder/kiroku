@@ -42,10 +42,14 @@ def test_migrate_twice_via_cli_needs_no_api_keys(blank_database_url: str) -> Non
 
 
 def test_unreachable_database_is_a_one_line_error() -> None:
-    env = {"KIROKU_DATABASE_URL": "postgresql://kiroku@127.0.0.1:1/x?connect_timeout=2"}
+    env = {
+        "KIROKU_DATABASE_URL": "postgresql://kiroku@127.0.0.1:1/x?connect_timeout=2",
+        "KIROKU_SECRETS_FILE": "/nonexistent",
+    }
     result = runner.invoke(app, ["db", "migrate"], env=env)
     assert result.exit_code == 2
-    assert result.stderr.startswith("kiroku: cannot reach Postgres at 127.0.0.1:1")
+    assert result.stderr.startswith("kiroku: cannot connect to Postgres at 127.0.0.1:1: ")
+    assert len(result.stderr.strip().splitlines()) == 1
     assert "Traceback" not in result.output
 
 
@@ -80,3 +84,28 @@ def test_new_migration_is_named_to_load(tmp_path: Path) -> None:
     assert path.name == "20261012093000_add_rule.sql"
     with pytest.raises(MigrationError):
         new_migration("Bad Name", directory=tmp_path)
+
+
+def test_insecure_secrets_file_is_a_one_line_error(tmp_path: Path) -> None:
+    secrets = tmp_path / "secrets.env"
+    secrets.write_text("GROQ_API_KEY=x\n")
+    secrets.chmod(0o644)
+    result = runner.invoke(app, ["db", "migrate"], env={"KIROKU_SECRETS_FILE": str(secrets)})
+    assert result.exit_code == 2
+    assert "chmod 600" in result.stderr
+    assert "Traceback" not in result.output
+
+
+def test_wrong_database_names_the_real_cause(template_db: str) -> None:
+    from tests.conftest import url_for
+
+    env = {"KIROKU_DATABASE_URL": url_for("kiroku_missing_db"), "KIROKU_SECRETS_FILE": "/x"}
+    result = runner.invoke(app, ["db", "migrate"], env=env)
+    assert result.exit_code == 2
+    assert 'database "kiroku_missing_db" does not exist' in result.stderr
+
+
+async def test_migrate_refuses_non_autocommit_connection(blank_database_url: str) -> None:
+    async with await psycopg.AsyncConnection.connect(blank_database_url) as conn:
+        with pytest.raises(ValueError, match="autocommit"):
+            await migrate(conn)

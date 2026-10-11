@@ -88,6 +88,8 @@ async def spent(
 
     Monthly cap: `spent(conn, since=month_start)`. Session cap: `spent(conn, session_id=s)`.
     """
+    if since is not None and since.tzinfo is None:
+        raise ValueError("spent(since=...) needs a timezone-aware datetime")
     clauses: list[sql.Composable] = [sql.SQL("true")]
     params: list[object] = []
     if since is not None:

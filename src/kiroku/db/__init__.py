@@ -28,8 +28,10 @@ async def connect(database_url: str) -> AsyncGenerator[AsyncConnection]:
     except psycopg.OperationalError as e:
         params = conninfo_to_dict(database_url)
         where = f"{params.get('host', 'localhost')}:{params.get('port', 5432)}"
+        cause = str(e).strip().splitlines()[-1] if str(e).strip() else type(e).__name__
         raise DatabaseUnavailable(
-            f"cannot reach Postgres at {where}. Is it running? Try `docker compose up -d --wait`."
+            f"cannot connect to Postgres at {where}: {cause}. "
+            "If it is not running, try `docker compose up -d --wait`."
         ) from e
     async with conn:
         yield conn

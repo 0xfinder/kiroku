@@ -46,3 +46,8 @@ async def test_row_without_usage_is_rejected_by_the_database(conn: AsyncConnecti
             "INSERT INTO cost_ledger (provider, model, purpose, usd, latency_ms) "
             "VALUES ('x', 'y', 'gate', 0, 1)"
         )
+
+
+async def test_naive_since_is_rejected(conn: AsyncConnection) -> None:
+    with pytest.raises(ValueError, match="timezone-aware"):
+        await spent(conn, since=datetime(2026, 11, 1))

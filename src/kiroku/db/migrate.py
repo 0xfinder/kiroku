@@ -87,8 +87,11 @@ def pending(available: list[Migration], applied: list[AppliedMigration]) -> list
 async def migrate(conn: AsyncConnection) -> list[Migration]:
     """Apply pending migrations and return them; [] when the schema is up to date.
 
-    `conn` must be in autocommit mode (kiroku.db.connect gives one).
+    `conn` must be in autocommit mode (kiroku.db.connect gives one). Otherwise every
+    statement would join one implicit transaction that is never committed.
     """
+    if not conn.autocommit:
+        raise ValueError("migrate() needs an autocommit connection; use kiroku.db.connect")
     await conn.execute("SELECT pg_advisory_lock(%s)", [ADVISORY_LOCK_KEY])
     try:
         await conn.execute(
@@ -113,7 +116,10 @@ async def migrate(conn: AsyncConnection) -> list[Migration]:
                 )
         return todo
     finally:
-        await conn.execute("SELECT pg_advisory_unlock(%s)", [ADVISORY_LOCK_KEY])
+        # A dead connection already released its session lock; unlocking would raise
+        # and hide the error that killed it.
+        if not conn.broken and not conn.closed:
+            await conn.execute("SELECT pg_advisory_unlock(%s)", [ADVISORY_LOCK_KEY])
 
 
 def new_migration(name: str, now: datetime | None = None, directory: Path = MIGRATIONS_DIR) -> Path:

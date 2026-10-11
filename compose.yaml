@@ -15,7 +15,8 @@ services:
     # Sized for a 2 vCPU / 3 GB host shared with the app and ffmpeg.
     command: ["postgres", "-c", "shared_buffers=128MB", "-c", "work_mem=8MB", "-c", "max_connections=30"]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kiroku -d kiroku"]
+      # Over TCP: during first-boot init the temporary server listens only on the socket.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U kiroku -d kiroku"]
       interval: 2s
       timeout: 3s
       retries: 15

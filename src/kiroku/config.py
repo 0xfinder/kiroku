@@ -78,7 +78,9 @@ class Settings:
         """Read the environment and secrets.env once. Tests pass `env` instead of patching."""
         env = os.environ if env is None else env
         path = Path(env.get("KIROKU_SECRETS_FILE", DEFAULT_SECRETS_FILE)).expanduser()
-        values = read_secrets_file(path) | {n.value: env[n.value] for n in SecretName if n in env}
+        values = read_secrets_file(path) | {
+            n.value: env[n.value] for n in SecretName if env.get(n.value)
+        }
         return cls(
             database_url=env.get("KIROKU_DATABASE_URL", DEFAULT_DATABASE_URL),
             secrets=Secrets(values, path),
@@ -91,4 +93,4 @@ def read_secrets_file(path: Path) -> dict[str, str]:
         return {}
     if path.stat().st_mode & 0o077:
         raise ConfigError(f"{path} is readable by other users. Run `chmod 600 {path}`.")
-    return {k: v for k, v in dotenv_values(path).items() if v is not None}
+    return {k: v for k, v in dotenv_values(path, interpolate=False).items() if v is not None}

@@ -41,3 +41,15 @@ def test_secret_values_never_appear_in_repr(tmp_path: Path) -> None:
     settings = Settings.load({"KIROKU_SECRETS_FILE": str(path)})
     assert "gsk_live_value" not in repr(settings)
     assert "gsk_live_value" not in str(Secret("gsk_live_value"))
+
+
+def test_empty_environment_variable_does_not_hide_file_value(tmp_path: Path) -> None:
+    path = _secrets_file(tmp_path, "GROQ_API_KEY=from-file\n")
+    settings = Settings.load({"KIROKU_SECRETS_FILE": str(path), "GROQ_API_KEY": ""})
+    assert settings.secrets.require(SecretName.GROQ).reveal() == "from-file"
+
+
+def test_secret_values_are_not_interpolated(tmp_path: Path) -> None:
+    path = _secrets_file(tmp_path, "TELEGRAM_BOT_TOKEN=abc${HOME}def\n")
+    settings = Settings.load({"KIROKU_SECRETS_FILE": str(path)})
+    assert settings.secrets.require(SecretName.TELEGRAM).reveal() == "abc${HOME}def"
