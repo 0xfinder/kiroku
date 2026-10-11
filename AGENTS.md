@@ -4,12 +4,26 @@ Kiroku transcribes live streams (Twitch first), keeps structured notes, sends al
 
 ## Current status
 
-Phase 1 is starting. There is no application code yet, only design docs and the spike. Read these before starting work:
+Phase 1 is in progress: the scaffold (CLI, config, Postgres migrations, cost ledger, CI) is in place. Read these before starting work:
 
 - [PLAN.md](PLAN.md): the pipeline, storage, and phases.
 - [docs/decisions.md](docs/decisions.md): what was decided, why, and what was rejected.
 - [CONTEXT.md](CONTEXT.md): the domain glossary. Use these terms in code and docs.
 - [spikes/README.md](spikes/README.md): measured results that shaped the design (Gate context split, Rule wording, Vocabulary).
+
+## Setup and checks
+
+```sh
+docker compose up -d --wait     # Postgres 17 + pgvector on 127.0.0.1:5432
+uv sync
+uv run kiroku db migrate        # idempotent; needs no API keys
+uv run ruff check && uv run ruff format --check && uv run pyright && uv run pytest
+```
+
+- CI runs the same four checks against the same compose file. Run all four before pushing.
+- Tests need the compose Postgres and fail (not skip) when it is down. Each test gets its own database cloned from a migrated template, so tests may commit.
+- New migration: `uv run kiroku db new <name>`, then write SQL in the file it prints. Never edit a migration that has been merged; the runner refuses changed checksums.
+- If `docker` says permission denied right after Docker was installed, the session predates the `docker` group. Run commands as `sg docker -c "docker compose up -d --wait"`.
 
 ## Workflow
 
