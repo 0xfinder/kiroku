@@ -1,0 +1,53 @@
+[project]
+name = "kiroku"
+version = "0.1.0"
+description = "Transcribe live streams, keep Notes, send Alerts."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "typer>=0.15",
+    "psycopg[binary]>=3.2",
+    "python-dotenv>=1.0",
+]
+
+[project.scripts]
+kiroku = "kiroku.cli:main"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.8",
+    "pyright>=1.1.390",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.25",
+]
+
+[build-system]
+requires = ["uv_build>=0.7,<0.12"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["spikes"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC", "TID", "RUF"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"kiroku.packs".msg = "Core must not import a Pack. Define a Protocol in core and let kiroku.cli inject the Pack."
+
+[tool.ruff.lint.per-file-ignores]
+"src/kiroku/packs/**" = ["TID251"]
+"src/kiroku/cli.py" = ["TID251"]
+"tests/**" = ["TID251"]
+
+[tool.pyright]
+include = ["src", "tests"]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+venvPath = "."
+venv = ".venv"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

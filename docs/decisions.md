@@ -121,3 +121,17 @@ Muse and Jev were both about a month old when chosen, and Jev is in early access
 - **Rejected: Helix polling.** It needs a registered Twitch app and an app access token, and buys nothing extra while streamlink is the audio path anyway.
 - **Rejected: EventSub webhooks.** They need a public HTTPS endpoint, which conflicts with D18.
 - **Revisit if:** Twitch rate-limits the metadata polling, or more than about 20 channels need watching.
+
+## D22. Database layer: async psycopg 3, raw SQL, a small in-house migration runner
+
+Chosen for issue #1 by an architect arena. Three independent design candidates (Opus, Sonnet, Haiku) converged on this shape.
+
+- **Async throughout.** The workload is I/O-bound fan-out in one process: capture subprocesses, Groq/Jev/Anthropic calls, the Telegram long-poll, and FastAPI SSE.
+- **Raw SQL with one owning module per table.** The schema leans on Postgres features (JSONB, partial unique indexes, generated tsvector, pgvector) that an ORM would only translate away.
+- **Forward-only `.sql` migrations named by UTC timestamp.** Each file runs in a transaction with checksum drift detection and an advisory lock. Timestamps rather than counters, so PRs written in parallel never collide on a version number.
+- **Secrets are loaded lazily per component**, so `kiroku db migrate` needs no API keys.
+
+- **Rejected: SQLAlchemy plus Alembic.** It adds a second schema model and needs type shims for pgvector and tsvector. Alembic's revision chain also forks heads when parallel branches add migrations.
+- **Rejected: sync code with threads.** SSE and the Telegram long-poll would each need a thread-to-async bridge.
+- **Rejected: pydantic-settings with one global settings object.** Every command would need every key, or every key would be optional and checked separately at each use.
+- **Revisit if:** migrations need rollbacks, or the hand-written runner grows past about 100 lines.
