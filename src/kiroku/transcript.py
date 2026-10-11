@@ -54,17 +54,32 @@ async def commit(pool: Pool, session_id: int, transcriber: str, result: Result) 
         return True
 
 
-async def tail_text(pool: Pool, session_id: int, transcriber: str, chars: int = 400) -> str:
-    """The end of the stored transcript, to seed the prompt after a restart."""
+async def tail_text(
+    pool: Pool, session_id: int, transcriber: str, *, before_ms: int | None = None, chars: int = 400
+) -> str:
+    """The end of the stored transcript, or of the part before `before_ms`, to seed the
+    prompt after a restart or ahead of a backfilled gap."""
     async with pool.connection() as conn:
         cur = await conn.execute(
             """
             SELECT coalesce(string_agg(text, ' ' ORDER BY audio_start_ms), '') FROM (
                 SELECT text, audio_start_ms FROM utterance
                 WHERE session_id = %s AND transcriber = %s
+                  AND (%s::integer IS NULL OR audio_start_ms < %s)
                 ORDER BY audio_start_ms DESC LIMIT 20) t
             """,
-            [session_id, transcriber],
+            [session_id, transcriber, before_ms, before_ms],
         )
         row = await cur.fetchone()
     return (row[0] if row else "")[-chars:]
+
+
+async def spans(pool: Pool, session_id: int, transcriber: str) -> list[tuple[int, int]]:
+    """Every committed (audio_start_ms, audio_end_ms) of this Transcriber, in order."""
+    async with pool.connection() as conn:
+        cur = await conn.execute(
+            "SELECT audio_start_ms, audio_end_ms FROM transcript_span "
+            "WHERE session_id = %s AND transcriber = %s ORDER BY audio_start_ms",
+            [session_id, transcriber],
+        )
+        return list(await cur.fetchall())

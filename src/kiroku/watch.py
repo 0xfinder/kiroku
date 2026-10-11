@@ -5,6 +5,7 @@
         SessionRun (while Live)
           _capture   Source legs -> capture_leg rows -> AudioBlocks -> queue  (reconnects)
           _transcribe  queue -> Transcriber -> Results -> transcript.commit     (drains)
+          _backfill  archive gaps a crash left -> Transcriber -> transcript.commit  (paced)
 
 The lifecycle is a pure state machine (`step`); the shell executes its actions. Every
 action is idempotent in the database (kiroku.sessions), so the shell never needs to know
@@ -23,7 +24,7 @@ from pathlib import Path
 
 import psycopg
 
-from kiroku import sessions, transcript
+from kiroku import backfill, sessions, transcript
 from kiroku.audio import BYTES_PER_SAMPLE, SAMPLES_PER_MS, AudioBlock, AudioEvent, LegEnded
 from kiroku.db import Pool
 from kiroku.sessions import Channel
@@ -35,6 +36,7 @@ log = logging.getLogger(__name__)
 OFFLINE_PROBES_TO_CLOSE = 2  # one NotLive blip doesn't stop capture
 CAPTURE_STOP_TIMEOUT_S = 15.0
 DRAIN_TIMEOUT_S = 120.0
+BACKFILL_STOP_TIMEOUT_S = 30.0  # one in-flight Transcriber call; the rest waits for next start
 
 # ---- lifecycle: pure ---------------------------------------------------------------------
 
@@ -192,6 +194,7 @@ class SessionRun:
         data_dir: Path,
         *,
         reconnect_max_s: float = 30.0,
+        backfill_pace: float | None = backfill.BACKFILL_PACE,
     ) -> None:
         self.session_id = session_id
         self.meta = meta
@@ -201,19 +204,27 @@ class SessionRun:
         self._transcriber = transcriber
         self._data_dir = data_dir
         self._reconnect_max_s = reconnect_max_s
+        self._backfill_pace = backfill_pace
         self._queue: asyncio.Queue[AudioEvent | None] = asyncio.Queue()
         self._stopping = asyncio.Event()
         self._capture_handle: Capture | None = None
         self._capturing: asyncio.Task[None] | None = None
         self._transcribing: asyncio.Task[None] | None = None
+        self._backfilling: asyncio.Task[None] | None = None
         # End of the last leg captured in this run. The database may not know it yet (its
         # spans can still be queued), so the next leg never starts before it.
         self._clock_ms = 0
 
     async def start(self) -> None:
+        # Before the first leg is placed: it must start after the legs a crash left open.
+        gaps = await backfill.prepare(
+            self._pool, self.session_id, self._transcriber.name, self._data_dir
+        )
         previous = await transcript.tail_text(self._pool, self.session_id, self._transcriber.name)
         self._transcribing = asyncio.create_task(self._transcribe(previous))
         self._capturing = asyncio.create_task(self._capture())
+        if gaps:
+            self._backfilling = asyncio.create_task(self._backfill(gaps))
 
     def raise_if_failed(self) -> None:
         for task in (self._capturing, self._transcribing):
@@ -256,6 +267,13 @@ class SessionRun:
             except TimeoutError:
                 log.warning(
                     "session %d: drain timed out; queued audio stays untranscribed", self.session_id
+                )
+        if self._backfilling is not None:
+            try:
+                await asyncio.wait_for(self._backfilling, BACKFILL_STOP_TIMEOUT_S)
+            except TimeoutError:
+                log.warning(
+                    "session %d: backfill cut short; it resumes on the next start", self.session_id
                 )
 
     async def _capture(self) -> None:
@@ -307,6 +325,24 @@ class SessionRun:
             else:
                 path.unlink(missing_ok=True)
         return samples > 0
+
+    async def _backfill(self, gaps: list[backfill.Gap]) -> None:
+        """Behind live audio, never instead of it: a failure here leaves the gaps for the next
+        start and does not stop the session."""
+        try:
+            await backfill.run(
+                self._pool,
+                self.session_id,
+                self._transcriber,
+                self._data_dir,
+                gaps,
+                self._vocabulary,
+                commit=self._commit,
+                pace=self._backfill_pace,
+                stopping=self._stopping,
+            )
+        except Exception:
+            log.exception("session %d: backfill failed; the gaps stay", self.session_id)
 
     async def _events(self) -> AsyncIterator[AudioEvent]:
         while (event := await self._queue.get()) is not None:

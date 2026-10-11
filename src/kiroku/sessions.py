@@ -38,6 +38,13 @@ class Leg:
     seq: int
     audio_start_ms: int
     archive_path: PurePosixPath  # relative to the data directory
+    audio_end_ms: int | None = None  # None while capturing, or after a crash until sealed
+
+
+@dataclass(frozen=True, slots=True)
+class SessionInfo:
+    id: int
+    title: str
 
 
 @asynccontextmanager
@@ -144,9 +151,9 @@ async def next_leg(pool: Pool, channel: Channel, session_id: int, at_least_ms: i
     """Where the next capture leg starts on the session's audio clock.
 
     After the previous leg's recorded end, after audio a Transcriber already committed, and
-    after `at_least_ms` (the caller's own record of where its last leg ended). After a crash
-    the previous leg's end is unknown; its untranscribed tail then becomes unreachable
-    rather than overlapping the next leg's offsets.
+    after `at_least_ms` (the caller's own record of where its last leg ended). A leg a crash
+    left open must be sealed first (kiroku.backfill.prepare), or its archived tail past the
+    committed audio would share offsets with the next leg.
     """
     async with pool.connection() as conn:
         cur = await conn.execute(
@@ -182,8 +189,38 @@ async def record_leg(pool: Pool, leg: Leg, started_at: datetime) -> None:
 
 
 async def end_leg(pool: Pool, leg: Leg, audio_end_ms: int) -> None:
+    """Record where a leg ended: by capture when it stops, or by backfill when sealing a leg
+    a crash left open. The first end recorded stays; later legs were placed after it."""
     async with pool.connection() as conn:
         await conn.execute(
-            "UPDATE capture_leg SET audio_end_ms = %s WHERE session_id = %s AND seq = %s",
+            "UPDATE capture_leg SET audio_end_ms = %s "
+            "WHERE session_id = %s AND seq = %s AND audio_end_ms IS NULL",
             [audio_end_ms, leg.session_id, leg.seq],
         )
+
+
+async def legs(pool: Pool, session_id: int) -> list[Leg]:
+    """The session's recorded legs, in order."""
+    async with pool.connection() as conn:
+        cur = await conn.execute(
+            "SELECT seq, audio_start_ms, archive_path, audio_end_ms FROM capture_leg "
+            "WHERE session_id = %s ORDER BY seq",
+            [session_id],
+        )
+        rows = await cur.fetchall()
+    return [Leg(session_id, seq, start, PurePosixPath(path), end) for seq, start, path, end in rows]
+
+
+async def find_session(pool: Pool, channel: Channel, session_id: int | None) -> SessionInfo | None:
+    """The channel's session with this id, or its latest session when `session_id` is None."""
+    async with pool.connection() as conn:
+        cur = await conn.execute(
+            """
+            SELECT id, coalesce(title, '') FROM stream_session
+            WHERE channel_id = %s AND (%s::bigint IS NULL OR id = %s)
+            ORDER BY started_at DESC, id DESC LIMIT 1
+            """,
+            [channel.id, session_id, session_id],
+        )
+        row = await cur.fetchone()
+    return SessionInfo(row[0], row[1]) if row else None

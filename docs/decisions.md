@@ -153,3 +153,17 @@ Chosen by an architect arena: three design candidates (Opus, Sonnet, Haiku) plus
 - **Stopping cuts the input, not the reader.** The leg ends exactly like a stream drop, so everything ffmpeg received is archived, recorded as the leg's end, and transcribed. SIGTERM (systemd) and SIGINT take this path.
 - **Accepted: a crash loses queued audio from the transcript, not from the archive.** The loss shows up as a gap in `transcript_span` coverage, to be backfilled later (follow-up issue).
 - **Accepted: one Groq request per 15–25 s chunk**, about 1,000–1,400 requests per 6-hour stream. The free tier allows 2,000 requests a day, so two long streams on the same day exceed it.
+
+## D25. Backfill crash gaps on session start (issue #10)
+
+D23 accepted that a crash loses queued audio from the transcript but not from the archive. Backfill recovers that audio. (Numbered D25 because another branch may add D24 at the same time.)
+
+- **Seal first, then place the next leg.** When a session starts, a leg with no recorded end gets one: its archive's decoded length, read with ffprobe as `duration_ts - initial_padding`. This needs one seek, not a decode. A full decode runs at about 130x real time, so a 6-hour leg would take minutes and live capture would wait for it. The sealed end is never below the audio already committed, and never past a later leg's start. Sealing runs before `next_leg`, so the next leg can't share offsets with the archived tail. A recorded end never moves afterwards.
+  - **Rejected: estimating the end from wall-clock time.** It would leave gaps or overlaps on the session's audio clock.
+- **Gap finding is pure.** `find_gaps(legs, spans)` returns each leg's extent minus the spans of the current Transcriber. Exactly-once follows from three facts: gaps come from committed spans, a commit is a no-op for a span already stored, and the channel lock allows one backfill per session.
+- **The same Transcriber path, one stream per gap.** Each gap is decoded from its leg's archive with a pre-rolled `-ss`, which is bit-exact against a full decode. The audio goes through `Transcriber.transcribe`, prompted with the stored text just before the gap. Silent chunks still cost nothing, and costs reach the ledger through `transcript.commit`.
+- **Behind live audio, never instead of it.** Backfill runs as its own task alongside live transcription and feeds audio at no more than 2x real time. This caps its share of the per-key rate limits at twice the live share. Because the cap comes from pacing the input, it works for any Transcriber, including Muse. A backfill failure is logged and doesn't stop the session. On stop, backfill finishes the audio it has already fed, then yields. Whatever is left resumes on the next start.
+  - **Rejected: backfill before live.** Live latency would grow by the length of the backlog.
+  - **Rejected: priority inside the Groq adapter.** Pacing is simpler and doesn't depend on the Transcriber.
+- **`kiroku backfill <channel>`** covers sessions that `kiroku watch` won't resume, for example when the stream ended while kiroku was down.
+- **Revisit if:** the Transcriber changes mid-session. Gaps are counted per Transcriber, so the new one would backfill every leg.
