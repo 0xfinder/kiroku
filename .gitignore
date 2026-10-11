@@ -1,0 +1,6 @@
+*.ogg
+*.opus
+*.wav
+.env
+__pycache__/
+.venv/

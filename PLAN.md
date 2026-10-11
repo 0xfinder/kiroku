@@ -46,8 +46,8 @@ Each phase ends with something that can be observed working.
 ### Phase 0 — Spikes (time-boxed)
 
 - Muse: stream a recorded Caedrel co-stream clip through it. Record the speaker-label format, the limit on biasing keywords, and the reconnect behaviour.
-- Jev: send three Rules plus a Mode question against a hand-picked transcript Window, and confirm the response shape and latency from this host.
-- Source: run streamlink → ffmpeg → PCM against a live channel on this host, and measure CPU and RAM use.
+- ~~Jev: send three Rules plus a Mode question against a transcript Window, and confirm the response shape and latency from this host.~~ Done 2026-10-11 with Groq on a live Gorgc co-stream; see [spikes/README.md](spikes/README.md).
+- ~~Source: run streamlink → ffmpeg against a live channel on this host, and measure CPU and RAM use.~~ Done 2026-10-11: 9% of one CPU, 65 MB.
 
 ### Phase 1 — Core + League v1
 
