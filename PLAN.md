@@ -25,7 +25,9 @@ Twitch watcher (streamlink metadata poll ~60 s: live? category?)
 | `channel` | Watch list: platform, login, enabled |
 | `stream_session` | One live broadcast: start/end times, audio path |
 | `segment` | Category spans within a session, plus the Pack |
+| `capture_leg` | One streamlink→ffmpeg run: position on the session audio clock, wall-clock start, archive file |
 | `utterance` | Transcript text, session-relative and wall-clock times, Speaker label, Transcriber used |
+| `transcript_span` | Audio ranges a Transcriber has finalized; the exactly-once key and the completeness watermark |
 | `speaker_map` | Speaker label → role, probability, who decided it and when |
 | `window` | Window bounds, inferred Mode and its probability |
 | `note` | JSONB body, Pack, Mode, `schema_version`, model, time span, Game key |
@@ -37,7 +39,7 @@ Twitch watcher (streamlink metadata poll ~60 s: live? category?)
 
 Added later: a full-text search column on `utterance` and `note`, and a pgvector embeddings table (Phase 5).
 
-Audio files are stored at `audio/<channel>/<session>.opus`; evaluation clips at `clips/`.
+Audio files are stored at `audio/<channel>/<session>/<leg>.opus` (D23); evaluation clips at `clips/`.
 
 ## Phases
 

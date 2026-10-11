@@ -7,6 +7,9 @@ dependencies = [
     "typer>=0.15",
     "psycopg[binary]>=3.2",
     "python-dotenv>=1.0",
+    "httpx>=0.28.1",
+    "psycopg-pool>=3.3.3",
+    "streamlink>=8.6.2",
 ]
 
 [project.scripts]

@@ -12,6 +12,9 @@ The names kiroku's code, docs, and design discussions use. If a discussion needs
 
 ## Transcription and speakers
 
+- **Capture leg** — one streamlink→ffmpeg run within a Stream session. Each leg has its own archive file. Legs sit back to back on the session's audio clock, and each anchors that clock to wall-clock time. A stream drop or reconnect starts a new leg in the same session.
+- **Transcript span** — a range of the session's audio clock that a Transcriber has finalized, silent ranges included. Its row commits atomically with its Utterances and Cost ledger row. The highest span end is the "transcript complete up to here" watermark.
+
 - **Utterance** — one finalized piece of transcript from the Transcriber. It has start and end timestamps and a Speaker label.
 - **Speaker label** — the anonymous speaker id the Transcriber assigns (`speaker_A`). It is only stable within one transcription connection.
 - **Speaker map** — the mapping from Speaker labels to roles: `streamer`, `caster`, or `other`. It is decided per session and re-decided after a reconnect or when a new label appears.
