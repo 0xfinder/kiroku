@@ -23,8 +23,15 @@ from pathlib import Path
 from typing import Any, Protocol, cast
 
 from kiroku.audio import FFMPEG_PCM, SAMPLE_RATE
+from kiroku.errors import KirokuError
 
 PROBE_TIMEOUT_S = 30
+
+
+class ToolMissing(KirokuError):
+    pass
+
+
 READ_SIZE = 32_768
 ARCHIVE_BITRATE = "32k"  # D17
 
@@ -151,13 +158,19 @@ class StreamlinkSource:
                 stderr=asyncio.subprocess.DEVNULL,
                 start_new_session=True,
             )
-            ffmpeg = await asyncio.create_subprocess_exec(
-                *ffmpeg_command(self._ffmpeg, archive),
-                stdin=read_fd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.DEVNULL,
-                start_new_session=True,
-            )
+            try:
+                ffmpeg = await asyncio.create_subprocess_exec(
+                    *ffmpeg_command(self._ffmpeg, archive),
+                    stdin=read_fd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.DEVNULL,
+                    start_new_session=True,
+                )
+            except BaseException:
+                await _stop(streamlink, grace_s=0)
+                raise
+        except FileNotFoundError as e:
+            raise ToolMissing(f"{e.filename} not found; install it or fix PATH") from e
         finally:
             # Our copies must close, so ffmpeg sees EOF when streamlink exits.
             os.close(read_fd)

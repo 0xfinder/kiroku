@@ -85,8 +85,8 @@ def watch_command(
         asyncio.get_running_loop().add_signal_handler(signal.SIGTERM, main.cancel)
         key = settings.secrets.require(SecretName.GROQ)
         async with (
+            open_pool(settings.database_url) as pool,  # refuses a stale schema first
             claim_channels(settings.database_url, "twitch", channels) as claimed,
-            open_pool(settings.database_url) as pool,
             httpx.AsyncClient(timeout=60) as http,
         ):
             sources = [(c, StreamlinkSource(c.login)) for c in claimed]

@@ -144,27 +144,33 @@ async def _watch_channel(
             probe = await source.probe()
             if isinstance(probe, ProbeFailed):
                 log.warning("%s: probe failed: %s", channel.login, probe.reason)
-            state, actions = step(state, probe)
-            for action in actions:
-                match action:
-                    case Close():
-                        if run is not None:
-                            await run.stop()
-                            run = None
-                        await sessions.close_open_sessions(pool, channel, datetime.now(UTC))
-                    case Open(meta):
-                        session_id = await sessions.open_session(
-                            pool, channel, meta, datetime.now(UTC)
-                        )
-                        log.info("%s: live, session %d", channel.login, session_id)
-                        run = SessionRun(
-                            pool, channel, source, session_id, meta, transcriber, data_dir
-                        )
-                        await run.start()
-                    case Update(meta):
-                        if run is not None:
-                            await sessions.update_title(pool, run.session_id, meta.title)
-                            run.meta = meta
+            next_state, actions = step(state, probe)
+            try:
+                for action in actions:
+                    match action:
+                        case Close():
+                            if run is not None:
+                                await run.stop()
+                                run = None
+                            await sessions.close_open_sessions(pool, channel, datetime.now(UTC))
+                        case Open(meta):
+                            session_id = await sessions.open_session(
+                                pool, channel, meta, datetime.now(UTC)
+                            )
+                            log.info("%s: live, session %d", channel.login, session_id)
+                            run = SessionRun(
+                                pool, channel, source, session_id, meta, transcriber, data_dir
+                            )
+                            await run.start()
+                        case Update(meta):
+                            if run is not None:
+                                await sessions.update_title(pool, run.session_id, meta.title)
+                                run.meta = meta
+                # Advance only once the actions are done. They are idempotent, so after a
+                # database blip the next probe retries the same transition.
+                state = next_state
+            except psycopg.OperationalError as e:
+                log.warning("%s: database error (%s); retrying next poll", channel.login, e)
             await asyncio.sleep(poll_s)
     finally:
         if run is not None:
@@ -200,6 +206,9 @@ class SessionRun:
         self._capture_handle: Capture | None = None
         self._capturing: asyncio.Task[None] | None = None
         self._transcribing: asyncio.Task[None] | None = None
+        # End of the last leg captured in this run. The database may not know it yet (its
+        # spans can still be queued), so the next leg never starts before it.
+        self._clock_ms = 0
 
     async def start(self) -> None:
         previous = await transcript.tail_text(self._pool, self.session_id, self._transcriber.name)
@@ -218,17 +227,26 @@ class SessionRun:
 
     async def stop(self, drain_timeout_s: float = DRAIN_TIMEOUT_S) -> None:
         """End the current leg cleanly (everything already received is archived and queued),
-        then let transcription drain the queue. Returns before a new run may start."""
+        then let transcription drain the queue. Returns before a new run may start.
+
+        A second cancellation of the caller (another SIGTERM) still propagates.
+        """
+        current = asyncio.current_task()
+        cancels_before = current.cancelling() if current else 0
         self._stopping.set()
         if self._capture_handle is not None:
             await self._capture_handle.stop_input()
         if self._capturing is not None:
             try:
-                await asyncio.wait_for(self._capturing, CAPTURE_STOP_TIMEOUT_S)
+                await asyncio.wait_for(asyncio.shield(self._capturing), CAPTURE_STOP_TIMEOUT_S)
             except TimeoutError:
                 log.warning("session %d: capture did not stop cleanly", self.session_id)
+                self._capturing.cancel()
             except asyncio.CancelledError:
-                pass
+                if current is not None and current.cancelling() > cancels_before:
+                    raise
+            except Exception:
+                log.exception("session %d: capture had failed", self.session_id)
         self._queue.put_nowait(None)
         log.info("session %d: capture stopped; draining transcription", self.session_id)
         if self._transcribing is not None:
@@ -243,44 +261,52 @@ class SessionRun:
     async def _capture(self) -> None:
         delay = 2.0
         while not self._stopping.is_set():
-            leg = await sessions.next_leg(self._pool, self._channel, self.session_id)
-            path = self._data_dir / leg.archive_path
-            samples = 0
-            leftover = b""
-            recorded = False
             try:
-                async with self._source.capture(path) as capture:
-                    self._capture_handle = capture
-                    if self._stopping.is_set():
-                        await capture.stop_input()
-                    async for data in capture.pcm:
-                        if not recorded:
-                            await sessions.record_leg(self._pool, leg, datetime.now(UTC))
-                            recorded = True
-                        data = leftover + data
-                        whole = len(data) - len(data) % BYTES_PER_SAMPLE
-                        leftover = data[whole:]
-                        block = AudioBlock(
-                            leg.audio_start_ms * SAMPLES_PER_MS + samples, data[:whole]
-                        )
-                        samples += whole // BYTES_PER_SAMPLE
-                        self._queue.put_nowait(block)
-            finally:
-                self._capture_handle = None
-                if samples:
-                    end_ms = leg.audio_start_ms + samples // SAMPLES_PER_MS
-                    await sessions.end_leg(self._pool, leg, end_ms)
-                    self._queue.put_nowait(LegEnded())
-                else:
-                    path.unlink(missing_ok=True)
+                captured = await self._capture_leg()
+            except psycopg.OperationalError as e:
+                log.warning("session %d: database error in capture (%s)", self.session_id, e)
+                captured = False
             if self._stopping.is_set():
                 return
-            if samples:
+            if captured:
                 delay = 2.0
-                log.info("session %d: leg %d ended; reconnecting", self.session_id, leg.seq)
             with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(self._stopping.wait(), delay)
             delay = min(delay * 2, self._reconnect_max_s)
+
+    async def _capture_leg(self) -> bool:
+        """Run one leg to its end. Returns whether it delivered any audio."""
+        leg = await sessions.next_leg(self._pool, self._channel, self.session_id, self._clock_ms)
+        path = self._data_dir / leg.archive_path
+        samples = 0
+        leftover = b""
+        recorded = False
+        try:
+            async with self._source.capture(path) as capture:
+                self._capture_handle = capture
+                if self._stopping.is_set():
+                    await capture.stop_input()
+                async for data in capture.pcm:
+                    if not recorded:
+                        await sessions.record_leg(self._pool, leg, datetime.now(UTC))
+                        recorded = True
+                    data = leftover + data
+                    whole = len(data) - len(data) % BYTES_PER_SAMPLE
+                    leftover = data[whole:]
+                    block = AudioBlock(leg.audio_start_ms * SAMPLES_PER_MS + samples, data[:whole])
+                    samples += whole // BYTES_PER_SAMPLE
+                    self._queue.put_nowait(block)
+        finally:
+            self._capture_handle = None
+            if samples:
+                end_ms = leg.audio_start_ms + samples // SAMPLES_PER_MS
+                self._clock_ms = end_ms
+                self._queue.put_nowait(LegEnded())
+                log.info("session %d: leg %d ended at %d ms", self.session_id, leg.seq, end_ms)
+                await sessions.end_leg(self._pool, leg, end_ms)
+            else:
+                path.unlink(missing_ok=True)
+        return samples > 0
 
     async def _events(self) -> AsyncIterator[AudioEvent]:
         while (event := await self._queue.get()) is not None:

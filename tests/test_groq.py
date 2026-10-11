@@ -8,6 +8,7 @@ import pytest
 
 from kiroku.audio import AudioBlock, AudioEvent, LegEnded
 from kiroku.config import Secret
+from kiroku.ledger import AudioSeconds
 from kiroku.transcriber import Context, Result
 from kiroku.transcriber.groq import (
     GroqAuthError,
@@ -163,3 +164,48 @@ def test_retry_delay(
     status: int | None, headers: dict[str, str], attempt: int, expected: float
 ) -> None:
     assert retry_delay(status, headers, attempt) == pytest.approx(expected)
+
+
+async def test_a_failing_audio_source_raises_instead_of_hanging() -> None:
+    import asyncio
+
+    async def broken() -> AsyncIterator[AudioEvent]:
+        pcm, _ = speechlike(5, seed=6)
+        yield AudioBlock(0, pcm)
+        raise RuntimeError("capture died")
+
+    t = _transcriber(FakeGroq())
+    with pytest.raises(RuntimeError, match="capture died"):
+        async with asyncio.timeout(10):
+            async for _ in t.transcribe(broken(), Context(vocabulary=lambda: "")):
+                pass
+
+
+async def test_a_lost_response_is_billed_rather_than_dropped() -> None:
+    fake = FakeGroq()
+    calls = 0
+
+    def flaky(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise httpx.ReadTimeout("response lost", request=request)
+        return fake(request)
+
+    http = httpx.AsyncClient(transport=httpx.MockTransport(flaky))
+    t = GroqTranscriber(http, Secret("k"), sleep=lambda _: asyncio_sleep0())
+    pcm, _ = speechlike(12, seed=7)
+    results = [r async for r in t.transcribe(_events(AudioBlock(0, pcm)), Context(lambda: ""))]
+    cost = results[0].cost
+    assert cost is not None and cost.usage == AudioSeconds(Decimal(24))  # 2 x 12 s
+
+
+async def asyncio_sleep0() -> None:
+    return None
+
+
+def test_segments_without_room_merge_into_the_previous_utterance() -> None:
+    body = _segments((10.0, 10.5, "late one"), (10.2, 10.5, "late two"))
+    utterances, text = to_utterances(0, 10_000, body)
+    assert [u.text for u in utterances] == ["late one late two"]
+    assert text == "late one late two"

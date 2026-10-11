@@ -73,23 +73,28 @@ class GroqTranscriber:
         chunks: asyncio.Queue[Chunk | None] = asyncio.Queue()
         backlog_ms = 0
 
-        async def produce() -> None:
+        def enqueue(ready: list[Chunk]) -> None:
             nonlocal backlog_ms
-            chunker: SilenceChunker | None = None
-            async for event in audio:
-                if isinstance(event, AudioBlock):
-                    chunker = chunker or SilenceChunker(event.start_sample, self._policy)
-                    ready = chunker.feed(event.pcm)
-                else:
-                    ready = chunker.flush() if chunker else []
-                    chunker = None
-                for chunk in ready:
-                    backlog_ms += _duration_ms(chunk)
-                    chunks.put_nowait(chunk)
-            if chunker:
-                for chunk in chunker.flush():
-                    chunks.put_nowait(chunk)
-            chunks.put_nowait(None)
+            for chunk in ready:
+                backlog_ms += _duration_ms(chunk)
+                chunks.put_nowait(chunk)
+
+        async def produce() -> None:
+            try:
+                chunker: SilenceChunker | None = None
+                async for event in audio:
+                    if isinstance(event, AudioBlock):
+                        chunker = chunker or SilenceChunker(event.start_sample, self._policy)
+                        enqueue(chunker.feed(event.pcm))
+                    else:
+                        enqueue(chunker.flush() if chunker else [])
+                        chunker = None
+                if chunker:
+                    enqueue(chunker.flush())
+            finally:
+                # Always end the consumer, so a failure here surfaces at `await producer`
+                # instead of leaving the consumer waiting forever.
+                chunks.put_nowait(None)
 
         producer = asyncio.create_task(produce())
         tail = context.previous_text
@@ -116,6 +121,7 @@ class GroqTranscriber:
     async def _call(self, chunk: Chunk, prompt: str) -> tuple[Result, str]:
         start_ms, end_ms = ms(chunk.start_sample), ms(chunk.end_sample)
         attempt = 0
+        maybe_billed = 0  # sent, but the response was lost: Groq may have billed it
         while True:
             delay = self._not_before - time.monotonic()
             if delay > 0:
@@ -136,6 +142,8 @@ class GroqTranscriber:
                 )
             except httpx.TransportError as e:
                 attempt += 1
+                if not isinstance(e, httpx.ConnectError | httpx.ConnectTimeout):
+                    maybe_billed += 1
                 log.warning("Groq request failed (%s); retrying", e)
                 await self._sleep(retry_delay(None, {}, attempt))
                 continue
@@ -159,6 +167,8 @@ class GroqTranscriber:
                 return Result(start_ms, end_ms, (), None), ""
             utterances, text = to_utterances(start_ms, end_ms, response.json())
             seconds, usd = billed(end_ms - start_ms)
+            # Over-report rather than under-report: Budget caps trust the ledger.
+            seconds, usd = seconds * (1 + maybe_billed), usd * (1 + maybe_billed)
             cost = CostEntry(
                 PROVIDER, MODEL, Purpose.TRANSCRIBE, AudioSeconds(seconds), usd, latency_ms
             )
@@ -252,9 +262,12 @@ def to_utterances(
         ):
             continue
         s = min(max(start_ms + round(float(seg["start"]) * 1000), last_start + 1), end_ms - 1)
-        if s <= last_start:
-            continue  # no room left in the chunk; merge into the previous utterance
         e = min(max(start_ms + round(float(seg["end"]) * 1000), s + 1), end_ms)
+        if s <= last_start and out:
+            # No room left for a distinct start: merge into the previous utterance.
+            prev = out[-1]
+            out[-1] = Utterance(prev.start_ms, max(prev.end_ms, e), f"{prev.text} {text}")
+            continue
         out.append(Utterance(s, e, text))
         last_start = s
     return tuple(out), " ".join(u.text for u in out)

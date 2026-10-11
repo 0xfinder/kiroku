@@ -38,3 +38,19 @@ def test_ffmpeg_writes_the_archive_and_pcm_from_one_input() -> None:
     archive_at = cmd.index("/data/audio/gorgc/1/001.opus")
     assert cmd[archive_at - 3 : archive_at] == ["-flush_packets", "1", "-y"]
     assert cmd[-1] == "pipe:1"
+
+
+async def test_missing_ffmpeg_is_a_named_error_and_leaves_no_streamlink(tmp_path: Path) -> None:
+    import sys
+
+    import pytest
+
+    from kiroku.source import StreamlinkSource, ToolMissing
+
+    fake = Path(__file__).parent / "fakes" / "streamlink.py"
+    source = StreamlinkSource(
+        "x", streamlink=(sys.executable, str(fake)), ffmpeg="/nonexistent/ffmpeg"
+    )
+    with pytest.raises(ToolMissing, match="/nonexistent/ffmpeg"):
+        async with source.capture(tmp_path / "a.opus"):
+            pass

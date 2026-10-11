@@ -109,3 +109,14 @@ async def test_migrate_refuses_non_autocommit_connection(blank_database_url: str
     async with await psycopg.AsyncConnection.connect(blank_database_url) as conn:
         with pytest.raises(ValueError, match="autocommit"):
             await migrate(conn)
+
+
+def test_watch_on_an_unmigrated_database_says_to_migrate(blank_database_url: str) -> None:
+    env = {
+        "KIROKU_DATABASE_URL": blank_database_url,
+        "KIROKU_SECRETS_FILE": "/x",
+        "GROQ_API_KEY": "k",
+    }
+    result = runner.invoke(app, ["watch", "gorgc"], env=env)
+    assert result.exit_code == 2
+    assert "run `kiroku db migrate`" in result.stderr

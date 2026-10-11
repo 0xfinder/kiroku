@@ -49,9 +49,12 @@ async def claim_channels(
     Two watchers on one channel would write the same session twice. The locks live on a
     dedicated connection (session locks belong to a connection), released when it closes.
     """
+    # Twitch logins are case-insensitive; dedupe so one process never watches a channel twice
+    # (session advisory locks are re-entrant on their own connection).
+    unique = list(dict.fromkeys(login.lower() for login in logins))
     async with connect(database_url) as conn:
         channels: list[Channel] = []
-        for login in logins:
+        for login in unique:
             cur = await conn.execute(
                 """
                 INSERT INTO channel (platform, login) VALUES (%s, %s)
@@ -137,12 +140,13 @@ async def update_title(pool: Pool, session_id: int, title: str) -> None:
         )
 
 
-async def next_leg(pool: Pool, channel: Channel, session_id: int) -> Leg:
+async def next_leg(pool: Pool, channel: Channel, session_id: int, at_least_ms: int = 0) -> Leg:
     """Where the next capture leg starts on the session's audio clock.
 
-    After the previous leg's recorded end, and never before audio a Transcriber already
-    committed. After a crash the previous leg's end is unknown; its untranscribed tail
-    then becomes unreachable rather than overlapping the next leg's offsets.
+    After the previous leg's recorded end, after audio a Transcriber already committed, and
+    after `at_least_ms` (the caller's own record of where its last leg ended). After a crash
+    the previous leg's end is unknown; its untranscribed tail then becomes unreachable
+    rather than overlapping the next leg's offsets.
     """
     async with pool.connection() as conn:
         cur = await conn.execute(
@@ -158,7 +162,7 @@ async def next_leg(pool: Pool, channel: Channel, session_id: int) -> Leg:
         )
         row = await cur.fetchone()
     assert row is not None
-    seq, start_ms = row
+    seq, start_ms = row[0], max(row[1], at_least_ms)
     path = PurePosixPath("audio", channel.login, str(session_id), f"{seq:03d}.opus")
     return Leg(session_id, seq, start_ms, path)
 
