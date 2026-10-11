@@ -113,3 +113,11 @@ Audio acquisition sits behind `Source`. No YouTube code gets written until Twitc
 ## D20. Vendor risk is handled by Fallbacks
 
 Muse and Jev were both about a month old when chosen, and Jev is in early access. Both sit behind interfaces with working Fallbacks, which also serve as comparison baselines.
+
+## D21. Live detection through streamlink metadata, not the Twitch Helix API
+
+`streamlink --json twitch.tv/<channel>` returns live status, category, and title with no Twitch credentials. Verified on 2026-10-11: Gorgc returned `category: "Dota 2"` with a co-stream title, and Caedrel (offline) returned "No playable streams". streamlink depends on the same unofficial Twitch endpoints for the audio itself, so using it for live detection adds no new point of failure. It also means one fewer credential.
+
+- **Rejected: Helix polling.** It needs a registered Twitch app and an app access token, and buys nothing extra while streamlink is the audio path anyway.
+- **Rejected: EventSub webhooks.** They need a public HTTPS endpoint, which conflicts with D18.
+- **Revisit if:** Twitch rate-limits the metadata polling, or more than about 20 channels need watching.

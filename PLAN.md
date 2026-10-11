@@ -7,7 +7,7 @@ Decisions and their reasons are in [docs/decisions.md](docs/decisions.md). Terms
 ## Pipeline
 
 ```
-Twitch watcher (Helix poll ~60 s: live? category?)
+Twitch watcher (streamlink metadata poll ~60 s: live? category?)
   → Source: streamlink → ffmpeg ─┬→ Opus archive (14 days)
                                  └→ PCM → Muse streaming STT (Pack Vocabulary biasing)
   → Utterances (speaker labels) → Speaker map (Jev) → Streamer turns
