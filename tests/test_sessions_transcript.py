@@ -11,6 +11,7 @@ import pytest
 from psycopg import AsyncConnection
 
 from kiroku import sessions, transcript
+from kiroku.budget import Budget, Caps
 from kiroku.config import Secret
 from kiroku.db import Pool, SchemaOutOfDate, open_pool
 from kiroku.ledger import AudioSeconds, CostEntry, Purpose
@@ -18,7 +19,7 @@ from kiroku.sessions import Channel, claim_channels
 from kiroku.source import Capture, Online, Probe, StreamMeta
 from kiroku.transcriber import Result, Utterance
 from kiroku.transcriber.groq import GroqTranscriber
-from kiroku.watch import SessionRun
+from kiroku.watch import Services, SessionRun
 from tests.fakes.speech import speechlike
 
 T0 = datetime(2026, 10, 11, 12, 0, tzinfo=UTC)
@@ -157,15 +158,10 @@ async def test_stop_after_a_capture_failure_still_drains(
     groq = httpx.MockTransport(lambda r: httpx.Response(200, json={"segments": []}))
     async with httpx.AsyncClient(transport=groq) as http:
         session = await sessions.open_session(pool, channel, A, T0)
-        run = SessionRun(
-            pool,
-            channel,
-            _DyingSource(pcm),
-            session,
-            A,
-            GroqTranscriber(http, Secret("k")),
-            tmp_path,
+        services = Services(
+            pool, GroqTranscriber(http, Secret("k")), tmp_path, Budget(pool, Caps()), None
         )
+        run = SessionRun(services, channel, _DyingSource(pcm), session, A)
         await run.start()
         async with asyncio.timeout(10):
             while True:

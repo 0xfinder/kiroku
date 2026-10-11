@@ -10,16 +10,19 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 from pathlib import Path
 
 from dotenv import dotenv_values
 
+from kiroku.budget import Caps
 from kiroku.errors import KirokuError
 
 DEFAULT_SECRETS_FILE = Path("~/.config/kiroku/secrets.env").expanduser()
 DEFAULT_DATABASE_URL = "postgresql://kiroku:kiroku@127.0.0.1:5432/kiroku"
 DEFAULT_DATA_DIR = Path("~/.local/share/kiroku").expanduser()
+DEFAULT_CAPS = Caps()
 
 
 class SecretName(StrEnum):
@@ -74,6 +77,7 @@ class Settings:
     database_url: str
     data_dir: Path  # audio archive: <data_dir>/audio/<channel>/<session>/<leg>.opus
     secrets: Secrets
+    caps: Caps  # D8 Budget caps, in USD
 
     @classmethod
     def load(cls, env: Mapping[str, str] | None = None) -> Settings:
@@ -87,7 +91,25 @@ class Settings:
             database_url=env.get("KIROKU_DATABASE_URL", DEFAULT_DATABASE_URL),
             data_dir=Path(env.get("KIROKU_DATA_DIR", DEFAULT_DATA_DIR)).expanduser(),
             secrets=Secrets(values, path),
+            caps=Caps(
+                session_usd=_usd(env, "KIROKU_SESSION_CAP_USD", DEFAULT_CAPS.session_usd),
+                month_usd=_usd(env, "KIROKU_MONTH_CAP_USD", DEFAULT_CAPS.month_usd),
+            ),
         )
+
+
+def _usd(env: Mapping[str, str], name: str, default: Decimal) -> Decimal:
+    """A cap in USD. A typo must not silently lift a cap, so anything unreadable is an error."""
+    raw = env.get(name, "").strip()
+    if not raw:
+        return default
+    try:
+        value = Decimal(raw)
+    except InvalidOperation:
+        value = Decimal("NaN")
+    if not value.is_finite() or value < 0:
+        raise ConfigError(f"{name}={raw!r} is not an amount in USD, e.g. 1.50")
+    return value
 
 
 def read_secrets_file(path: Path) -> dict[str, str]:

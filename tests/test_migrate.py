@@ -116,6 +116,7 @@ def test_watch_on_an_unmigrated_database_says_to_migrate(blank_database_url: str
         "KIROKU_DATABASE_URL": blank_database_url,
         "KIROKU_SECRETS_FILE": "/x",
         "GROQ_API_KEY": "k",
+        "JEV_API_KEY": "k",
     }
     result = runner.invoke(app, ["watch", "gorgc"], env=env)
     assert result.exit_code == 2

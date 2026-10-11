@@ -18,10 +18,12 @@ from typing import Annotated
 import httpx
 import typer
 
+from kiroku.budget import Budget
 from kiroku.config import SecretName, Settings
 from kiroku.db import connect, open_pool
 from kiroku.db.migrate import migrate, new_migration
 from kiroku.errors import KirokuError
+from kiroku.gate.jev import JevGate
 from kiroku.sessions import claim_channels
 from kiroku.source import StreamlinkSource
 from kiroku.transcriber.groq import GroqTranscriber
@@ -70,7 +72,8 @@ def watch_command(
     channels: Annotated[list[str], typer.Argument(help="Twitch logins, e.g. gorgc caedrel")],
     poll_s: Annotated[float, typer.Option(help="Seconds between live checks.")] = 60.0,
 ) -> None:
-    """Watch channels and store a live transcript while they stream. Runs until stopped."""
+    """Watch channels, store a live transcript while they stream, and gate it against the
+    active Rules. Runs until stopped."""
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
     )
@@ -83,14 +86,23 @@ def watch_command(
         main = asyncio.current_task()
         assert main is not None
         asyncio.get_running_loop().add_signal_handler(signal.SIGTERM, main.cancel)
-        key = settings.secrets.require(SecretName.GROQ)
+        groq_key = settings.secrets.require(SecretName.GROQ)
+        jev_key = settings.secrets.require(SecretName.JEV)
         async with (
             open_pool(settings.database_url) as pool,  # refuses a stale schema first
             claim_channels(settings.database_url, "twitch", channels) as claimed,
             httpx.AsyncClient(timeout=60) as http,
         ):
             sources = [(c, StreamlinkSource(c.login)) for c in claimed]
-            await watch(pool, sources, GroqTranscriber(http, key), settings.data_dir, poll_s=poll_s)
+            await watch(
+                pool,
+                sources,
+                GroqTranscriber(http, groq_key),
+                settings.data_dir,
+                budget=Budget(pool, settings.caps),
+                gate=JevGate(http, jev_key),
+                poll_s=poll_s,
+            )
 
     with _user_errors(), contextlib.suppress(KeyboardInterrupt, asyncio.CancelledError):
         try:

@@ -29,10 +29,10 @@ Twitch watcher (streamlink metadata poll ~60 s: live? category?)
 | `utterance` | Transcript text, session-relative and wall-clock times, Speaker label, Transcriber used |
 | `transcript_span` | Audio ranges a Transcriber has finalized; the exactly-once key and the completeness watermark |
 | `speaker_map` | Speaker label → role, probability, who decided it and when |
-| `window` | Window bounds, inferred Mode and its probability |
+| `gate_window` | Window bounds, the state the Gate saw, status, inferred Mode and its probability |
 | `note` | JSONB body, Pack, Mode, `schema_version`, model, time span, Game key |
 | `rule` | Owner, instructions, Pack scope, threshold, Cooldown, enabled |
-| `gate_decision` | Window × Rule: probability, threshold, passed, model version |
+| `gate_decision` | Window × Rule: the question asked, probability, threshold, passed |
 | `alert` | Rule, Game key, content, Notifier, external message id, sent time |
 | `label` | Gate decision → yes/no, source (`telegram` or `review`) |
 | `cost_ledger` | Provider, model, purpose, tokens or audio seconds, USD, latency |

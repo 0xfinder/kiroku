@@ -21,8 +21,10 @@ from decimal import Decimal
 from typing import Any, cast
 
 import httpx
+import psycopg
 
 from kiroku.audio import BYTES_PER_SAMPLE, SAMPLE_RATE, AudioBlock, AudioEvent, ms
+from kiroku.budget import BudgetGuard, OverBudget
 from kiroku.config import Secret
 from kiroku.errors import KirokuError
 from kiroku.ledger import AudioSeconds, CostEntry, Purpose
@@ -111,12 +113,31 @@ class GroqTranscriber:
                 if not chunk.voiced:
                     yield Result(ms(chunk.start_sample), ms(chunk.end_sample), (), None)
                     continue
+                if not await self._allowed(context.guard, chunk):
+                    # No Result: the chunk stays a gap in the transcript, and its audio stays
+                    # in the archive for backfill (#10) once Budget allows.
+                    continue
                 result, text = await self._call(chunk, build_prompt(context.vocabulary(), tail))
                 tail = (tail + " " + text).strip() if text else tail
                 yield result
         finally:
             producer.cancel()
         await producer  # re-raise a failure in the audio source
+
+    async def _allowed(self, guard: BudgetGuard, chunk: Chunk) -> bool:
+        """Ask the Budget before the first attempt; retries of an allowed call aren't re-asked.
+        When spend can't be read, wait rather than call (fail closed) or drop the audio."""
+        delay = 1.0
+        while True:
+            try:
+                await guard.check(billed(_duration_ms(chunk))[1])
+                return True
+            except OverBudget:
+                return False
+            except psycopg.OperationalError as e:
+                log.warning("Budget check failed (%s); retrying", e)
+                await self._sleep(delay)
+                delay = min(delay * 2, 30.0)
 
     async def _call(self, chunk: Chunk, prompt: str) -> tuple[Result, str]:
         start_ms, end_ms = ms(chunk.start_sample), ms(chunk.end_sample)

@@ -5,6 +5,7 @@
         SessionRun (while Live)
           _capture   Source legs -> capture_leg rows -> AudioBlocks -> queue  (reconnects)
           _transcribe  queue -> Transcriber -> Results -> transcript.commit     (drains)
+          _gating    GateLoop: committed transcript -> Windows -> Gate -> gating.commit
 
 The lifecycle is a pure state machine (`step`); the shell executes its actions. Every
 action is idempotent in the database (kiroku.sessions), so the shell never needs to know
@@ -25,7 +26,11 @@ import psycopg
 
 from kiroku import sessions, transcript
 from kiroku.audio import BYTES_PER_SAMPLE, SAMPLES_PER_MS, AudioBlock, AudioEvent, LegEnded
+from kiroku.budget import Budget
 from kiroku.db import Pool
+from kiroku.gate import Gate
+from kiroku.gate.windows import JSON
+from kiroku.gating import GateLoop
 from kiroku.sessions import Channel
 from kiroku.source import Capture, NotLive, Online, Probe, ProbeFailed, Source, StreamMeta
 from kiroku.transcriber import Context, Result, Transcriber
@@ -35,6 +40,7 @@ log = logging.getLogger(__name__)
 OFFLINE_PROBES_TO_CLOSE = 2  # one NotLive blip doesn't stop capture
 CAPTURE_STOP_TIMEOUT_S = 15.0
 DRAIN_TIMEOUT_S = 120.0
+GATE_DRAIN_TIMEOUT_S = 60.0
 
 # ---- lifecycle: pure ---------------------------------------------------------------------
 
@@ -119,22 +125,33 @@ async def watch(
     transcriber: Transcriber,
     data_dir: Path,
     *,
+    budget: Budget,
+    gate: Gate | None,
     poll_s: float = 60.0,
 ) -> None:
-    """Run until cancelled or a session fails with an error that needs a human."""
+    """Run until cancelled or a session fails with an error that needs a human. With no
+    `gate`, sessions are transcribed but not gated."""
+    services = Services(pool, transcriber, data_dir, budget, gate)
     async with asyncio.TaskGroup() as tg:
         for channel, source in channels:
-            tg.create_task(_watch_channel(pool, channel, source, transcriber, data_dir, poll_s))
+            tg.create_task(_watch_channel(services, channel, source, poll_s))
+
+
+@dataclass(frozen=True, slots=True)
+class Services:
+    """What every session of this process shares."""
+
+    pool: Pool
+    transcriber: Transcriber
+    data_dir: Path
+    budget: Budget
+    gate: Gate | None
 
 
 async def _watch_channel(
-    pool: Pool,
-    channel: Channel,
-    source: Source,
-    transcriber: Transcriber,
-    data_dir: Path,
-    poll_s: float,
+    services: Services, channel: Channel, source: Source, poll_s: float
 ) -> None:
+    pool = services.pool
     state: ChannelState = Unknown()
     run: SessionRun | None = None
     try:
@@ -150,7 +167,7 @@ async def _watch_channel(
                     match action:
                         case Close():
                             if run is not None:
-                                await run.stop()
+                                await run.stop(session_ended=True)
                                 run = None
                             await sessions.close_open_sessions(pool, channel, datetime.now(UTC))
                         case Open(meta):
@@ -158,9 +175,7 @@ async def _watch_channel(
                                 pool, channel, meta, datetime.now(UTC)
                             )
                             log.info("%s: live, session %d", channel.login, session_id)
-                            run = SessionRun(
-                                pool, channel, source, session_id, meta, transcriber, data_dir
-                            )
+                            run = SessionRun(services, channel, source, session_id, meta)
                             await run.start()
                         case Update(meta):
                             if run is not None:
@@ -183,29 +198,41 @@ class SessionRun:
 
     def __init__(
         self,
-        pool: Pool,
+        services: Services,
         channel: Channel,
         source: Source,
         session_id: int,
         meta: StreamMeta,
-        transcriber: Transcriber,
-        data_dir: Path,
         *,
         reconnect_max_s: float = 30.0,
     ) -> None:
         self.session_id = session_id
         self.meta = meta
-        self._pool = pool
+        self._pool = services.pool
         self._channel = channel
         self._source = source
-        self._transcriber = transcriber
-        self._data_dir = data_dir
+        self._transcriber = services.transcriber
+        self._data_dir = services.data_dir
+        self._guard = services.budget.guard(session_id)
+        self._gate_loop = (
+            GateLoop(
+                services.pool,
+                session_id,
+                services.transcriber.name,
+                services.gate,
+                self._guard,
+                self._stream,
+            )
+            if services.gate is not None
+            else None
+        )
         self._reconnect_max_s = reconnect_max_s
         self._queue: asyncio.Queue[AudioEvent | None] = asyncio.Queue()
         self._stopping = asyncio.Event()
         self._capture_handle: Capture | None = None
         self._capturing: asyncio.Task[None] | None = None
         self._transcribing: asyncio.Task[None] | None = None
+        self._gating: asyncio.Task[None] | None = None
         # End of the last leg captured in this run. The database may not know it yet (its
         # spans can still be queued), so the next leg never starts before it.
         self._clock_ms = 0
@@ -214,9 +241,11 @@ class SessionRun:
         previous = await transcript.tail_text(self._pool, self.session_id, self._transcriber.name)
         self._transcribing = asyncio.create_task(self._transcribe(previous))
         self._capturing = asyncio.create_task(self._capture())
+        if self._gate_loop is not None:
+            self._gating = asyncio.create_task(self._gate_loop.run())
 
     def raise_if_failed(self) -> None:
-        for task in (self._capturing, self._transcribing):
+        for task in (self._capturing, self._transcribing, self._gating):
             if (
                 task is not None
                 and task.done()
@@ -225,9 +254,13 @@ class SessionRun:
             ):
                 raise error
 
-    async def stop(self, drain_timeout_s: float = DRAIN_TIMEOUT_S) -> None:
+    async def stop(
+        self, *, session_ended: bool = False, drain_timeout_s: float = DRAIN_TIMEOUT_S
+    ) -> None:
         """End the current leg cleanly (everything already received is archived and queued),
-        then let transcription drain the queue. Returns before a new run may start.
+        let transcription drain the queue, then gate what it committed. With `session_ended`
+        the trailing partial Window is gated too; on a shutdown a restart closes it at full
+        length instead. Returns before a new run may start.
 
         A second cancellation of the caller (another SIGTERM) still propagates.
         """
@@ -257,6 +290,14 @@ class SessionRun:
                 log.warning(
                     "session %d: drain timed out; queued audio stays untranscribed", self.session_id
                 )
+        if self._gate_loop is not None and self._gating is not None:
+            self._gate_loop.finish(session_ended=session_ended)
+            try:
+                await asyncio.wait_for(self._gating, GATE_DRAIN_TIMEOUT_S)
+            except TimeoutError:
+                log.warning("session %d: Gate did not finish; restart resumes", self.session_id)
+            except Exception:
+                log.exception("session %d: Gate had failed", self.session_id)
 
     async def _capture(self) -> None:
         delay = 2.0
@@ -313,9 +354,16 @@ class SessionRun:
             yield event
 
     async def _transcribe(self, previous_text: str) -> None:
-        context = Context(vocabulary=self._vocabulary, previous_text=previous_text)
+        context = Context(self._vocabulary, self._guard, previous_text)
         async for result in self._transcriber.transcribe(self._events(), context):
             await self._commit(result)
+
+    def _stream(self) -> dict[str, JSON]:
+        """What the Gate is told about the stream: `context.stream`."""
+        stream: dict[str, JSON] = {"title": self.meta.title}
+        if self.meta.category:
+            stream["category"] = self.meta.category
+        return stream
 
     def _vocabulary(self) -> str:
         """Title-only until Packs supply real Vocabulary (#6)."""
@@ -328,6 +376,8 @@ class SessionRun:
         while True:
             try:
                 await transcript.commit(self._pool, self.session_id, self._transcriber.name, result)
+                if self._gate_loop is not None:
+                    self._gate_loop.wake()
                 return
             except psycopg.OperationalError as e:
                 log.warning("session %d: commit failed (%s); retrying", self.session_id, e)

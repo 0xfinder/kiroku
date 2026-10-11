@@ -7,6 +7,7 @@ import httpx
 import pytest
 
 from kiroku.audio import AudioBlock, AudioEvent, LegEnded
+from kiroku.budget import OverBudget, Refusal, Unlimited
 from kiroku.config import Secret
 from kiroku.ledger import AudioSeconds
 from kiroku.transcriber import Context, Result
@@ -64,7 +65,7 @@ async def _events(*events: AudioEvent) -> AsyncIterator[AudioEvent]:
 
 
 async def _collect(t: GroqTranscriber, *events: AudioEvent) -> list[Result]:
-    ctx = Context(vocabulary=lambda: "Dota 2 stream.")
+    ctx = Context(lambda: "Dota 2 stream.", Unlimited())
     return [r async for r in t.transcribe(_events(*events), ctx)]
 
 
@@ -177,7 +178,7 @@ async def test_a_failing_audio_source_raises_instead_of_hanging() -> None:
     t = _transcriber(FakeGroq())
     with pytest.raises(RuntimeError, match="capture died"):
         async with asyncio.timeout(10):
-            async for _ in t.transcribe(broken(), Context(vocabulary=lambda: "")):
+            async for _ in t.transcribe(broken(), Context(lambda: "", Unlimited())):
                 pass
 
 
@@ -195,7 +196,8 @@ async def test_a_lost_response_is_billed_rather_than_dropped() -> None:
     http = httpx.AsyncClient(transport=httpx.MockTransport(flaky))
     t = GroqTranscriber(http, Secret("k"), sleep=lambda _: asyncio_sleep0())
     pcm, _ = speechlike(12, seed=7)
-    results = [r async for r in t.transcribe(_events(AudioBlock(0, pcm)), Context(lambda: ""))]
+    events = _events(AudioBlock(0, pcm))
+    results = [r async for r in t.transcribe(events, Context(lambda: "", Unlimited()))]
     cost = results[0].cost
     assert cost is not None and cost.usage == AudioSeconds(Decimal(24))  # 2 x 12 s
 
@@ -209,3 +211,25 @@ def test_segments_without_room_merge_into_the_previous_utterance() -> None:
     utterances, text = to_utterances(0, 10_000, body)
     assert [u.text for u in utterances] == ["late one late two"]
     assert text == "late one late two"
+
+
+async def test_a_refused_chunk_is_left_as_a_gap_and_nothing_is_sent() -> None:
+    class RefuseFirst:
+        def __init__(self) -> None:
+            self.asked: list[Decimal] = []
+
+        async def check(self, estimate_usd: Decimal) -> None:
+            self.asked.append(estimate_usd)
+            if len(self.asked) == 1:
+                raise OverBudget(Refusal("month", Decimal(20), Decimal(20), estimate_usd))
+
+    fake = FakeGroq()
+    guard = RefuseFirst()
+    pcm, _ = speechlike(40, seed=9)
+    t = _transcriber(fake)
+    events = _events(AudioBlock(0, pcm), LegEnded())
+    results = [r async for r in t.transcribe(events, Context(lambda: "", guard))]
+    # Three voiced chunks: the first refused (no Result, no request), the others sent.
+    assert len(guard.asked) == 3 and len(fake.requests) == 2
+    assert len(results) == 2 and results[0].start_ms > 0
+    assert all(r.cost is not None for r in results)

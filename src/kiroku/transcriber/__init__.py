@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from kiroku.audio import AudioEvent
+from kiroku.budget import BudgetGuard
 from kiroku.ledger import CostEntry
 
 
@@ -35,6 +36,7 @@ class Result:
 @dataclass(frozen=True, slots=True)
 class Context:
     vocabulary: Callable[[], str]  # read per call: the title (later the Pack) can change
+    guard: BudgetGuard  # asked before every paid call; a refused chunk is left as a gap
     previous_text: str = ""  # tail of the stored transcript, to seed the first prompt
 
 
