@@ -19,6 +19,7 @@ from kiroku.errors import KirokuError
 
 DEFAULT_SECRETS_FILE = Path("~/.config/kiroku/secrets.env").expanduser()
 DEFAULT_DATABASE_URL = "postgresql://kiroku:kiroku@127.0.0.1:5432/kiroku"
+DEFAULT_DATA_DIR = Path("~/.local/share/kiroku").expanduser()
 
 
 class SecretName(StrEnum):
@@ -71,6 +72,7 @@ class Secrets:
 @dataclass(frozen=True, slots=True)
 class Settings:
     database_url: str
+    data_dir: Path  # audio archive: <data_dir>/audio/<channel>/<session>/<leg>.opus
     secrets: Secrets
 
     @classmethod
@@ -83,6 +85,7 @@ class Settings:
         }
         return cls(
             database_url=env.get("KIROKU_DATABASE_URL", DEFAULT_DATABASE_URL),
+            data_dir=Path(env.get("KIROKU_DATA_DIR", DEFAULT_DATA_DIR)).expanduser(),
             secrets=Secrets(values, path),
         )
 

@@ -12,11 +12,21 @@ from contextlib import asynccontextmanager
 import psycopg
 from psycopg import AsyncConnection
 from psycopg.conninfo import conninfo_to_dict
+from psycopg_pool import AsyncConnectionPool
 
 from kiroku.errors import KirokuError
 
+# Small on purpose: a 2 vCPU host, an I/O-bound app, and Postgres max_connections=30.
+POOL_MAX_SIZE = 5
+
+type Pool = AsyncConnectionPool[AsyncConnection]
+
 
 class DatabaseUnavailable(KirokuError):
+    pass
+
+
+class SchemaOutOfDate(KirokuError):
     pass
 
 
@@ -35,3 +45,29 @@ async def connect(database_url: str) -> AsyncGenerator[AsyncConnection]:
         ) from e
     async with conn:
         yield conn
+
+
+@asynccontextmanager
+async def open_pool(database_url: str) -> AsyncGenerator[Pool]:
+    """The pool a long-running process shares across tasks. Connections are autocommit.
+
+    Refuses to start while migrations are pending, so the schema has one trigger
+    (`kiroku db migrate`) and the app never runs against a schema it doesn't expect.
+    """
+    from kiroku.db.migrate import load_migrations, pending, read_applied
+
+    async with connect(database_url) as conn:
+        if pending(load_migrations(), await read_applied(conn)):
+            raise SchemaOutOfDate("the database schema is behind; run `kiroku db migrate`")
+    pool: Pool = AsyncConnectionPool(
+        database_url,
+        min_size=1,
+        max_size=POOL_MAX_SIZE,
+        kwargs={"autocommit": True},
+        open=False,
+    )
+    await pool.open(wait=True, timeout=10)
+    try:
+        yield pool
+    finally:
+        await pool.close()

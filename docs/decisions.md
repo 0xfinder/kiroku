@@ -135,3 +135,21 @@ Chosen for issue #1 by an architect arena. Three independent design candidates (
 - **Rejected: sync code with threads.** SSE and the Telegram long-poll would each need a thread-to-async bridge.
 - **Rejected: pydantic-settings with one global settings object.** Every command would need every key, or every key would be optional and checked separately at each use.
 - **Revisit if:** migrations need rollbacks, or the hand-written runner grows past about 100 lines.
+
+## D23. Live transcript pipeline shape (issue #2); archive files are per capture leg
+
+Chosen by an architect arena: three design candidates (Opus, Sonnet, Haiku) plus a Sonnet cross-judge. Candidate 1 was the base, with grafts from the other two.
+
+- **One archive file per Capture leg**, at `audio/<channel>/<session>/<seq>.opus`. This supersedes D17's single `<session>.opus` path; retention is unchanged. One ffmpeg per leg writes both the Opus file and the PCM the Transcriber reads, so the archive and the transcript share one clock.
+  - **Rejected: one chained Ogg file per session.** It needs page scanning, torn-tail repair, and silence padding after a crash, and browser playback of chained Ogg is unverified.
+- **Session audio clock.** Legs sit back to back on it; wall-clock time lives in `capture_leg.started_at`. `utterance.spoken_at` is derived in SQL from the leg holding the audio, and an utterance with no leg fails NOT NULL.
+- **Session identity is the platform's broadcast id**, which was stable for hours on a live Gorgc stream. A blip, a restart, or a reopen within one broadcast stays one session.
+- **The Transcriber is a stream**: `transcribe(audio events, context) -> AsyncIterator[Result]`. Chunking, retries, and rate limits live inside the Groq adapter, because Muse streams and has no chunks. Transcribers never touch the database.
+  - **Rejected: `transcribe(chunk)`.** It would force Muse into chunk latency and expose chunking to every caller.
+- **Exactly-once.** A `transcript_span` row, its utterances, and its ledger row commit in one transaction keyed by the span's start. A failed commit is retried; the paid call never is. Silent spans are recorded without a paid call.
+- **Silence chunking** uses adaptive 20 ms frame energy in pure Python (about 0.2% of a core): cut at the middle of a 300 ms pause after 15 s, or forced at 25 s on the quietest 100 ms.
+  - **Rejected: ffmpeg `silencedetect`.** Its timestamps arrive on stderr, separate from the audio.
+  - **Rejected: a model VAD.** It adds torch or onnx to a 2 vCPU host.
+- **Stopping cuts the input, not the reader.** The leg ends exactly like a stream drop, so everything ffmpeg received is archived, recorded as the leg's end, and transcribed. SIGTERM (systemd) and SIGINT take this path.
+- **Accepted: a crash loses queued audio from the transcript, not from the archive.** The loss shows up as a gap in `transcript_span` coverage, to be backfilled later (follow-up issue).
+- **Accepted: one Groq request per 15–25 s chunk**, about 1,000–1,400 requests per 6-hour stream. The free tier allows 2,000 requests a day, so two long streams on the same day exceed it.

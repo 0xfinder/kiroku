@@ -4,7 +4,7 @@ Kiroku transcribes live streams (Twitch first), keeps structured notes, sends al
 
 ## Current status
 
-Phase 1 is in progress: the scaffold (CLI, config, Postgres migrations, cost ledger, CI) is in place. Read these before starting work:
+Phase 1 is in progress: the scaffold (CLI, config, Postgres migrations, cost ledger, CI) and the live transcript (`kiroku watch`) are in place. Read these before starting work:
 
 - [PLAN.md](PLAN.md): the pipeline, storage, and phases.
 - [docs/decisions.md](docs/decisions.md): what was decided, why, and what was rejected.
@@ -23,6 +23,8 @@ uv run ruff check && uv run ruff format --check && uv run pyright && uv run pyte
 - CI runs the same four checks against the same compose file. Run all four before pushing.
 - Tests need the compose Postgres and fail (not skip) when it is down. Each test gets its own database cloned from a migrated template, so tests may commit.
 - New migration: `uv run kiroku db new <name>`, then write SQL in the file it prints. Never edit a migration that has been merged; the runner refuses changed checksums.
+- Tests also need `ffmpeg` on PATH; the end-to-end tests run real ffmpeg on synthetic audio (`tests/fakes/`).
+- Run a live session with `KIROKU_DATA_DIR=/tmp/x .venv/bin/kiroku watch <channel>`. Don't use `uv run` when you need a clean stop: `uv run` ends the child during Ctrl-C before it drains the transcript. systemd and the bare binary drain correctly on SIGTERM and SIGINT.
 - If `docker` says permission denied right after Docker was installed, the session predates the `docker` group. Run commands as `sg docker -c "docker compose up -d --wait"`.
 
 ## Workflow

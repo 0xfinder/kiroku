@@ -8,15 +8,24 @@ that run one coroutine each.
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import logging
+import signal
 from collections.abc import Generator
 from contextlib import contextmanager
+from typing import Annotated
 
+import httpx
 import typer
 
-from kiroku.config import Settings
-from kiroku.db import connect
+from kiroku.config import SecretName, Settings
+from kiroku.db import connect, open_pool
 from kiroku.db.migrate import migrate, new_migration
 from kiroku.errors import KirokuError
+from kiroku.sessions import claim_channels
+from kiroku.source import StreamlinkSource
+from kiroku.transcriber.groq import GroqTranscriber
+from kiroku.watch import watch
 
 app = typer.Typer(no_args_is_help=True, help="Transcribe live streams, keep Notes, send Alerts.")
 db_app = typer.Typer(no_args_is_help=True, help="Database schema.")
@@ -54,6 +63,41 @@ def db_new(name: str) -> None:
     """Create an empty migration file named with the current UTC time."""
     with _user_errors():
         typer.echo(str(new_migration(name)))
+
+
+@app.command("watch")
+def watch_command(
+    channels: Annotated[list[str], typer.Argument(help="Twitch logins, e.g. gorgc caedrel")],
+    poll_s: Annotated[float, typer.Option(help="Seconds between live checks.")] = 60.0,
+) -> None:
+    """Watch channels and store a live transcript while they stream. Runs until stopped."""
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+    )
+    # httpx logs every request URL at INFO; keep the log about kiroku.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
+    async def run(settings: Settings) -> None:
+        # systemd stops services with SIGTERM. Treat it like Ctrl-C: cancel, so every live
+        # session ends its leg cleanly and drains its transcription before exit.
+        main = asyncio.current_task()
+        assert main is not None
+        asyncio.get_running_loop().add_signal_handler(signal.SIGTERM, main.cancel)
+        key = settings.secrets.require(SecretName.GROQ)
+        async with (
+            claim_channels(settings.database_url, "twitch", channels) as claimed,
+            open_pool(settings.database_url) as pool,
+            httpx.AsyncClient(timeout=60) as http,
+        ):
+            sources = [(c, StreamlinkSource(c.login)) for c in claimed]
+            await watch(pool, sources, GroqTranscriber(http, key), settings.data_dir, poll_s=poll_s)
+
+    with _user_errors(), contextlib.suppress(KeyboardInterrupt, asyncio.CancelledError):
+        try:
+            asyncio.run(run(Settings.load()))
+        except* KirokuError as group:
+            # One channel's TaskGroup failure arrives as a group; report the first.
+            raise group.exceptions[0] from None
 
 
 def main() -> None:

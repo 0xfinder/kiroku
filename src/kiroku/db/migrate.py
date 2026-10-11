@@ -84,6 +84,16 @@ def pending(available: list[Migration], applied: list[AppliedMigration]) -> list
     return [m for m in available if m.version not in done]
 
 
+async def read_applied(conn: AsyncConnection) -> list[AppliedMigration]:
+    """Migrations recorded in the database; [] for a database never migrated."""
+    cur = await conn.execute("SELECT to_regclass('schema_migration') IS NOT NULL")
+    row = await cur.fetchone()
+    if row is None or not row[0]:
+        return []
+    cur = await conn.execute("SELECT version, checksum FROM schema_migration")
+    return [AppliedMigration(v, c) for v, c in await cur.fetchall()]
+
+
 async def migrate(conn: AsyncConnection) -> list[Migration]:
     """Apply pending migrations and return them; [] when the schema is up to date.
 
@@ -104,9 +114,7 @@ async def migrate(conn: AsyncConnection) -> list[Migration]:
             )
             """
         )
-        cur = await conn.execute("SELECT version, checksum FROM schema_migration")
-        applied = [AppliedMigration(v, c) for v, c in await cur.fetchall()]
-        todo = pending(load_migrations(), applied)
+        todo = pending(load_migrations(), await read_applied(conn))
         for m in todo:
             async with conn.transaction():
                 await conn.execute(m.sql.encode())
