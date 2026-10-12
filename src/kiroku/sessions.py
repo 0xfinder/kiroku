@@ -266,3 +266,18 @@ async def find_session(pool: Pool, channel: Channel, session_id: int | None) -> 
         )
         row = await cur.fetchone()
     return SessionInfo(row[0], row[1]) if row else None
+
+
+async def said_until(pool: Pool, session_id: int, end_ms: int) -> datetime | None:
+    """Speech end on the capture leg holding the Window's last audio sample."""
+    async with pool.connection() as conn:
+        cur = await conn.execute(
+            """
+            SELECT started_at + (%s - audio_start_ms) * interval '1 ms'
+            FROM capture_leg WHERE session_id = %s AND audio_start_ms <= %s
+            ORDER BY audio_start_ms DESC, seq DESC LIMIT 1
+            """,
+            [end_ms, session_id, end_ms - 1],
+        )
+        row = await cur.fetchone()
+    return row[0] if row else None

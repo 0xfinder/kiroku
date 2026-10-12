@@ -18,14 +18,15 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
 import psycopg
 
-from kiroku import backfill, gating, segments, sessions, transcript
+from kiroku import backfill, gating, labels, segments, sessions, transcript
+from kiroku.alerting import AlertWorker
 from kiroku.archive import LengthUnknown
 from kiroku.audio import BYTES_PER_SAMPLE, SAMPLES_PER_MS, AudioBlock, AudioEvent, LegEnded
 from kiroku.budget import Budget
@@ -33,6 +34,7 @@ from kiroku.db import Pool
 from kiroku.gate import Gate
 from kiroku.gate.windows import JSON, Bounds
 from kiroku.gating import GateLoop
+from kiroku.notify import Notifier
 from kiroku.pack import LiveContext, Pack, PackSelector
 from kiroku.sessions import Channel
 from kiroku.source import Capture, NotLive, Online, Probe, ProbeFailed, Source, StreamMeta
@@ -134,11 +136,26 @@ async def watch(
     gate: Gate | None,
     poll_s: float = 60.0,
     select_pack: PackSelector = lambda category: None,
+    alerts: AlertWorker | None = None,
+    notifier: Notifier | None = None,
+    database_url: str | None = None,
 ) -> None:
     """Run until cancelled or a session fails with an error that needs a human. With no
     `gate`, sessions are transcribed but not gated."""
-    services = Services(pool, transcriber, data_dir, budget, gate, select_pack)
+    services = Services(
+        pool,
+        transcriber,
+        data_dir,
+        budget,
+        gate,
+        select_pack,
+        alerts.wake if alerts else lambda: None,
+    )
     async with asyncio.TaskGroup() as tg:
+        if alerts is not None:
+            tg.create_task(alerts.run())
+        if notifier is not None and database_url is not None:
+            tg.create_task(labels.run_taps(pool, database_url, notifier))
         for channel, source in channels:
             tg.create_task(_watch_channel(services, channel, source, poll_s))
 
@@ -153,6 +170,7 @@ class Services:
     budget: Budget
     gate: Gate | None
     select_pack: PackSelector = lambda category: None
+    alerts_wake: Callable[[], None] = lambda: None
 
 
 async def _watch_channel(
@@ -223,6 +241,7 @@ async def _gate_closed_sessions(services: Services, channel: Channel) -> None:
             services.budget.guard(session_id),
             lambda stream=stream: stream,
             use_segments=True,
+            on_commit=services.alerts_wake,
         )
         loop.finish(session_ended=True)
         try:
@@ -277,6 +296,7 @@ class SessionRun:
                 self._stream,
                 live=self._live_for_window,
                 use_segments=True,
+                on_commit=services.alerts_wake,
                 blocked_from=lambda: self._pending_update[1] if self._pending_update else None,
             )
             if services.gate is not None

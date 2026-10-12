@@ -19,7 +19,6 @@ from __future__ import annotations
 import asyncio
 import io
 import logging
-import re
 import time
 import wave
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
@@ -33,6 +32,7 @@ from kiroku.audio import BYTES_PER_SAMPLE, SAMPLE_RATE, AudioBlock, AudioEvent, 
 from kiroku.budget import BudgetGuard, OverBudget
 from kiroku.config import Secret
 from kiroku.errors import KirokuError
+from kiroku.groq_http import retry_delay as retry_delay
 from kiroku.ledger import AudioSeconds, CostEntry, Purpose
 from kiroku.transcriber import Context, Result, Utterance
 from kiroku.transcriber.chunker import Chunk, ChunkPolicy, SilenceChunker
@@ -288,43 +288,6 @@ def billed(duration_ms: int) -> tuple[Decimal, Decimal]:
     """Groq bills max(duration, 10 s) at $0.04 per audio hour. Returns (seconds, usd)."""
     seconds = max(Decimal(duration_ms) / 1000, MIN_BILLED_SECONDS)
     return seconds, (seconds * USD_PER_AUDIO_HOUR / 3600).quantize(Decimal("0.000001"))
-
-
-_GO_DURATION = re.compile(
-    r"(?:(\d+(?:\.\d+)?)h)?(?:(\d+(?:\.\d+)?)m(?!s))?(?:(\d+(?:\.\d+)?)s)?(?:(\d+(?:\.\d+)?)ms)?"
-)
-
-
-def _go_seconds(text: str) -> float | None:
-    """'2m59.56s' -> 179.56, '750ms' -> 0.75. Groq's reset headers use Go durations."""
-    match = _GO_DURATION.fullmatch(text.strip())
-    if not match or not any(match.groups()):
-        return None
-    h, m, s, milli = (float(g) if g else 0.0 for g in match.groups())
-    return h * 3600 + m * 60 + s + milli / 1000
-
-
-def retry_delay(status: int | None, headers: Mapping[str, str], attempt: int) -> float:
-    """Seconds to wait before retrying the same chunk.
-
-    429: `retry-after` if present, else the larger of the audio-seconds and request reset
-    headers. Otherwise (5xx, network): 1, 2, 4 ... seconds, capped at 60.
-    """
-    backoff = float(min(2 ** (attempt - 1), 60))
-    if status != 429:
-        return backoff
-    if (value := headers.get("retry-after")) is not None:
-        try:
-            return max(float(value), 1.0)
-        except ValueError:
-            pass
-    resets = [
-        _go_seconds(headers[h])
-        for h in ("x-ratelimit-reset-audio-seconds", "x-ratelimit-reset-requests")
-        if h in headers
-    ]
-    waits = [r for r in resets if r is not None]
-    return max(waits) if waits else backoff
 
 
 def to_utterances(

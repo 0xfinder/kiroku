@@ -1,0 +1,87 @@
+{
+  "origin": "synthesized: no human tap within 20 minutes",
+  "label": [
+    1,
+    true,
+    "telegram",
+    1
+  ],
+  "calls": [
+    {
+      "origin": "synthesized from Telegram Bot API docs",
+      "method": "getUpdates",
+      "request": {
+        "timeout": 50,
+        "allowed_updates": [
+          "callback_query"
+        ]
+      },
+      "response": {
+        "ok": true,
+        "result": [
+          {
+            "update_id": 1,
+            "callback_query": {
+              "id": "<CALLBACK_QUERY_ID>",
+              "from": {
+                "id": "<CHAT_ID>",
+                "is_bot": false,
+                "first_name": "Test"
+              },
+              "message": {
+                "message_id": 1045,
+                "date": 1791798692,
+                "chat": {
+                  "id": "<CHAT_ID>",
+                  "type": "private"
+                }
+              },
+              "data": "l:1:y"
+            }
+          }
+        ]
+      },
+      "status": 200
+    },
+    {
+      "origin": "synthesized from Telegram Bot API docs",
+      "method": "answerCallbackQuery",
+      "request": {
+        "callback_query_id": "<CALLBACK_QUERY_ID>",
+        "text": "Saved \ud83d\udc4d"
+      },
+      "response": {
+        "ok": true,
+        "result": true
+      },
+      "status": 200
+    },
+    {
+      "origin": "synthesized from Telegram Bot API docs",
+      "method": "editMessageReplyMarkup",
+      "request": {
+        "chat_id": "<CHAT_ID>",
+        "message_id": 1045,
+        "reply_markup": {
+          "inline_keyboard": [
+            [
+              {
+                "text": "\ud83d\udc4d \u2713",
+                "callback_data": "l:1:y"
+              },
+              {
+                "text": "\ud83d\udc4e",
+                "callback_data": "l:1:n"
+              }
+            ]
+          ]
+        }
+      },
+      "response": {
+        "ok": true,
+        "result": true
+      },
+      "status": 200
+    }
+  ]
+}

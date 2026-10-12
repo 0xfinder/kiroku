@@ -1,0 +1,543 @@
+{
+  "origin": "live Bot API",
+  "calls": [
+    {
+      "method": "sendMessage",
+      "request": {
+        "chat_id": "<CHAT_ID>",
+        "text": "\ud83d\udd14 <b>gorgc</b> \u00b7 predicts_winner\nkiroku test: Gorgc rates Spirit about 70-30 to beat PARIVISION in this game.\n09:51 UTC \u00b7 Gate 0.68",
+        "parse_mode": "HTML",
+        "link_preview_options": {
+          "is_disabled": true
+        },
+        "reply_markup": {
+          "inline_keyboard": [
+            [
+              {
+                "text": "\ud83d\udc4d",
+                "callback_data": "l:1:y"
+              },
+              {
+                "text": "\ud83d\udc4e",
+                "callback_data": "l:1:n"
+              }
+            ]
+          ]
+        }
+      },
+      "response": {
+        "ok": true,
+        "result": {
+          "message_id": 1045,
+          "from": {
+            "id": 8517072900,
+            "is_bot": true
+          },
+          "chat": {
+            "id": "<CHAT_ID>",
+            "type": "private"
+          },
+          "date": 1791798692,
+          "text": "\ud83d\udd14 gorgc \u00b7 predicts_winner\nkiroku test: Gorgc rates Spirit about 70-30 to beat PARIVISION in this game.\n09:51 UTC \u00b7 Gate 0.68",
+          "entities": [
+            {
+              "offset": 3,
+              "length": 5,
+              "type": "bold"
+            }
+          ],
+          "reply_markup": {
+            "inline_keyboard": [
+              [
+                {
+                  "text": "\ud83d\udc4d",
+                  "callback_data": "l:1:y"
+                },
+                {
+                  "text": "\ud83d\udc4e",
+                  "callback_data": "l:1:n"
+                }
+              ]
+            ]
+          }
+        }
+      },
+      "status": 200,
+      "headers": {}
+    },
+    {
+      "method": "getUpdates",
+      "request": {
+        "timeout": 50,
+        "allowed_updates": [
+          "callback_query"
+        ]
+      },
+      "response": {
+        "ok": true,
+        "result": [
+          {
+            "update_id": 13463443,
+            "message": {
+              "message_id": 1043,
+              "from": {
+                "id": "<CHAT_ID>",
+                "is_bot": false,
+                "language_code": "en"
+              },
+              "chat": {
+                "id": "<CHAT_ID>",
+                "type": "private"
+              },
+              "date": 1791796692,
+              "text": "/start",
+              "entities": [
+                {
+                  "offset": 0,
+                  "length": 6,
+                  "type": "bot_command"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "status": 200,
+      "headers": {}
+    },
+    {
+      "method": "getUpdates",
+      "request": {
+        "timeout": 50,
+        "allowed_updates": [
+          "callback_query"
+        ],
+        "offset": 13463444
+      },
+      "response": {
+        "ok": true,
+        "result": []
+      },
+      "status": 200,
+      "headers": {}
+    },
+    {
+      "method": "getUpdates",
+      "request": {
+        "timeout": 50,
+        "allowed_updates": [
+          "callback_query"
+        ],
+        "offset": 13463444
+      },
+      "response": {
+        "ok": true,
+        "result": []
+      },
+      "status": 200,
+      "headers": {}
+    },
+    {
+      "method": "getUpdates",
+      "request": {
+        "timeout": 50,
+        "allowed_updates": [
+          "callback_query"
+        ],
+        "offset": 13463444
+      },
+      "response": {
+        "ok": true,
+        "result": []
+      },
+      "status": 200,
+      "headers": {}
+    },
+    {
+      "method": "getUpdates",
+      "request": {
+        "timeout": 50,
+        "allowed_updates": [
+          "callback_query"
+        ],
+        "offset": 13463444
+      },
+      "response": {
+        "ok": true,
+        "result": []
+      },
+      "status": 200,
+      "headers": {}
+    },
+    {
+      "method": "getUpdates",
+      "request": {
+        "timeout": 50,
+        "allowed_updates": [
+          "callback_query"
+        ],
+        "offset": 13463444
+      },
+      "response": {
+        "ok": true,
+        "result": []
+      },
+      "status": 200,
+      "headers": {}
+    },
+    {
+      "method": "getUpdates",
+      "request": {
+        "timeout": 50,
+        "allowed_updates": [
+          "callback_query"
+        ],
+        "offset": 13463444
+      },
+      "response": {
+        "ok": true,
+        "result": []
+      },
+      "status": 200,
+      "headers": {}
+    },
+    {
+      "method": "getUpdates",
+      "request": {
+        "timeout": 50,
+        "allowed_updates": [
+          "callback_query"
+        ],
+        "offset": 13463444
+      },
+      "response": {
+        "ok": true,
+        "result": []
+      },
+      "status": 200,
+      "headers": {}
+    },
+    {
+      "method": "getUpdates",
+      "request": {
+        "timeout": 50,
+        "allowed_updates": [
+          "callback_query"
+        ],
+        "offset": 13463444
+      },
+      "response": {
+        "ok": true,
+        "result": []
+      },
+      "status": 200,
+      "headers": {}
+    },
+    {
+      "method": "getUpdates",
+      "request": {
+        "timeout": 50,
+        "allowed_updates": [
+          "callback_query"
+        ],
+        "offset": 13463444
+      },
+      "response": {
+        "ok": true,
+        "result": []
+      },
+      "status": 200,
+      "headers": {}
+    },
+    {
+      "method": "getUpdates",
+      "request": {
+        "timeout": 50,
+        "allowed_updates": [
+          "callback_query"
+        ],
+        "offset": 13463444
+      },
+      "response": {
+        "ok": true,
+        "result": []
+      },
+      "status": 200,
+      "headers": {}
+    },
+    {
+      "method": "getUpdates",
+      "request": {
+        "timeout": 50,
+        "allowed_updates": [
+          "callback_query"
+        ],
+        "offset": 13463444
+      },
+      "response": {
+        "ok": true,
+        "result": []
+      },
+      "status": 200,
+      "headers": {}
+    },
+    {
+      "method": "getUpdates",
+      "request": {
+        "timeout": 50,
+        "allowed_updates": [
+          "callback_query"
+        ],
+        "offset": 13463444
+      },
+      "response": {
+        "ok": true,
+        "result": []
+      },
+      "status": 200,
+      "headers": {}
+    },
+    {
+      "method": "getUpdates",
+      "request": {
+        "timeout": 50,
+        "allowed_updates": [
+          "callback_query"
+        ],
+        "offset": 13463444
+      },
+      "response": {
+        "ok": true,
+        "result": []
+      },
+      "status": 200,
+      "headers": {}
+    },
+    {
+      "method": "getUpdates",
+      "request": {
+        "timeout": 50,
+        "allowed_updates": [
+          "callback_query"
+        ],
+        "offset": 13463444
+      },
+      "response": {
+        "ok": true,
+        "result": []
+      },
+      "status": 200,
+      "headers": {}
+    },
+    {
+      "method": "getUpdates",
+      "request": {
+        "timeout": 50,
+        "allowed_updates": [
+          "callback_query"
+        ],
+        "offset": 13463444
+      },
+      "response": {
+        "ok": true,
+        "result": []
+      },
+      "status": 200,
+      "headers": {}
+    },
+    {
+      "method": "getUpdates",
+      "request": {
+        "timeout": 50,
+        "allowed_updates": [
+          "callback_query"
+        ],
+        "offset": 13463444
+      },
+      "response": {
+        "ok": true,
+        "result": []
+      },
+      "status": 200,
+      "headers": {}
+    },
+    {
+      "method": "getUpdates",
+      "request": {
+        "timeout": 50,
+        "allowed_updates": [
+          "callback_query"
+        ],
+        "offset": 13463444
+      },
+      "response": {
+        "ok": true,
+        "result": []
+      },
+      "status": 200,
+      "headers": {}
+    },
+    {
+      "method": "getUpdates",
+      "request": {
+        "timeout": 50,
+        "allowed_updates": [
+          "callback_query"
+        ],
+        "offset": 13463444
+      },
+      "response": {
+        "ok": true,
+        "result": []
+      },
+      "status": 200,
+      "headers": {}
+    },
+    {
+      "method": "getUpdates",
+      "request": {
+        "timeout": 50,
+        "allowed_updates": [
+          "callback_query"
+        ],
+        "offset": 13463444
+      },
+      "response": {
+        "ok": true,
+        "result": []
+      },
+      "status": 200,
+      "headers": {}
+    },
+    {
+      "method": "getUpdates",
+      "request": {
+        "timeout": 50,
+        "allowed_updates": [
+          "callback_query"
+        ],
+        "offset": 13463444
+      },
+      "response": {
+        "ok": true,
+        "result": []
+      },
+      "status": 200,
+      "headers": {}
+    },
+    {
+      "method": "getUpdates",
+      "request": {
+        "timeout": 50,
+        "allowed_updates": [
+          "callback_query"
+        ],
+        "offset": 13463444
+      },
+      "response": {
+        "ok": true,
+        "result": []
+      },
+      "status": 200,
+      "headers": {}
+    },
+    {
+      "method": "getUpdates",
+      "request": {
+        "timeout": 50,
+        "allowed_updates": [
+          "callback_query"
+        ],
+        "offset": 13463444
+      },
+      "response": {
+        "ok": true,
+        "result": []
+      },
+      "status": 200,
+      "headers": {}
+    },
+    {
+      "method": "getUpdates",
+      "request": {
+        "timeout": 50,
+        "allowed_updates": [
+          "callback_query"
+        ],
+        "offset": 13463444
+      },
+      "response": {
+        "ok": true,
+        "result": []
+      },
+      "status": 200,
+      "headers": {}
+    },
+    {
+      "method": "editMessageText",
+      "request": {
+        "chat_id": "<CHAT_ID>",
+        "message_id": 1045,
+        "text": "kiroku test:\n\ud83d\udd14 <b>gorgc</b> \u00b7 predicts_winner\nGorgc rates Spirit about 70-30 to beat PARIVISION in this game.\n09:51 UTC \u00b7 Gate 0.68",
+        "parse_mode": "HTML",
+        "reply_markup": {
+          "inline_keyboard": [
+            [
+              {
+                "text": "\ud83d\udc4d",
+                "callback_data": "l:1:y"
+              },
+              {
+                "text": "\ud83d\udc4e",
+                "callback_data": "l:1:n"
+              }
+            ]
+          ]
+        },
+        "link_preview_options": {
+          "is_disabled": true
+        }
+      },
+      "response": {
+        "ok": true,
+        "result": {
+          "message_id": 1045,
+          "from": {
+            "id": 8517072900,
+            "is_bot": true
+          },
+          "chat": {
+            "id": "<CHAT_ID>",
+            "type": "private"
+          },
+          "date": 1791798692,
+          "edit_date": 1791801175,
+          "text": "kiroku test:\n\ud83d\udd14 gorgc \u00b7 predicts_winner\nGorgc rates Spirit about 70-30 to beat PARIVISION in this game.\n09:51 UTC \u00b7 Gate 0.68",
+          "entities": [
+            {
+              "offset": 16,
+              "length": 5,
+              "type": "bold"
+            }
+          ],
+          "reply_markup": {
+            "inline_keyboard": [
+              [
+                {
+                  "text": "\ud83d\udc4d",
+                  "callback_data": "l:1:y"
+                },
+                {
+                  "text": "\ud83d\udc4e",
+                  "callback_data": "l:1:n"
+                }
+              ]
+            ]
+          }
+        }
+      },
+      "status": 200,
+      "headers": {}
+    }
+  ]
+}
