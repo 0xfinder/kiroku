@@ -263,3 +263,16 @@ Freshness uses the capture leg holding the Window's last sample, including recon
 `👍` means the Rule applied to that decision's `new`; `👎` means it did not. Callbacks name the alert id. Lock that row, verify the existing external id when present, upsert one Label per decision and source, then acknowledge the callback and show its selection. An unconfirmed send becomes `sent` in the same transaction, with the callback's chat/message id and message date. Redelivery is idempotent; a later opposite tap changes the verdict. The advisory lock gives the bot one poller across watch processes. Contenders wait and take ownership when the owner stops; database connection failures retry rather than permanently disabling Labels.
 
 Rejected: inline sends in GateLoop, a per-session alert worker that misses closed-session Windows, Rule-global Cooldown, a second classifier veto, and extra attempt/cursor tables. Bug recovery marks an affected decision failed before send, or unconfirmed after send starts, then continues; an inability to write that recovery stops Alerts for the process. Known limits include model nondeterminism, coarse keys that can combine adjacent games, and the crash gap between a billed LLM response and its transaction. Live runs and offline acceptance results are recorded in spikes/README.md.
+
+
+## D30. Authentication recovery and bounded Alert shutdown (issue #5 review)
+
+2026-10-12. Supersedes D29's per-send shutdown drain and callback-date details. Clarifies D24's primary-auth stop behavior and D20's Fallback bypass.
+
+A primary Jev authentication error stops gating for the session, but never consumes the Window. Possibly billed costs use a separate session ledger transaction. A nullable unique idempotency key on each standalone cost makes database retries safe after a lost commit acknowledgement. Restarting with a fixed key gates the original transcript. Fallback authentication failure disables only the Fallback for the process, logs its auth error once, and fails the affected Window with combined costs. Each later Window still tries Jev.
+
+Shutdown first stops channels and drains transcription and their final Gate passes. The process-wide worker then gets up to 20 seconds to drain fresh decisions. It and the tap poller are cancelled afterwards. A second signal interrupts either drain. Pending sends interrupted by cancellation keep the existing at-most-once recovery behavior.
+
+A send needs at least five seconds remaining before its deadline, plus the pacing wait. Insufficient time produces `stale` without sending or starting Cooldown. A started send gets its normal 15-second request timeout; staleness gates the start. Callbacks with a missing message date or `date: 0` confirm uncertain delivery at receipt time instead of 1970.
+
+Rejected: consuming a Window to persist primary-auth costs, stopping the primary for a Fallback key error, and cancelling the worker before final Gate decisions exist. Regression coverage includes a real ffmpeg shutdown replay, second-signal interruption, lost ledger acknowledgements, deadline pacing, and inaccessible callbacks.

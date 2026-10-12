@@ -47,6 +47,7 @@ CAPTURE_STOP_TIMEOUT_S = 15.0
 DRAIN_TIMEOUT_S = 120.0
 BACKFILL_STOP_TIMEOUT_S = 30.0  # one in-flight Transcriber call; the rest waits for next start
 GATE_DRAIN_TIMEOUT_S = 60.0
+ALERT_DRAIN_TIMEOUT_S = 20.0
 PACK_REFRESH_S = 60.0
 
 # ---- lifecycle: pure ---------------------------------------------------------------------
@@ -151,13 +152,46 @@ async def watch(
         select_pack,
         alerts.wake if alerts else lambda: None,
     )
-    async with asyncio.TaskGroup() as tg:
+    background: list[asyncio.Task[None]] = []
+    worker: asyncio.Task[None] | None = None
+    try:
         if alerts is not None:
-            tg.create_task(alerts.run())
+            worker = asyncio.create_task(alerts.run())
+            background.append(worker)
         if notifier is not None and database_url is not None:
-            tg.create_task(labels.run_taps(pool, database_url, notifier))
-        for channel, source in channels:
-            tg.create_task(_watch_channel(services, channel, source, poll_s))
+            background.append(asyncio.create_task(labels.run_taps(pool, database_url, notifier)))
+        try:
+            channel_tasks = [
+                asyncio.create_task(_watch_channel(services, channel, source, poll_s))
+                for channel, source in channels
+            ]
+            try:
+                # gather forwards repeated cancellation to channels already draining.
+                # Python 3.12 TaskGroup only cancels its children on the first signal.
+                await asyncio.gather(*channel_tasks)
+            finally:
+                for task in channel_tasks:
+                    if not task.done():
+                        task.cancel()
+                await asyncio.gather(*channel_tasks, return_exceptions=True)
+        finally:
+            current = asyncio.current_task()
+            # Channels and their SessionRuns have stopped. A second
+            # signal during that stop skips Alert draining as well.
+            if (
+                alerts is not None
+                and worker is not None
+                and (current is None or current.cancelling() < 2)
+            ):
+                alerts.finish()
+                try:
+                    await asyncio.wait_for(asyncio.shield(worker), ALERT_DRAIN_TIMEOUT_S)
+                except TimeoutError:
+                    log.warning("Alert drain timed out; remaining decisions wait for restart")
+    finally:
+        for task in background:
+            task.cancel()
+        await asyncio.gather(*background, return_exceptions=True)
 
 
 @dataclass(frozen=True, slots=True)

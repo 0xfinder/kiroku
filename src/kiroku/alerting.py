@@ -5,19 +5,19 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-from collections.abc import Awaitable, Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any, cast
 
 import psycopg
-from psycopg import AsyncConnection
+from psycopg import AsyncConnection, sql
 from psycopg.types.json import Jsonb
 
 from kiroku import extraction, ledger, sessions
 from kiroku.budget import Budget, OverBudget
-from kiroku.db import Pool
+from kiroku.db import Pool, retrying
 from kiroku.extraction import Previous
 from kiroku.gate.windows import JSON, GateState
 from kiroku.ledger import CostEntry
@@ -27,6 +27,7 @@ from kiroku.notify import (
     Delivery,
     Notifier,
     NotifierRejected,
+    NotifierStale,
     NotifierUnavailable,
     NotifierUnsure,
 )
@@ -87,15 +88,24 @@ class Sending:
     costs: tuple[CostEntry, ...]
 
 
-type Decided = Stale | Cooldown | Duplicate | Sending
+@dataclass(frozen=True, slots=True)
+class Failed:
+    game_key: str
+    content: Content
+    notifier: str
+    reason: str
+
+
+type Decided = Stale | Cooldown | Duplicate | Sending | Failed
 
 
 async def pending(pool: Pool, channel_ids: Sequence[int]) -> list[Candidate]:
     async with pool.connection() as conn:
         cur = await conn.execute(
-            """
+            sql.SQL("""
             SELECT d.id, d.rule_id, d.probability, w.session_id, s.channel_id, c.login,
-                   w.start_ms, w.end_ms, w.started_at, w.state, w.game_key, w.model,
+                   w.start_ms, w.end_ms, w.started_at, speech.said_until,
+                   w.state, w.game_key, w.model,
                    coalesce((SELECT max(g.start_ms) FROM segment g
                              WHERE g.session_id = w.session_id AND g.start_ms <= w.start_ms), 0),
                    r.name, d.question, r.cooldown_s
@@ -104,17 +114,37 @@ async def pending(pool: Pool, channel_ids: Sequence[int]) -> list[Candidate]:
             JOIN stream_session s ON s.id = w.session_id
             JOIN channel c ON c.id = s.channel_id
             JOIN rule r ON r.id = d.rule_id
+            LEFT JOIN LATERAL ({speech}) speech ON true
             WHERE d.passed AND s.channel_id = ANY(%s)
               AND NOT EXISTS (SELECT 1 FROM alert a WHERE a.decision_id = d.id)
             ORDER BY w.started_at NULLS FIRST, w.session_id, w.start_ms, d.rule_id LIMIT 20
-            """,
+            """).format(
+                speech=sessions.said_until_sql(sql.SQL("w.session_id"), sql.SQL("w.end_ms"))
+            ),
             [list(channel_ids)],
         )
         rows = await cur.fetchall()
     out: list[Candidate] = []
-    for d, r, p, s, c, channel, start, end, said, raw, key, model, segment, name, q, cd in rows:
+    for (
+        d,
+        r,
+        p,
+        s,
+        c,
+        channel,
+        start,
+        end,
+        said,
+        until,
+        raw,
+        key,
+        model,
+        segment,
+        name,
+        q,
+        cd,
+    ) in rows:
         state = cast(dict[str, Any], raw)
-        until = await sessions.said_until(pool, s, end)
         out.append(
             Candidate(
                 d,
@@ -235,6 +265,8 @@ async def commit(pool: Pool, candidate: Candidate, decided: Decided) -> int | No
             outcome = "sending"
             degraded = content.get("degraded")
             reason = degraded if isinstance(degraded, str) else None
+        case Failed(key, content, notifier, reason):
+            outcome = "failed"
     async with pool.connection() as conn, conn.transaction():
         cur = await conn.execute(
             """
@@ -273,6 +305,15 @@ async def mark_sent(pool: Pool, alert_id: int, delivery: Delivery, at: datetime)
             "UPDATE alert SET outcome = 'sent', external_id = %s, sent_at = %s "
             "WHERE id = %s AND outcome = 'sending'",
             [delivery.external_id, at, alert_id],
+        )
+
+
+async def mark_stale(pool: Pool, alert_id: int, reason: str) -> None:
+    async with pool.connection() as conn:
+        await conn.execute(
+            "UPDATE alert SET outcome = 'stale', notifier = NULL, reason = %s "
+            "WHERE id = %s AND outcome = 'sending'",
+            [reason, alert_id],
         )
 
 
@@ -330,17 +371,6 @@ async def recent(
         return list(await cur.fetchall())
 
 
-async def _retry[T](operation: Callable[[], Awaitable[T]]) -> T:
-    delay = 1.0
-    while True:
-        try:
-            return await operation()
-        except psycopg.OperationalError:
-            log.warning("Alert database write failed; retrying")
-            await asyncio.sleep(delay)
-            delay = min(delay * 2, 30.0)
-
-
 class AlertWorker:
     def __init__(
         self,
@@ -359,10 +389,16 @@ class AlertWorker:
         self._notifier, self._budget, self._now = notifier, budget, now
         self._stale_after, self._coarse_gap, self._poll_s = stale_after, coarse_gap, poll_s
         self._wake = asyncio.Event()
+        self._finishing = False
         self._errors: set[str] = set()
 
     def wake(self) -> None:
         self._wake.set()
+
+    def finish(self) -> None:
+        """Do a final drain after all channels have committed their final Gate passes."""
+        self._finishing = True
+        self.wake()
 
     def _stale(self, candidate: Candidate) -> bool:
         return (
@@ -373,13 +409,16 @@ class AlertWorker:
 
     async def run(self) -> None:
         try:
-            await _retry(lambda: recover(self._pool, self._channels))
+            await retrying("Alert database write", lambda: recover(self._pool, self._channels))
             while True:
                 self._wake.clear()
+                finishing = self._finishing
                 try:
                     await self.drain()
                 except psycopg.OperationalError:
                     log.warning("Alert database read failed; retrying")
+                if finishing:
+                    return
                 with contextlib.suppress(TimeoutError):
                     await asyncio.wait_for(self._wake.wait(), self._poll_s)
         except Exception as e:
@@ -411,28 +450,28 @@ class AlertWorker:
             ).fetchone()
         if row is not None:
             if row[1] == "sending":
-                await _retry(lambda: mark_unconfirmed(self._pool, row[0], reason))
+                await retrying(
+                    "Alert database write", lambda: mark_unconfirmed(self._pool, row[0], reason)
+                )
             return
         if candidate.said_at is None or candidate.said_until is None:
             await self._commit(candidate, Stale())
             return
         key = await game_key(self._pool, candidate, self._coarse_gap)
-        alert_id = await self._commit(
+        await self._commit(
             candidate,
-            Sending(
+            Failed(
                 key,
                 {"degraded": reason, "excerpt": candidate.state.new[-280:]},
-                None,
-                None,
                 self._notifier.name,
-                (),
+                reason,
             ),
         )
-        if alert_id is not None:
-            await _retry(lambda: mark_failed(self._pool, alert_id, reason))
 
     async def _commit(self, candidate: Candidate, decided: Decided) -> int | None:
-        return await _retry(lambda: commit(self._pool, candidate, decided))
+        return await retrying(
+            "Alert database write", lambda: commit(self._pool, candidate, decided)
+        )
 
     async def _one(self, candidate: Candidate) -> None:
         if self._stale(candidate):
@@ -480,23 +519,17 @@ class AlertWorker:
         decided = Sending(
             key, content, prev.alert_id if prev else None, model, self._notifier.name, costs
         )
-        task = asyncio.create_task(self._deliver(candidate, decided))
-        try:
-            await asyncio.shield(task)
-        except asyncio.CancelledError:
-            try:
-                await asyncio.wait_for(asyncio.shield(task), 15.0)
-            except TimeoutError:
-                task.cancel()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await task
-            raise
+        await self._deliver(candidate, decided)
 
     async def _deliver(self, candidate: Candidate, decided: Sending) -> None:
+        assert candidate.said_at is not None and candidate.said_until is not None
+        left = (candidate.said_until + self._stale_after - self._now()).total_seconds()
+        if left < 5.0:
+            await self._commit(candidate, Stale(decided.content, decided.costs))
+            return
         alert_id = await self._commit(candidate, decided)
         if alert_id is None:
             return
-        assert candidate.said_at is not None and candidate.said_until is not None
         content = decided.content
         degraded = content.get("degraded")
         quote = content.get("quote")
@@ -516,14 +549,24 @@ class AlertWorker:
         left = (candidate.said_until + self._stale_after - self._now()).total_seconds()
         try:
             delivery = await self._notifier.send(message, give_up_s=min(120.0, max(0.0, left)))
+        except NotifierStale as e:
+            reason = str(e)
+            await retrying("Alert database write", lambda: mark_stale(self._pool, alert_id, reason))
         except (NotifierUnavailable, NotifierRejected) as e:
             reason = str(e)
             if reason not in self._errors:
                 self._errors.add(reason)
                 log.error("Alert delivery failed: %s", reason)
-            await _retry(lambda: mark_failed(self._pool, alert_id, reason))
+            await retrying(
+                "Alert database write", lambda: mark_failed(self._pool, alert_id, reason)
+            )
         except NotifierUnsure as e:
             reason = str(e)
-            await _retry(lambda: mark_unconfirmed(self._pool, alert_id, reason))
+            await retrying(
+                "Alert database write", lambda: mark_unconfirmed(self._pool, alert_id, reason)
+            )
         else:
-            await _retry(lambda: mark_sent(self._pool, alert_id, delivery, self._now()))
+            await retrying(
+                "Alert database write",
+                lambda: mark_sent(self._pool, alert_id, delivery, self._now()),
+            )

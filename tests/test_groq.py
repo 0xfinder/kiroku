@@ -323,3 +323,74 @@ async def test_background_calls_are_spaced_across_sessions() -> None:
     assert len(fake.requests) >= 4
     assert len(sleeps) == len(fake.requests) - 1, "every background call after the first waits"
     assert all(BACKGROUND_INTERVAL_S - 1 < s <= BACKGROUND_INTERVAL_S for s in sleeps)
+
+
+async def test_audio_limit_uses_exhausted_audio_reset() -> None:
+    fake = FakeGroq(
+        [
+            httpx.Response(
+                429,
+                headers={
+                    "x-ratelimit-remaining-audio-seconds": "0",
+                    "x-ratelimit-reset-audio-seconds": "7s",
+                    "x-ratelimit-remaining-requests": "999",
+                    "x-ratelimit-reset-requests": "1h20m",
+                    "retry-after": "1",
+                },
+            )
+        ]
+    )
+    waits: list[float] = []
+    pcm, _ = speechlike(12, seed=3)
+    results = await _collect(_transcriber(fake, waits), AudioBlock(0, pcm))
+    assert len(fake.requests) == 2 and len(results) == 1
+    assert 6 < waits[0] <= 7
+    assert _without_boundary(fake.requests[0]) == _without_boundary(fake.requests[1])
+
+
+@pytest.mark.parametrize(
+    "headers, expected",
+    [
+        ({"x-ratelimit-reset-tokens": "2s", "x-ratelimit-reset-requests": "1h20m"}, 2),
+        ({"retry-after": "3", "x-ratelimit-reset-requests": "1h20m"}, 3),
+        (
+            {
+                "x-ratelimit-remaining-requests": "0",
+                "x-ratelimit-reset-requests": "1h20m",
+                "x-ratelimit-reset-tokens": "2s",
+            },
+            4800,
+        ),
+        (
+            {
+                "x-ratelimit-remaining-tokens": "0",
+                "x-ratelimit-reset-tokens": "broken",
+                "retry-after": "4",
+            },
+            4,
+        ),
+        ({}, 4),
+    ],
+)
+def test_rate_limit_selects_exhausted_limit_or_shortest_reset(
+    headers: dict[str, str],
+    expected: float,
+) -> None:
+    from kiroku.groq_http import retry_delay as llm_retry_delay
+
+    assert llm_retry_delay(429, headers, 3) == expected
+
+
+def test_whisper_keeps_previous_reset_behavior_without_exhaustion_headers() -> None:
+    assert (
+        retry_delay(
+            429,
+            {
+                "x-ratelimit-reset-audio-seconds": "7s",
+                "x-ratelimit-reset-requests": "20s",
+                "x-ratelimit-reset-tokens": "1h20m",
+            },
+            1,
+        )
+        == 20
+    )

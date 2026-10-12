@@ -96,10 +96,13 @@ class GateAnswer:
 class GateFailed(Exception):
     """No answer for this Window. `costs` holds anything that may have been billed anyway."""
 
-    def __init__(self, reason: str, costs: tuple[CostEntry, ...] = ()) -> None:
+    def __init__(
+        self, reason: str, costs: tuple[CostEntry, ...] = (), *, reported: bool = False
+    ) -> None:
         super().__init__(reason)
         self.reason = reason
         self.costs = costs
+        self.reported = reported
 
 
 class GateUnavailable(GateFailed):

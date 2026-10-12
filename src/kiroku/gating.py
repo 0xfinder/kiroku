@@ -29,7 +29,7 @@ from psycopg.types.json import Jsonb
 
 from kiroku import ledger, rules, segments
 from kiroku.budget import BudgetGuard, OverBudget
-from kiroku.db import Pool
+from kiroku.db import Pool, retrying
 from kiroku.gate import (
     Gate,
     GateAnswer,
@@ -323,9 +323,7 @@ class GateLoop:
                 outcome = await self._ask(state, questions)
             except GateAuthError as e:
                 if e.costs:
-                    await self._commit(
-                        bounds, state, questions, NotAsked(Status.FAILED, str(e), e.costs)
-                    )
+                    await ledger.record_session_costs(self._pool, self._session_id, e.costs)
                 raise
             game_key = (
                 live.game_key
@@ -346,7 +344,8 @@ class GateLoop:
         except OverBudget as e:
             return NotAsked(Status.OVER_BUDGET, str(e.refusal), e.costs)
         except GateFailed as e:
-            log.error("session %d: Gate failed: %s", self._session_id, e.reason)
+            if not e.reported:
+                log.error("session %d: Gate failed: %s", self._session_id, e.reason)
             return NotAsked(Status.FAILED, e.reason, e.costs)
 
     async def _commit(
@@ -358,25 +357,20 @@ class GateLoop:
         game_key: str | None = None,
     ) -> None:
         """Retry the commit, never the paid call that produced the outcome."""
-        delay = 1.0
-        while True:
-            try:
-                await commit(
-                    self._pool,
-                    self._session_id,
-                    self._transcriber,
-                    bounds,
-                    state,
-                    questions,
-                    outcome,
-                    game_key,
-                )
-                self._on_commit()
-                return
-            except psycopg.OperationalError as e:
-                log.warning("session %d: Gate commit failed (%s); retrying", self._session_id, e)
-                await asyncio.sleep(delay)
-                delay = min(delay * 2, 30.0)
+        await retrying(
+            f"session {self._session_id}: Gate commit",
+            lambda: commit(
+                self._pool,
+                self._session_id,
+                self._transcriber,
+                bounds,
+                state,
+                questions,
+                outcome,
+                game_key,
+            ),
+        )
+        self._on_commit()
 
 
 def _log_window(
