@@ -21,7 +21,7 @@ from kiroku.notify import (
     AlertMessage,
     Delivery,
     NotifierRejected,
-    NotifierUnavailable,
+    NotifierStale,
     NotifierUnsure,
     Tap,
 )
@@ -67,7 +67,12 @@ def integer(raw: object) -> int:
     return raw
 
 
-def parse_tap(raw: Mapping[str, Any], chat_id: int) -> Tap | None:
+def parse_tap(
+    raw: Mapping[str, Any],
+    chat_id: int,
+    *,
+    now: Callable[[], datetime] = lambda: datetime.now(UTC),
+) -> Tap | None:
     callback = object_body(raw["callback_query"])
     message = object_body(callback["message"])
     chat = object_body(message["chat"])
@@ -84,12 +89,13 @@ def parse_tap(raw: Mapping[str, Any], chat_id: int) -> Tap | None:
     if not isinstance(query_id, str):
         raise TypeError("expected callback id")
     message_id = integer(message["message_id"])
+    date = message.get("date")
     return Tap(
         alert_id,
         match[2] == "y",
         Callback(query_id, message_id),
         Delivery(f"{chat_id}:{message_id}"),
-        datetime.fromtimestamp(integer(message["date"]), UTC),
+        now() if date is None or integer(date) == 0 else datetime.fromtimestamp(integer(date), UTC),
     )
 
 
@@ -141,14 +147,16 @@ class TelegramNotifier:
         while True:
             wait = max(wait, self._not_before - self._clock(), 0.0)
             left = give_up_s - (self._clock() - first)
-            if left <= 0 or wait >= left:
-                raise NotifierUnavailable("Telegram retry deadline reached")
+            if left < 5.0 + wait:
+                raise NotifierStale("Telegram send deadline too close")
             if wait:
                 await self._sleep(wait)
+                if give_up_s - (self._clock() - first) < 5.0:
+                    raise NotifierStale("Telegram send deadline too close")
             attempt += 1
             self._not_before = max(self._not_before, self._clock() + 1.0)
             try:
-                response = await self._post("sendMessage", body, min(15.0, left - wait))
+                response = await self._post("sendMessage", body, 15.0)
             except (httpx.ConnectError, httpx.ConnectTimeout):
                 wait = float(min(2 ** (attempt - 1), 30))
                 continue

@@ -6,7 +6,9 @@ no ORM and no generic repository layer.
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
+import asyncio
+import logging
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
 import psycopg
@@ -20,6 +22,20 @@ from kiroku.errors import KirokuError
 POOL_MAX_SIZE = 5
 
 type Pool = AsyncConnectionPool[AsyncConnection]
+
+log = logging.getLogger(__name__)
+
+
+async def retrying[T](what: str, fn: Callable[[], Awaitable[T]]) -> T:
+    """Retry a database operation, never the paid call that preceded it."""
+    delay = 1.0
+    while True:
+        try:
+            return await fn()
+        except psycopg.OperationalError:
+            log.warning("%s failed; retrying", what)
+            await asyncio.sleep(delay)
+            delay = min(delay * 2, 30.0)
 
 
 class DatabaseUnavailable(KirokuError):

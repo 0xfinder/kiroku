@@ -42,6 +42,10 @@ class NotifierRejected(Exception):
     """Permanent rejection."""
 
 
+class NotifierStale(Exception):
+    """Too little time remains to start another delivery attempt."""
+
+
 class NotifierUnsure(Exception):
     """The request may have been delivered. Never resend."""
 

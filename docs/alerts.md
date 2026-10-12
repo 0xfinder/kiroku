@@ -9,7 +9,7 @@ A passing Gate decision produces one durable `alert` outcome. The worker handles
 3. Check Cooldown for the Rule on that Channel, before spending on Extraction.
 4. Extract from the saved Gate question and state. Compare with the previous delivered or possibly delivered claim for that Rule, Channel and Game key.
 5. Store a duplicate when the take is unchanged. Failed or Budget-refused Extraction uses a degraded transcript excerpt.
-6. Check freshness again, then commit `sending` and its ledger rows before sending one message.
+6. Check freshness again and require at least five seconds to start a send, plus any pacing wait. Commit `sending` and its ledger rows before the Bot API call. A deadline too close to start produces `stale`; a started request gets its normal 15-second timeout.
 7. Store `sent`, `failed`, or `unconfirmed` from the Notifier's result.
 
 `kiroku alert list --last N` shows recent outcomes and suppression reasons. `kiroku watch --no-alerts` keeps Gate and Fallback evaluation without Telegram sending or polling. `--no-gate` transcribes only.
@@ -18,7 +18,11 @@ A passing Gate decision produces one durable `alert` outcome. The worker handles
 
 Delivery is at most once. A crash after `sending` commits but before Telegram receives the request can lose a message. A crash after Telegram receives it can lose the success receipt. Both recover to `unconfirmed`, with no resend. Telegram 5xx, uncertain transport failures and malformed success bodies have the same outcome. Only definite connect failures and valid 429 responses retry. The adapter paces sends to one per second.
 
-Every message has 👍/👎 buttons naming its alert id. A tap locks the alert row and upserts one Label per decision and source. An uncertain delivery becomes `sent` in that transaction, using the callback's message date and external id. Commit precedes acknowledgement. Redelivered updates leave the Label unchanged, and an opposite tap changes the verdict. An advisory lock permits one Telegram poller; another watch waits to take over if the owner exits.
+Every message has 👍/👎 buttons naming its alert id. A tap locks the alert row and upserts one Label per decision and source. An uncertain delivery becomes `sent` in that transaction, using the callback's message date and external id. Missing dates and `date: 0` use receipt time. Commit precedes acknowledgement. Redelivered updates leave the Label unchanged, and an opposite tap changes the verdict. An advisory lock permits one Telegram poller; another watch waits to take over if the owner exits.
+
+Shutdown stops channels first, including transcription draining and their final Gate passes. The worker then gets up to 20 seconds to drain fresh decisions before it and the tap poller are cancelled. A second signal interrupts the current drain.
+
+Primary Jev authentication failure stops the session's Gate and leaves the Window ungated. Possibly billed attempts are recorded in a separate ledger transaction with stable idempotency keys for database retries. Fixing the key and restarting gates the backlog. Fallback authentication failure logs once, disables only the Fallback for this process, and produces a failed Window with costs. Jev is tried again for each later Window.
 
 ## Module ownership
 
@@ -39,7 +43,7 @@ The arena selected candidate 1; the independent cross-judge agreed. Its process-
 
 The synthesis grafts uncertain Telegram 5xx handling and callback delivery confirmation from candidate 3, and send pacing and `alert list` from candidate 2. Its corrections pin Extraction to the stored wording, use the final capture leg for freshness, and preserve primary costs when the Fallback cannot spend. D28 and D29 record the resulting choices.
 
-Independent GPT-6-Astra, GPT-6-Sol and GPT-6-Luna reviews found bugs in quota expiry, concurrent quota admission, poller handoff, authentication-cost preservation, and per-decision failure recovery. The fixes have offline behavior tests. Stored Gate state follows the existing trusted-writer boundary: core code writes its shape, and manually corrupted database JSON can still stop candidate decoding.
+Independent GPT-6-Astra, GPT-6-Sol and GPT-6-Luna reviews found bugs in quota expiry, concurrent quota admission, poller handoff, authentication-cost preservation, and per-decision failure recovery. The fixes have offline behavior tests. A second review also corrected Fallback auth isolation, primary-auth progress, shutdown order, send deadlines, inaccessible callback dates, batch freshness reads, shared database retries, direct failed inserts, and rate-limit reset selection. Stored Gate state follows the existing trusted-writer boundary: core code writes its shape, and manually corrupted database JSON can still stop candidate decoding.
 
 ## Measured limits
 

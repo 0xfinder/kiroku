@@ -488,3 +488,70 @@ async def test_telegram_hang_doesnt_stall_the_gate(
     assert await (
         await conn.execute("SELECT count(*) FROM gate_window WHERE status='answered'")
     ).fetchone() == (2,)
+
+
+async def test_shutdown_alerts_decisions_from_drained_transcription(
+    database_url: str,
+    pool: Pool,
+    conn: AsyncConnection,
+    tmp_path: Path,
+    fake_stream: Callable[[str], None],
+) -> None:
+    from kiroku.llm.groq import GroqLLM
+    from tests.fakes.alerts import Sink
+    from tests.test_alerts import completion
+    from tests.test_gating import FakeGate
+
+    fake_stream("70")
+    entered, release = asyncio.Event(), asyncio.Event()
+    groq = GroqStub()
+    sink = Sink()
+
+    async def held_first_chunk(req: httpx.Request) -> httpx.Response:
+        entered.set()
+        await release.wait()
+        return groq(req)
+
+    async def stop_with_transcription_pending() -> bool:
+        if not entered.is_set():
+            return False
+        captured = await (
+            await conn.execute("SELECT max(audio_end_ms) FROM capture_leg")
+        ).fetchone()
+        if captured is None or captured[0] is None or captured[0] < 70_000:
+            return False
+        assert await (await conn.execute("SELECT count(*) FROM gate_window")).fetchone() == (0,)
+        release.set()
+        return True
+
+    await rules.add(pool, "prediction", "predicts a winner", threshold=Decimal(".6"))
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(
+            lambda req: httpx.Response(
+                200,
+                json=completion(
+                    {
+                        "claim": "winner",
+                        "summary": "winner",
+                        "quote": None,
+                        "same_as_previous": False,
+                    }
+                ),
+            )
+        )
+    ) as http:
+        await watch_until(
+            database_url,
+            pool,
+            tmp_path / "data",
+            cast(Any, held_first_chunk),
+            stop_with_transcription_pending,
+            gate=FakeGate(0.9),
+            llm=GroqLLM(http, Secret("k")),
+            notifier=sink,
+        )
+    assert len(sink.messages) == 1
+    assert await (await conn.execute("SELECT outcome FROM alert")).fetchall() == [("sent",)]
+    assert await (await conn.execute("SELECT start_ms, end_ms FROM gate_window")).fetchall() == [
+        (0, 45_000)
+    ]
