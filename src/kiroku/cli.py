@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import shutil
 import signal
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -18,6 +19,7 @@ from typing import Annotated
 import httpx
 import typer
 
+from kiroku import backfill, sessions
 from kiroku.budget import Budget
 from kiroku.config import SecretName, Settings
 from kiroku.db import connect, open_pool
@@ -25,9 +27,9 @@ from kiroku.db.migrate import migrate, new_migration
 from kiroku.errors import KirokuError
 from kiroku.gate.jev import JevGate
 from kiroku.sessions import claim_channels
-from kiroku.source import StreamlinkSource
+from kiroku.source import StreamlinkSource, ToolMissing
 from kiroku.transcriber.groq import GroqTranscriber
-from kiroku.watch import watch
+from kiroku.watch import vocabulary, watch
 
 app = typer.Typer(no_args_is_help=True, help="Transcribe live streams, keep Notes, send Alerts.")
 db_app = typer.Typer(no_args_is_help=True, help="Database schema.")
@@ -67,6 +69,14 @@ def db_new(name: str) -> None:
         typer.echo(str(new_migration(name)))
 
 
+def _log_to_stderr() -> None:
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+    )
+    # httpx logs every request URL at INFO; keep the log about kiroku.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
+
 @app.command("watch")
 def watch_command(
     channels: Annotated[list[str], typer.Argument(help="Twitch logins, e.g. gorgc caedrel")],
@@ -77,11 +87,13 @@ def watch_command(
 ) -> None:
     """Watch channels, store a live transcript while they stream, and gate it against the
     active Rules. Runs until stopped."""
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
-    )
-    # httpx logs every request URL at INFO; keep the log about kiroku.
-    logging.getLogger("httpx").setLevel(logging.WARNING)
+    _log_to_stderr()
+    with _user_errors():
+        # Capture needs both, and sealing a crashed leg needs ffprobe before a leg is placed.
+        # Fail at launch rather than when a stream first goes live.
+        for tool in ("ffmpeg", "ffprobe"):
+            if shutil.which(tool) is None:
+                raise ToolMissing(f"{tool} not found; install it or fix PATH")
 
     async def run(settings: Settings) -> None:
         # systemd stops services with SIGTERM. Treat it like Ctrl-C: cancel, so every live
@@ -113,6 +125,58 @@ def watch_command(
         except* KirokuError as group:
             # One channel's TaskGroup failure arrives as a group; report the first.
             raise group.exceptions[0] from None
+
+
+@app.command("backfill")
+def backfill_command(
+    channel: Annotated[str, typer.Argument(help="Twitch login, e.g. gorgc")],
+    session: Annotated[
+        int | None, typer.Option(help="Session id. Default: the channel's latest session.")
+    ] = None,
+) -> None:
+    """Transcribe the gaps a crash left in a session's transcript, from its audio archive.
+
+    `kiroku watch` does this by itself when it resumes a session. Use this for a session it
+    won't resume, e.g. one whose stream ended while kiroku was down. Safe beside a running
+    `kiroku watch`: it yields to live audio on the same key, leaves legs a watcher may be
+    capturing alone, and refuses only while another backfill of the session runs.
+    """
+    _log_to_stderr()
+
+    async def run(settings: Settings) -> None:
+        key = settings.secrets.require(SecretName.GROQ)
+        async with (
+            open_pool(settings.database_url) as pool,
+            httpx.AsyncClient(timeout=60) as http,
+        ):
+            found_channel = await sessions.find_channel(pool, "twitch", channel)
+            found = (
+                await sessions.find_session(pool, found_channel, session) if found_channel else None
+            )
+            if found_channel is None or found is None:
+                which = f"session {session}" if session is not None else "session"
+                raise KirokuError(f"no {which} found for {channel}")
+            transcriber = GroqTranscriber(http, key)
+            data_dir = settings.data_dir
+            await backfill.seal_open_legs(
+                pool, found.id, transcriber.name, data_dir, unless_watched=found_channel
+            )
+            _report(found.id, await backfill.gaps(pool, found.id, transcriber.name))
+            title = found.title
+            guard = Budget(pool, settings.caps).guard(found.id)
+            if not await backfill.run(
+                pool, found.id, transcriber, data_dir, lambda: vocabulary(title, None), guard
+            ):
+                raise KirokuError(f"a backfill of session {found.id} is already running")
+            _report(found.id, await backfill.gaps(pool, found.id, transcriber.name))
+
+    with _user_errors(), contextlib.suppress(KeyboardInterrupt, asyncio.CancelledError):
+        asyncio.run(run(Settings.load()))
+
+
+def _report(session_id: int, gaps: list[backfill.Gap]) -> None:
+    seconds = sum(g.duration_ms for g in gaps) / 1000
+    typer.echo(f"session {session_id}: {len(gaps)} gaps, {seconds:.1f} s untranscribed")
 
 
 def main() -> None:

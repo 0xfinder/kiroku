@@ -6,6 +6,12 @@ chunk's text. While Groq rate-limits, the queue grows rather than dropping audio
 `max_backlog_ms`; past that the oldest chunk is skipped (logged, and visible as a missing
 span). One GroqTranscriber serves every session, and a 429 on any session pauses all of
 them, because the limit is per API key.
+
+Background streams (Backfill, `Context.background`) use the key's spare capacity only: a
+background call waits until no live chunk on the key is queued or in flight and the key is
+not paused, and background calls start at most once per `background_interval_s` across all
+sessions. Their audio comes from the archive, so instead of a backlog they get backpressure:
+the producer reads no further ahead than the next chunk, and nothing is skipped.
 """
 
 from __future__ import annotations
@@ -39,6 +45,9 @@ URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 USD_PER_AUDIO_HOUR = Decimal("0.04")
 MIN_BILLED_SECONDS = Decimal(10)
 PROMPT_TAIL_CHARS = 400  # Whisper reads at most 224 prompt tokens
+# Background calls start at most this often per key: 6 requests a minute with 15-25 s chunks,
+# about 2x real time. Groq's free tier allows 20 a minute; live uses 3-4 per channel.
+BACKGROUND_INTERVAL_S = 10.0
 NO_SPEECH_DROP = 0.6  # Whisper's own heuristic: drop a segment above this no_speech_prob
 LOGPROB_DROP = -1.0  # ...when its avg_logprob is also below this
 
@@ -55,15 +64,24 @@ class GroqTranscriber:
         *,
         policy: ChunkPolicy | None = None,
         max_backlog_ms: int = 30 * 60_000,
+        background_interval_s: float = BACKGROUND_INTERVAL_S,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ) -> None:
         self._http = http
         self._key = key
         self._policy = policy or ChunkPolicy()
         self._max_backlog_ms = max_backlog_ms
+        self._background_interval_s = background_interval_s
         self._sleep = sleep
         # Monotonic time before which no session may call Groq. Writers only raise it.
         self._not_before = 0.0
+        # Voiced live chunks queued or in flight, over every session; set while zero.
+        self._live_pending = 0
+        self._live_idle = asyncio.Event()
+        self._live_idle.set()
+        # Background calls take turns, and a turn starts no sooner than this.
+        self._background_turn = asyncio.Lock()
+        self._background_after = 0.0
 
     @property
     def name(self) -> str:
@@ -72,14 +90,28 @@ class GroqTranscriber:
     async def transcribe(
         self, audio: AsyncIterator[AudioEvent], context: Context
     ) -> AsyncIterator[Result]:
+        background = context.background
         chunks: asyncio.Queue[Chunk | None] = asyncio.Queue()
+        room = asyncio.Semaphore(1) if background else None  # backpressure, background only
         backlog_ms = 0
+        live_pending = 0  # this stream's share of self._live_pending
 
-        def enqueue(ready: list[Chunk]) -> None:
-            nonlocal backlog_ms
+        async def enqueue(ready: list[Chunk]) -> None:
+            nonlocal backlog_ms, live_pending
             for chunk in ready:
+                if room is not None:
+                    await room.acquire()
+                elif chunk.voiced:
+                    live_pending += 1
+                    self._add_live(1)
                 backlog_ms += _duration_ms(chunk)
                 chunks.put_nowait(chunk)
+
+        def done_live(chunk: Chunk) -> None:
+            nonlocal live_pending
+            if not background and chunk.voiced:
+                live_pending -= 1
+                self._add_live(-1)
 
         async def produce() -> None:
             try:
@@ -87,12 +119,12 @@ class GroqTranscriber:
                 async for event in audio:
                     if isinstance(event, AudioBlock):
                         chunker = chunker or SilenceChunker(event.start_sample, self._policy)
-                        enqueue(chunker.feed(event.pcm))
+                        await enqueue(chunker.feed(event.pcm))
                     else:
-                        enqueue(chunker.flush() if chunker else [])
+                        await enqueue(chunker.flush() if chunker else [])
                         chunker = None
                 if chunker:
-                    enqueue(chunker.flush())
+                    await enqueue(chunker.flush())
             finally:
                 # Always end the consumer, so a failure here surfaces at `await producer`
                 # instead of leaving the consumer waiting forever.
@@ -102,26 +134,35 @@ class GroqTranscriber:
         tail = context.previous_text
         try:
             while (chunk := await chunks.get()) is not None:
+                if room is not None:
+                    room.release()
                 backlog_ms -= _duration_ms(chunk)
+                # Live only in effect: a background stream's backpressure keeps this at 0.
                 if backlog_ms > self._max_backlog_ms:
                     log.warning(
                         "Groq backlog over %d ms; skipping chunk at %d ms",
                         self._max_backlog_ms,
                         ms(chunk.start_sample),
                     )
+                    done_live(chunk)
                     continue
                 if not chunk.voiced:
                     yield Result(ms(chunk.start_sample), ms(chunk.end_sample), (), None)
                     continue
-                if not await self._allowed(context.guard, chunk):
-                    # No Result: the chunk stays a gap in the transcript, and its audio stays
-                    # in the archive for backfill (#10) once Budget allows.
-                    continue
-                result, text = await self._call(chunk, build_prompt(context.vocabulary(), tail))
+                try:
+                    if not await self._allowed(context.guard, chunk):
+                        # No Result: the chunk stays a gap in the transcript, and its audio
+                        # stays in the archive for backfill once Budget allows.
+                        continue
+                    prompt = build_prompt(context.vocabulary(), tail)
+                    result, text = await self._call(chunk, prompt, background)
+                finally:
+                    done_live(chunk)
                 tail = (tail + " " + text).strip() if text else tail
                 yield result
         finally:
             producer.cancel()
+            self._add_live(-live_pending)  # chunks this stream will never send
         await producer  # re-raise a failure in the audio source
 
     async def _allowed(self, guard: BudgetGuard, chunk: Chunk) -> bool:
@@ -139,14 +180,36 @@ class GroqTranscriber:
                 await self._sleep(delay)
                 delay = min(delay * 2, 30.0)
 
-    async def _call(self, chunk: Chunk, prompt: str) -> tuple[Result, str]:
+    def _add_live(self, n: int) -> None:
+        self._live_pending += n
+        if self._live_pending:
+            self._live_idle.clear()
+        else:
+            self._live_idle.set()
+
+    async def _turn(self, background: bool) -> None:
+        """Wait until a call may be sent. Live waits only for a rate-limit pause."""
+        if not background:
+            delay = self._not_before - time.monotonic()
+            if delay > 0:
+                await self._sleep(delay)
+            return
+        async with self._background_turn:
+            while True:
+                await self._live_idle.wait()
+                delay = max(self._not_before, self._background_after) - time.monotonic()
+                if delay > 0:
+                    await self._sleep(delay)
+                if self._live_idle.is_set():
+                    break
+            self._background_after = time.monotonic() + self._background_interval_s
+
+    async def _call(self, chunk: Chunk, prompt: str, background: bool) -> tuple[Result, str]:
         start_ms, end_ms = ms(chunk.start_sample), ms(chunk.end_sample)
         attempt = 0
         maybe_billed = 0  # sent, but the response was lost: Groq may have billed it
         while True:
-            delay = self._not_before - time.monotonic()
-            if delay > 0:
-                await self._sleep(delay)
+            await self._turn(background)
             started = time.monotonic()
             try:
                 response = await self._http.post(
