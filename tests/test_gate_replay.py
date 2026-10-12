@@ -124,6 +124,7 @@ async def test_league_live_context_replays_real_jev_answers(
     conn: AsyncConnection,
     repeat: int,
 ) -> None:
+    from kiroku import segments
     from kiroku.pack import LiveContext
 
     recording = LEAGUE_RECORDED
@@ -142,6 +143,13 @@ async def test_league_live_context_replays_real_jev_answers(
             datetime.now(UTC),
         )
     leg = await sessions.next_leg(pool, channel, session)
+    await segments.record(
+        pool,
+        session,
+        0,
+        StreamMeta("recorded", header["stream"]["title"], "League of Legends"),
+        "league",
+    )
     await sessions.record_leg(pool, leg, datetime.now(UTC))
     for i, text in enumerate(header["texts"]):
         await transcript.commit(
@@ -167,7 +175,7 @@ async def test_league_live_context_replays_real_jev_answers(
             JevGate(http, Secret("k")),
             Unlimited(),
             lambda: header["stream"],
-            pack=lambda: "league",
+            use_segments=True,
             live=lambda bounds: LiveContext(header["live"], header["game_key"]),
         )
         loop.finish(session_ended=True)

@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 import os
 import re
 import time
@@ -19,6 +20,7 @@ FEED = "https://feed.lolesports.com/livestats/v1"
 # lolesports.com's public website key, shipped to every browser.
 PUBLIC_WEBSITE_KEY = "0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z"
 DATA_TTL_S = 24 * 3600
+log = logging.getLogger(__name__)
 
 
 class DataError(ValueError):
@@ -55,6 +57,7 @@ class LeagueData:
         self.cache_dir = data_dir / "packs" / "league"
         self.key = key
         self._lock = asyncio.Lock()
+        self._parsed: dict[tuple[str, object], tuple[int, object]] = {}
 
     async def get(
         self, url: str, *, params: Mapping[str, str] | None = None, website: bool = False
@@ -79,23 +82,48 @@ class LeagueData:
         )
 
     async def cached[T](
-        self, name: str, url: str, parse: Callable[[object], T], *, website: bool = False
+        self,
+        name: str,
+        url: str,
+        parse: Callable[[object], T],
+        *,
+        website: bool = False,
+        memoize: bool = False,
     ) -> T:
         async with self._lock:
             path = self.cache_dir / f"{name}.json"
+            stale: tuple[T] | None = None
+            memo_key = (name, parse)
             try:
-                if time.time() - path.stat().st_mtime < DATA_TTL_S:
+                stat = path.stat()
+                memo = self._parsed.get(memo_key) if memoize else None
+                if memo is not None and memo[0] == stat.st_mtime_ns:
+                    parsed = cast(T, memo[1])
+                else:
                     cached: object = json.loads(path.read_text())
-                    return parse(cached)
+                    parsed = parse(cached)
+                    if memoize:
+                        self._parsed[memo_key] = (stat.st_mtime_ns, parsed)
+                stale = (parsed,)
+                if time.time() - stat.st_mtime < DATA_TTL_S:
+                    return parsed
             except (OSError, ValueError, KeyError, IndexError):
                 pass
-            body = await self.get(url, website=website)
-            parsed = parse(body)
-            # Atomic replace also protects another watcher reading the same cache.
-            self.cache_dir.mkdir(parents=True, exist_ok=True)
-            temporary = path.with_suffix(f".{os.getpid()}.tmp")
-            temporary.write_text(json.dumps(body))
-            temporary.replace(path)
+            try:
+                body = await self.get(url, website=website)
+                parsed = parse(body)
+                # Atomic replace also protects another watcher reading the same cache.
+                self.cache_dir.mkdir(parents=True, exist_ok=True)
+                temporary = path.with_suffix(f".{os.getpid()}.tmp")
+                temporary.write_text(json.dumps(body))
+                temporary.replace(path)
+                if memoize:
+                    self._parsed[memo_key] = (path.stat().st_mtime_ns, parsed)
+            except (httpx.HTTPError, OSError, ValueError, KeyError, IndexError) as e:
+                if stale is None:
+                    raise
+                log.warning("League %s refresh failed; using stale cache (%s)", name, e)
+                return stale[0]
             return parsed
 
 
@@ -119,16 +147,21 @@ def roster_terms(data: object, title: str) -> tuple[str, ...]:
     teams = [obj(team) for team in array(obj(obj(data)["data"])["teams"])]
     chosen = [team for team in teams if team.get("status") == "active" and mentioned(team, title)]
     return tuple(
-        text(obj(player)["summonerName"])
+        name
         for team in chosen
         for player in array(team["players"])
         if obj(player).get("role") != "coach"
+        if isinstance(name := obj(player).get("summonerName"), str) and name.strip()
     )
+
+
+def contains_term(term: str, title: str) -> bool:
+    return bool(term and re.search(rf"(?<!\w){re.escape(term)}(?!\w)", title, re.I))
 
 
 def mentioned(team: dict[str, object], title: str) -> bool:
     return any(
-        isinstance(term, str) and re.search(rf"(?<!\w){re.escape(term)}(?!\w)", title, re.I)
+        isinstance(term, str) and contains_term(term, title)
         for term in (team.get("code"), team.get("name"))
     )
 

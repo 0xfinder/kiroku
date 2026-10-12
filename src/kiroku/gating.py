@@ -226,7 +226,6 @@ class GateLoop:
         guard: BudgetGuard,
         stream: Callable[[], Mapping[str, JSON]],
         *,
-        pack: Callable[[], str | None] = lambda: None,
         live: Callable[[Bounds], LiveContext | None] = lambda bounds: None,
         use_segments: bool = False,
         blocked_from: Callable[[], int | None] = lambda: None,
@@ -239,7 +238,6 @@ class GateLoop:
         self._gate = gate
         self._guard = guard
         self._stream = stream
-        self._pack = pack
         self._live = live
         self._use_segments = use_segments
         self._blocked_from = blocked_from
@@ -305,7 +303,7 @@ class GateLoop:
                 else None
             )
             stream = self._stream()
-            pack = self._pack()
+            pack = None
             if segment is not None:
                 stream = {"title": segment.title}
                 if segment.category:

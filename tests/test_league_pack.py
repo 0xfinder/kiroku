@@ -15,8 +15,16 @@ from kiroku import rules
 from kiroku.config import Secret
 from kiroku.db import Pool, open_pool
 from kiroku.gate.jev import JevGate
-from kiroku.packs.league import LeaguePack
-from kiroku.packs.league.data import DATA_TTL_S, DataError, match_context, names, select_event
+from kiroku.pack import pack_selector
+from kiroku.packs.league import LeaguePack, vocabulary
+from kiroku.packs.league.data import (
+    DATA_TTL_S,
+    DataError,
+    match_context,
+    names,
+    roster_terms,
+    select_event,
+)
 from kiroku.transcriber.groq import build_prompt
 from tests.test_live_replay import GroqStub, query_rows, spans_cover, watch_until
 from tests.test_live_replay import fake_stream as fake_stream
@@ -39,10 +47,16 @@ class LeagueReplay:
         self.calls.append(request)
         path = request.url.path
         endpoint = path.rsplit("/", 1)[-1]
+        if self.fail == "window_204" and "/window/" in path:
+            return httpx.Response(204)
+        if self.fail == "getLive_403" and endpoint == "getLive":
+            return httpx.Response(403)
         if self.fail and self.fail in path:
             return httpx.Response(503)
         if "/window/" in path:
             body = read("window")
+            if self.fail == "window_metadata":
+                del body["gameMetadata"]
         elif endpoint == "getLive" and self.live:
             # Real completed match, with ONLY lifecycle flags changed to replay live routing.
             body = read("getSchedule")
@@ -125,6 +139,110 @@ async def test_cache_reuses_real_catalogue_expires_and_recovers_corruption(tmp_p
         assert len(replay.calls) == 7
 
 
+def test_title_fallback_keeps_the_last_word_and_truncates_at_a_word_boundary() -> None:
+    assert vocabulary("T1 vs Gen.G LCK Finals", {}, {}, (), None) == (
+        "League of Legends. T1 vs Gen.G LCK Finals"
+    )
+    assert vocabulary("Finals " * 60, {}, {}, (), None) == (
+        "League of Legends. " + " ".join(["Finals"] * 47)
+    )
+    assert vocabulary("x" * 400, {}, {}, (), None) == "League of Legends."
+    assert vocabulary("x" * 331 + " Finals", {}, {}, (), None) == (
+        "League of Legends. " + "x" * 331
+    )
+
+
+def test_catalogue_terms_match_whole_words_in_the_title() -> None:
+    champions = {"Vi": "Vi"}
+    items = {"1": "Infinity Edge"}
+    assert vocabulary("VOD REVIEW with viewers", champions, items, (), None) == (
+        "League of Legends. VOD REVIEW with viewers"
+    )
+    assert vocabulary("VI: infinity EDGE!", champions, items, (), None) == (
+        "League of Legends. Vi, Infinity Edge, VI: infinity EDGE!"
+    )
+
+
+def test_rosters_skip_players_without_usable_names() -> None:
+    data = {
+        "data": {
+            "teams": [
+                {
+                    "status": "active",
+                    "code": "T1",
+                    "players": [
+                        {"summonerName": "Faker", "role": "mid"},
+                        {"summonerName": "", "role": "top"},
+                        {"role": "jungle"},
+                        {"summonerName": "coach", "role": "coach"},
+                    ],
+                }
+            ]
+        }
+    }
+    assert roster_terms(data, "T1 Finals") == ("Faker",)
+
+
+@pytest.mark.parametrize("failure", ["http", "invalid"])
+async def test_stale_cache_survives_failed_refresh_and_keeps_retrying(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+    failure: str,
+) -> None:
+    replay = LeagueReplay(live=False)
+
+    def api(request: httpx.Request) -> httpx.Response:
+        if replay.fail and failure == "invalid":
+            replay.calls.append(request)
+            return httpx.Response(200, json={"wrong": "shape"})
+        return replay(request)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(api)) as http:
+        pack = LeaguePack(http, tmp_path, "public-test-key")
+        first = await pack.vocabulary(TITLE, None)
+        path = tmp_path / "packs/league/versions.json"
+        os.utime(path, (0, 0))
+        replay.fail = "versions"
+        for expected_calls in (5, 6):
+            assert await pack.vocabulary(TITLE, None) == first
+            assert len(replay.calls) == expected_calls
+            assert path.stat().st_mtime == 0
+        assert "stale" in caplog.text
+        replay.fail = None
+        assert await pack.vocabulary(TITLE, None) == first
+        assert len(replay.calls) == 7 and path.stat().st_mtime > 0
+
+
+async def test_catalogue_memoization_invalidates_when_disk_changes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    replay = LeagueReplay()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(replay)) as http:
+        pack = LeaguePack(http, tmp_path, "public-test-key")
+        await pack.get_live_match(TITLE)
+        await pack.vocabulary(TITLE, None)
+        original = Path.read_text
+        reads: list[str] = []
+
+        def count_reads(path: Path, *args: Any, **kwargs: Any) -> str:
+            if path.parent == tmp_path / "packs/league" and path.name != "teams.json":
+                reads.append(path.name)
+            return original(path, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "read_text", count_reads)
+        await pack.get_live_match(TITLE)
+        await pack.vocabulary(TITLE, None)
+        assert reads == []
+        path = next((tmp_path / "packs/league").glob("champion-*.json"))
+        body = json.loads(original(path))
+        body["data"]["Yunara"]["name"] = "Updated Yunara"
+        path.write_text(json.dumps(body))
+        live = await pack.get_live_match(TITLE)
+        assert live is not None and "Updated Yunara" in live.vocabulary
+        assert reads == [path.name]
+
+
 def test_offline_ambiguous_or_unmentioned_matches_have_no_context() -> None:
     assert select_event(read("getLive"), TITLE) is None
     data = read("getSchedule")
@@ -161,6 +279,9 @@ def test_malformed_data_fails_at_the_boundary_and_feed_ids_must_match() -> None:
         ("getLive", "watching_pro"),
         ("getTeams", "watching_pro"),
         ("window", "watching_pro"),
+        ("window_204", "watching_pro"),
+        ("window_metadata", "watching_pro"),
+        ("getLive_403", "watching_pro"),
     ],
 )
 async def test_session_sends_pack_context_and_rules_or_survives_http_failure(
@@ -222,16 +343,15 @@ async def test_session_sends_pack_context_and_rules_or_survives_http_failure(
             RecordingGroq(),
             spans_cover(conn, 70_000),
             gate=JevGate(jev_http, Secret("k")),
-            select_pack=lambda category: pack if category == "League of Legends" else None,
+            select_pack=pack_selector([pack]),
         )
     assert states and prompts
     assert await query_rows(conn, "SELECT count(*) FROM utterance") != [(0,)]
     assert await query_rows(
         conn, "SELECT r.name FROM gate_decision d JOIN rule r ON r.id=d.rule_id"
     ) == [("league_take",)]
-    if fail:
+    if fail and fail != "getTeams":
         assert "live" not in states[0]["context"]
-        assert all("Gryffinn" not in p for p in prompts)
         assert await query_rows(conn, "SELECT game_key FROM gate_window") == [(None,)]
     else:
         assert states[0]["context"]["live"]["teams"][1] == {
@@ -239,9 +359,14 @@ async def test_session_sends_pack_context_and_rules_or_survives_http_failure(
             "picks": ["Ornn", "Nocturne", "Syndra", "Yunara", "Lulu"],
             "bans": None,
         }
-        assert any("Gryffinn" in p and "Yunara" in p for p in prompts)
         expected_key = "league:117133830114188936:1" if mode == "watching_pro" else None
         assert await query_rows(conn, "SELECT game_key FROM gate_window") == [(expected_key,)]
+    if fail in {"versions", "getTeams"}:
+        assert all("Gryffinn" not in p for p in prompts)
+    elif fail:
+        assert any("Gryffinn" in p and "Aegis" in p for p in prompts)
+    else:
+        assert any("Gryffinn" in p and "Yunara" in p for p in prompts)
 
 
 @pytest.mark.parametrize("change", ["category", "http_failure"])
@@ -291,7 +416,7 @@ async def test_refresh_discards_context_after_category_change_or_failure(
             GroqStub(),
             done,
             gate=JevGate(jev, Secret("k")),
-            select_pack=lambda category: pack if category == "League of Legends" else None,
+            select_pack=pack_selector([pack]),
         )
     windows = await query_rows(conn, "SELECT state FROM gate_window ORDER BY start_ms")
     assert windows[0][0]["context"]["live"]["teams"][0]["name"] == "RED Kalunga"
@@ -381,7 +506,7 @@ async def test_recovery_uses_historical_pack_and_omits_new_live_context_from_old
             GroqStub(),
             done,
             gate=JevGate(jev, Secret("k")),
-            select_pack=lambda category: pack if category == "League of Legends" else None,
+            select_pack=pack_selector([pack]),
         )
     windows = await query_rows(conn, "SELECT state,game_key FROM gate_window ORDER BY start_ms")
     assert [w[0]["context"]["stream"]["category"] for w in windows[:2]] == [

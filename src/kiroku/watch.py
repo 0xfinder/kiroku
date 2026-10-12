@@ -272,7 +272,6 @@ class SessionRun:
                 services.gate,
                 self._guard,
                 self._stream,
-                pack=lambda: self._pack.name if self._pack else None,
                 live=self._live_for_window,
                 use_segments=True,
                 blocked_from=lambda: self._pending_update[1] if self._pending_update else None,
@@ -499,11 +498,16 @@ class SessionRun:
                 try:
                     async with asyncio.timeout(20):
                         live = await pack.get_live_match(meta.title)
+                except Exception as e:
+                    # A failed live refresh must clear the previous Game key.
+                    log.warning(
+                        "session %d: Pack live context unavailable (%s)", self.session_id, e
+                    )
+                try:
+                    async with asyncio.timeout(20):
                         vocabulary = await pack.vocabulary(meta.title, live)
                 except Exception as e:
-                    # A failed refresh clears stale data, including a previous Game key.
-                    log.warning("session %d: Pack data unavailable (%s)", self.session_id, e)
-                    live, vocabulary = None, None
+                    log.warning("session %d: Pack Vocabulary unavailable (%s)", self.session_id, e)
             if self._pack_revision == revision:
                 old_key = self._live.game_key if self._live else None
                 new_key = live.game_key if live else None

@@ -197,3 +197,13 @@ Chosen by an architect arena: Opus, Sonnet and GPT-6.1-Sol (Codex) candidates pl
 Measured results and the reading-only audit are in [spikes/README.md](../spikes/README.md). The compact live summary still affects Jev: a draft Rule rose from 0.10–0.11 without live data to 0.60–0.62 with it, below its 0.70 threshold, on in-game commentary. One of three chatting repeats was classified `watching_pro` with live metadata. This is recorded, not treated as proof of calibrated live accuracy. Test Rule wording against real live-context Windows before relying on it.
 
 Rejected: dumping every champion/item/player into Whisper; choosing an arbitrary concurrent match; fabricating bans; making a Pack outage stop capture. Revisit after an actual pro match verifies the feed clock and Mode/Rule quality, and when Dota exposes which interface choices need to change.
+
+## D27. Independent Pack refresh and declared Categories (issue #6 review)
+
+2026-10-12. Supersedes D26's selection, refresh-failure, and cache details. The Pack Protocol declares `categories`. The CLI builds a generic Category selector from one Pack factory registry and derives `PACK_NOT_LIVE` warnings from that registry. Adding a Pack requires one registry entry. The Gate's Pack scope comes only from the Window's stored Segment; the current-Pack callback is removed.
+
+Live context and Vocabulary refresh independently with separate timeouts. A live-feed failure clears the previous Game key while catalogue and roster Vocabulary remain available. A Vocabulary failure leaves validated live context available to the Gate. Category revisions still discard obsolete refresh results.
+
+The 24-hour disk cache validates expired copies too. A failed fetch or invalid response serves a usable stale copy with a warning and leaves its timestamp unchanged, so the next refresh retries. Without a usable copy the error propagates to the optional Pack refresh. Catalogue parsing is memoized by parser and file mtime, so changed files invalidate the memo. Roster parsing skips players with missing or empty names. Team and catalogue title matching share whole-word matching.
+
+The Secrets policy explicitly permits the public lolesports website key as a commented, named constant with an environment override. User API keys remain outside the repository. The measured effect of live picks on the draft Rule remains a limit to monitor through Labels in #5; the Gate wording and recordings are unchanged.

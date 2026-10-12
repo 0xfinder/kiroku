@@ -12,6 +12,7 @@ from kiroku.packs.league.data import (
     PERSISTED,
     LeagueData,
     array,
+    contains_term,
     match_context,
     names,
     obj,
@@ -37,31 +38,35 @@ def vocabulary(
     this stream are sent, with room left for the previous transcript's tail.
     """
     candidates = list(live.vocabulary if live else rosters)
-    candidates.extend(
-        n for n in (*champions.values(), *items.values()) if n.casefold() in title.casefold()
-    )
+    candidates.extend(n for n in (*champions.values(), *items.values()) if contains_term(n, title))
     out = "League of Legends."
     for term in dict.fromkeys(candidates):
         if len(out) + len(term) + 2 <= VOCABULARY_CHARS:
             out += f" {term},"
     remaining = VOCABULARY_CHARS - len(out) - 1
     if remaining > 0 and live is None:
-        out += " " + title[:remaining].rsplit(" ", 1)[0]
+        tail = title if len(title) <= remaining else title[: remaining + 1].rpartition(" ")[0]
+        out += " " + tail
     return out.strip(" ,")
 
 
 class LeaguePack:
     name = "league"
+    categories = ("League of Legends",)
 
     def __init__(self, http: httpx.AsyncClient, data_dir: Path, key: str) -> None:
         self.data = LeagueData(http, data_dir, key)
 
     async def _catalogue(self) -> tuple[dict[str, str], dict[str, str]]:
-        available = await self.data.cached("versions", f"{DDRAGON}/api/versions.json", versions)
+        available = await self.data.cached(
+            "versions", f"{DDRAGON}/api/versions.json", versions, memoize=True
+        )
         version = available[0]
         base = f"{DDRAGON}/cdn/{version}/data/en_US"
-        champions = await self.data.cached(f"champion-{version}", f"{base}/champion.json", names)
-        items = await self.data.cached(f"item-{version}", f"{base}/item.json", names)
+        champions = await self.data.cached(
+            f"champion-{version}", f"{base}/champion.json", names, memoize=True
+        )
+        items = await self.data.cached(f"item-{version}", f"{base}/item.json", names, memoize=True)
         return champions, items
 
     async def vocabulary(self, title: str, live: LiveContext | None) -> str:

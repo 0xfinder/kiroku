@@ -28,6 +28,7 @@ from kiroku.db.migrate import migrate, new_migration
 from kiroku.errors import KirokuError
 from kiroku.gate import rule_question
 from kiroku.gate.jev import JevGate
+from kiroku.pack import Pack, pack_selector
 from kiroku.packs.league import LeaguePack
 from kiroku.packs.league.data import PUBLIC_WEBSITE_KEY
 from kiroku.rules import Rule
@@ -41,6 +42,12 @@ db_app = typer.Typer(no_args_is_help=True, help="Database schema.")
 app.add_typer(db_app, name="db")
 rule_app = typer.Typer(no_args_is_help=True, help="Alert Rules: what the Gate asks about.")
 app.add_typer(rule_app, name="rule")
+
+PACK_FACTORIES: dict[str, Callable[[httpx.AsyncClient, Settings], Pack]] = {
+    LeaguePack.name: lambda http, settings: LeaguePack(
+        http, settings.data_dir, settings.lolesports_api_key or PUBLIC_WEBSITE_KEY
+    ),
+}
 
 
 @contextmanager
@@ -106,11 +113,7 @@ def watch_command(
             httpx.AsyncClient(timeout=60) as http,
         ):
             sources = [(c, StreamlinkSource(c.login)) for c in claimed]
-            league = LeaguePack(
-                http,
-                settings.data_dir,
-                settings.lolesports_api_key or PUBLIC_WEBSITE_KEY,
-            )
+            packs = [factory(http, settings) for factory in PACK_FACTORIES.values()]
             await watch(
                 pool,
                 sources,
@@ -119,7 +122,7 @@ def watch_command(
                 budget=Budget(pool, settings.caps),
                 gate=JevGate(http, jev_key) if jev_key else None,
                 poll_s=poll_s,
-                select_pack=lambda category: league if category == "League of Legends" else None,
+                select_pack=pack_selector(packs),
             )
 
     with _user_errors(), contextlib.suppress(KeyboardInterrupt, asyncio.CancelledError):
@@ -162,6 +165,12 @@ def _show(rule: Rule) -> None:
         f"{rule.name} ({state}, threshold {rule.threshold}, {pack}, cooldown {rule.cooldown_s} s)"
     )
     typer.echo(f"  {rule.instructions}")
+    if rule.pack is not None and rule.pack not in PACK_FACTORIES:
+        typer.echo(
+            f"PACK_NOT_LIVE: {rule.pack} is unavailable; "
+            "this Rule won't be asked by the live Gate.",
+            err=True,
+        )
 
 
 @rule_app.command("add")

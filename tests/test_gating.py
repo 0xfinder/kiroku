@@ -517,7 +517,6 @@ async def test_backlog_before_the_first_segment_stays_unscoped(
         gate,
         Unlimited(),
         lambda: {"title": "now", "category": "League of Legends"},
-        pack=lambda: "league",
         use_segments=True,
     )
     loop.finish(session_ended=True)
