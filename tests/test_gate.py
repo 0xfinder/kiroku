@@ -320,3 +320,11 @@ def test_context_tail_never_drops_a_whole_word(text: str, chars: int, expected: 
     policy = WindowPolicy(context_chars=chars)
     state = build_state(Bounds(60_000, 105_000), [Turn(30_000, text)], {}, policy)
     assert state.context["earlier"] == expected
+
+
+def test_a_probability_at_the_threshold_passes_like_the_database_says() -> None:
+    from kiroku.gate import passes
+
+    assert Decimal("0.7") > 0.7  # the trap: a float is not exactly 0.7
+    assert passes(0.7, Decimal("0.70")) and passes(0.6, Decimal("0.6"))
+    assert not passes(0.69994, Decimal("0.7"))

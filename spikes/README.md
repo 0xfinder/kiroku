@@ -56,3 +56,27 @@ The thresholds were fixed before the run: `predicts_winner` at 0.60, the others 
 3. **The split also sharpens other Rules.** `draft_opinion` on chunk 3 (play-by-play, no draft talk) fell from 0.91 (merged) to 0.05, and on chunk 7 from 0.80–0.84 to 0.40–0.44. It still scores 0.85–0.96 on chunks that only mention heroes, so finding 3 (Rule wording) stands; that is #4's `rule test`.
 4. **Jev is nearly deterministic.** Repeats differ by at most 0.05, and the response reports the model version (`jev-1.13.0`).
 5. **Size and cost.** 770–926 input tokens per Window with three Rules, about $0.00004. The Budget estimate (body bytes / 2) is 1.33–1.43 times the billed tokens, and a test holds it to these recordings.
+
+## 2026-10-12: Rule wording with `rule test` (issue #4)
+
+**Setup:** `KIROKU_DATABASE_URL=<migrated db> uv run python spikes/rule_wording.py spikes/results/2026-10-12-rule-wording.jsonl`. The script runs the production Rule test path (`kiroku.dry_run.run`, which is what `kiroku rule test` calls) over the spike's eight Windows. It uses the exact state the Gate saw, and compares two wordings of `draft_opinion` at threshold 0.70:
+
+- **old** (the spike's): "Does the speaker give an opinion on a team's draft or hero picks?"
+- **new**: "Does the speaker talk about picking or banning heroes in this game's draft, such as why a hero was picked, banned, or should have been picked?"
+
+| Chunk | old | new | What was said |
+| --- | --- | --- | --- |
+| 0 | 0.16 | 0.03 | play-by-play, a win-probability call |
+| 1 | **0.96** | **0.97** | "this ban and block pick, they know Yatora plays Anti-Mage" |
+| 2 | **0.89** | **0.86** | "if I'm ST here I would like an Axe" |
+| 3 | 0.05 | 0.03 | play-by-play |
+| 4 | **0.95** | **0.95** | "Ursa is one of the highest win rates against Anti-Mage... picked it for a reason" |
+| 5 | **0.90** | 0.23 | "Lycan does not scale Giga well, but he's super farmed" |
+| 6 | **0.82** | 0.11 | "he is actually very good at hunting the supports" (an item build) |
+| 7 | 0.44 | 0.07 | teamfight and items |
+
+**Findings:**
+
+1. **The old wording passes any talk about heroes:** 5 of 8, including in-game remarks on scaling and builds (chunks 5 and 6).
+2. **The reworded Rule passes exactly the three Windows about picks and bans**, and nothing else scores above 0.23. Naming the concrete events ("picked, banned, should have been picked") separates better than an abstract category ("opinion on the draft"). Two other attempts did worse: one explicitly excluded in-game talk, the other asked about "the draft phase".
+3. Each wording took 8 calls, about $0.0003, in about 2 s.

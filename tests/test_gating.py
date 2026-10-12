@@ -332,8 +332,25 @@ async def test_a_wrong_key_stops_the_gate_but_writes_nothing(
 
 async def test_a_rule_cannot_name_state_fields(pool: Pool) -> None:
     # Only the Gate's wrapper points Jev at `new` and `context`.
-    with pytest.raises(psycopg.errors.CheckViolation):
+    with pytest.raises(rules.RuleError, match="backticks"):
         await rules.add(pool, "sneaky", "Is it said in `context`?", threshold=Decimal("0.5"))
+    async with pool.connection() as conn:  # and the table refuses it too
+        with pytest.raises(psycopg.errors.CheckViolation):
+            await conn.execute(
+                "INSERT INTO rule (name, instructions, threshold) VALUES ('x', '`new`?', 0.5)"
+            )
+
+
+async def test_a_disabled_rule_is_not_asked(
+    pool: Pool, session: int, conn: AsyncConnection
+) -> None:
+    winner, _ = await two_rules(pool)
+    await rules.set_enabled(pool, winner.name, False)
+    await speak(pool, session, 0, 45, "Spirit wins.")
+    gate = FakeGate(0.9)
+    await gate_once(pool, session, gate, ended=False)
+    assert [q.name for q in gate.requests[0].rules] == ["talks_item"]
+    assert await rows(conn, "SELECT count(*) FROM gate_decision") == [(1,)]
 
 
 async def test_a_gate_bug_is_logged_and_never_raised(
@@ -413,3 +430,21 @@ async def test_sessions_that_closed_ungated_get_their_last_windows(
         (45_000, 70_000),
     ]
     assert await rows(conn, "SELECT count(*) FROM stream_session WHERE ended_at IS NULL") == [(0,)]
+
+
+async def test_a_failing_rule_test_still_records_every_paid_call(
+    pool: Pool, session: int, conn: AsyncConnection
+) -> None:
+    from kiroku import dry_run
+    from kiroku.gate import rule_question
+    from kiroku.gate.windows import GateState
+
+    winner, _ = await two_rules(pool)
+    windows = [
+        dry_run.StoredWindow(i, session, i * 45_000, GateState({}, f"window {i}")) for i in range(4)
+    ]
+    gate = FakeGate(0.5, 0.5, GateAuthError("Jev rejected the API key (HTTP 401)"), 0.5)
+    with pytest.raises(GateAuthError):
+        await dry_run.run(pool, gate, Unlimited(), rule_question(winner), windows)
+    assert len(gate.requests) == 4
+    assert await rows(conn, "SELECT count(*) FROM cost_ledger") == [(3,)]

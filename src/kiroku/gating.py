@@ -37,7 +37,9 @@ from kiroku.gate import (
     GateFailed,
     GateRequest,
     RuleQuestion,
+    passes,
     rule_question,
+    stored_probability,
 )
 from kiroku.gate.windows import (
     JSON,
@@ -204,7 +206,7 @@ async def commit(
 
 
 def _decimal(p: float | None) -> Decimal | None:
-    return None if p is None else Decimal(f"{p:.4f}")
+    return None if p is None else stored_probability(p)
 
 
 class GateLoop:
@@ -335,9 +337,9 @@ def _log_window(
     match outcome:
         case Answered(answer):
             scores = ", ".join(
-                f"{q.name} {p:.2f}" + (" PASS" if p >= q.threshold else "")
+                f"{q.name} {p:.2f}" + (" PASS" if passes(p, q.threshold) else "")
                 for q in questions
-                if (p := _decimal(answer.probabilities[q.rule_id])) is not None
+                for p in [answer.probabilities[q.rule_id]]
             )
             log.info("session %d: window %s: %s; %s", session_id, span, answer.mode, scores or "-")
         case NotAsked(status, reason):

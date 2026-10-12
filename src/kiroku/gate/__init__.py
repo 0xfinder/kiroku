@@ -63,6 +63,17 @@ def rule_question(rule: Rule) -> RuleQuestion:
     return RuleQuestion(rule.id, rule.name, question, rule.threshold)
 
 
+def stored_probability(p: float) -> Decimal:
+    """A probability as gate_decision stores it (numeric(5,4))."""
+    return Decimal(f"{p:.4f}")
+
+
+def passes(p: float, threshold: Decimal) -> bool:
+    """Whether `p` passes, exactly as gate_decision.passed computes it. A float compared with
+    a Decimal directly disagrees at the boundary: 0.7 >= Decimal("0.7") is False."""
+    return stored_probability(p) >= threshold
+
+
 @dataclass(frozen=True, slots=True)
 class GateRequest:
     state: GateState
