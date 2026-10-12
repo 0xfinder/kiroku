@@ -8,7 +8,7 @@ The names kiroku's code, docs, and design discussions use. If a discussion needs
 - **Source** — where a stream's audio comes from. Twitch first, using streamlink piped into ffmpeg. YouTube is a later Source implementation.
 - **Stream session** — one continuous live broadcast of a Channel, from going live to going offline.
 - **Category** — the game or category Twitch reports for the stream (`League of Legends`, `Dota 2`, `Just Chatting`). It can change mid-session.
-- **Segment** — the part of a Stream session spent in one Category. A Category change starts a new Segment.
+- **Segment** — the part of a Stream session spent in one Category. A Category change starts a new Segment. `segment` stores Category, title and Pack at an audio-clock boundary; title updates also record a boundary. A Window uses the Segment at its start, including during recovery.
 
 ## Transcription and speakers
 
@@ -24,9 +24,9 @@ The names kiroku's code, docs, and design discussions use. If a discussion needs
 
 - **Pack** — a game-specific plug-in chosen by Category: `league` and `dota`. A Pack provides the Vocabulary, a Notes schema for each Mode, and optional Live context tools. The core works with no Pack and simply has less context.
 - **Mode** — what the streamer is doing within a Pack: `playing`, `watching_pro`, `chatting`, or `other`. The Gate infers it for each Window.
-- **Vocabulary** — the list of terms a Pack supplies for the Transcriber's keyword biasing: champions or heroes, items, players, and slang.
-- **Live context tool** — a Pack function that returns the live game state, such as `get_live_match()` (teams, picks, game number). It is optional.
-- **Game key** — an identifier for "the game currently being discussed", used to scope deduplication. Examples: a lolesports match plus game number, or a Dota match id.
+- **Vocabulary** — the list of terms a Pack supplies for the Transcriber's keyword biasing: champions or heroes, items, players, and slang. League loads Data Dragon and current rosters, then selects match terms or title-relevant names to fit Whisper's prompt.
+- **Live context tool** — a Pack function that returns the live game state, such as `get_live_match()` (teams, picks, game number). It is optional. League writes its compact summary to `context.live`; bans are `null` when the source does not expose them. A new snapshot does not apply to Windows starting before its Game boundary.
+- **Game key** — an identifier for "the game currently being discussed", used to scope deduplication. Examples: `league:<lolesports event id>:<game number>`, or a Dota match id. The League Gate stores it on `gate_window` only for Mode `watching_pro` with live context. Missing context means a `null` key.
 
 ## Notes
 

@@ -28,6 +28,8 @@ from kiroku.db.migrate import migrate, new_migration
 from kiroku.errors import KirokuError
 from kiroku.gate import rule_question
 from kiroku.gate.jev import JevGate
+from kiroku.packs.league import LeaguePack
+from kiroku.packs.league.data import PUBLIC_WEBSITE_KEY
 from kiroku.rules import Rule
 from kiroku.sessions import claim_channels
 from kiroku.source import StreamlinkSource
@@ -104,6 +106,11 @@ def watch_command(
             httpx.AsyncClient(timeout=60) as http,
         ):
             sources = [(c, StreamlinkSource(c.login)) for c in claimed]
+            league = LeaguePack(
+                http,
+                settings.data_dir,
+                settings.lolesports_api_key or PUBLIC_WEBSITE_KEY,
+            )
             await watch(
                 pool,
                 sources,
@@ -112,6 +119,7 @@ def watch_command(
                 budget=Budget(pool, settings.caps),
                 gate=JevGate(http, jev_key) if jev_key else None,
                 poll_s=poll_s,
+                select_pack=lambda category: league if category == "League of Legends" else None,
             )
 
     with _user_errors(), contextlib.suppress(KeyboardInterrupt, asyncio.CancelledError):
@@ -136,11 +144,6 @@ Threshold = Annotated[
     Decimal | None,
     typer.Option(parser=_threshold, help="Pass at this probability or above, e.g. 0.7."),
 ]
-
-PACK_NOT_LIVE = (
-    "note: Packs aren't wired into the live Gate yet (#6); a Pack-scoped Rule is not asked "
-    "until they are"
-)
 
 
 def _run_with_pool[T](body: Callable[[Pool], Awaitable[T]]) -> T:
@@ -171,8 +174,6 @@ def rule_add(
 ) -> None:
     """Add a Rule. Try it with `kiroku rule test` before relying on it."""
     assert threshold is not None
-    if pack is not None:
-        typer.echo(PACK_NOT_LIVE, err=True)
     _show(
         _run_with_pool(
             lambda pool: rules.add(
@@ -192,8 +193,6 @@ def rule_edit(
     any_pack: Annotated[bool, typer.Option("--any-pack", help="Apply with any Pack.")] = False,
 ) -> None:
     """Change a Rule. Past decisions keep the wording they were asked with."""
-    if pack is not None:
-        typer.echo(PACK_NOT_LIVE, err=True)
     _show(
         _run_with_pool(
             lambda pool: rules.edit(

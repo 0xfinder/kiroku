@@ -201,7 +201,7 @@ def test_bad_input_is_a_one_line_error(kiroku: Callable[..., Any]) -> None:
         assert message in result.stderr, (args, result.stderr)
         assert "Traceback" not in result.output
     scoped = kiroku("add", "x", "Q?", "--pack", "league")
-    assert scoped.exit_code == 0 and "aren't wired into the live Gate yet" in scoped.stderr
+    assert scoped.exit_code == 0 and scoped.stderr == ""
 
 
 def test_a_rewording_is_tested_at_the_saved_threshold(

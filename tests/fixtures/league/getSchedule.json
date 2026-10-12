@@ -1,0 +1,3426 @@
+{
+  "data": {
+    "schedule": {
+      "pages": {
+        "older": "b2xkZXI6OjExNzEzMzgwNTU1MjI2MjM4OQ==",
+        "newer": "bmV3ZXI6OjExNTY2MDU0MDcyNjA5NTA1MQ=="
+      },
+      "events": [
+        {
+          "startTime": "2026-10-04T07:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "DCGI",
+            "slug": "demacia_cup"
+          },
+          "match": {
+            "id": "117133805552262389",
+            "flags": [
+              "hasVod"
+            ],
+            "teams": [
+              {
+                "name": "BNK FEARX",
+                "code": "BFX",
+                "image": "http://static.lolesports.com/teams/1734691810721_BFXfullcolorfordarkbg.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 2
+                },
+                "record": {
+                  "wins": 2,
+                  "losses": 0
+                }
+              },
+              {
+                "name": "LGD GAMING",
+                "code": "LGD",
+                "image": "http://static.lolesports.com/teams/LGD-FullonDark-1.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 1
+                },
+                "record": {
+                  "wins": 2,
+                  "losses": 1
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 3
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-04T09:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "DCGI",
+            "slug": "demacia_cup"
+          },
+          "match": {
+            "id": "117133805552262393",
+            "flags": [
+              "hasVod"
+            ],
+            "teams": [
+              {
+                "name": "kt Rolster",
+                "code": "KT",
+                "image": "http://static.lolesports.com/teams/kt_darkbackground.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 2
+                },
+                "record": {
+                  "wins": 2,
+                  "losses": 0
+                }
+              },
+              {
+                "name": "RED Kalunga",
+                "code": "RED",
+                "image": "http://static.lolesports.com/teams/1631820575924_red-2021-worlds.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 1,
+                  "losses": 2
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 3
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-04T11:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "DCGI",
+            "slug": "demacia_cup"
+          },
+          "match": {
+            "id": "117133805552262397",
+            "flags": [
+              "hasVod"
+            ],
+            "teams": [
+              {
+                "name": "Xi'an Team WE",
+                "code": "WE",
+                "image": "http://static.lolesports.com/teams/1634763008788_220px-Team_WE_logo.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 2
+                },
+                "record": {
+                  "wins": 2,
+                  "losses": 0
+                }
+              },
+              {
+                "name": "HANJIN BRION",
+                "code": "BRO",
+                "image": "http://static.lolesports.com/teams/1716454325887_Nowyprojekt.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 1
+                },
+                "record": {
+                  "wins": 2,
+                  "losses": 1
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 3
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-04T16:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Knockouts",
+          "league": {
+            "name": "EMEA Masters",
+            "slug": "emea_masters"
+          },
+          "match": {
+            "id": "117173205319911339",
+            "flags": [
+              "hasVod"
+            ],
+            "teams": [
+              {
+                "name": "The Secret Club",
+                "code": "TSC",
+                "image": "http://static.lolesports.com/teams/1754902519348_EBL_TSC-MonochromeDarkBG.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 1
+                }
+              },
+              {
+                "name": "Galions",
+                "code": "GL",
+                "image": "http://static.lolesports.com/teams/1734090136444_WHITE_GALIONS_LOGO.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 3
+                },
+                "record": {
+                  "wins": 3,
+                  "losses": 0
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-04T16:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Knockouts",
+          "league": {
+            "name": "EMEA Masters",
+            "slug": "emea_masters"
+          },
+          "match": {
+            "id": "117173205319911345",
+            "flags": [
+              "hasVod"
+            ],
+            "teams": [
+              {
+                "name": "Solary",
+                "code": "SLY",
+                "image": "http://static.lolesports.com/teams/LFL-SLY-logo.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 3
+                },
+                "record": {
+                  "wins": 3,
+                  "losses": 0
+                }
+              },
+              {
+                "name": "Bar\u00e7a Esports",
+                "code": "BAR",
+                "image": "http://static.lolesports.com/teams/1639828813946_61b778236a9c9995719028.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 1
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-04T16:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Knockouts",
+          "league": {
+            "name": "EMEA Masters",
+            "slug": "emea_masters"
+          },
+          "match": {
+            "id": "117173205319911351",
+            "flags": [
+              "hasVod"
+            ],
+            "teams": [
+              {
+                "name": "UCAM Esports Club",
+                "code": "UCAM",
+                "image": "http://static.lolesports.com/teams/1774563455909_ucam_c.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 2
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 1
+                }
+              },
+              {
+                "name": "Movistar KOI F\u00e9nix",
+                "code": "MKF",
+                "image": "http://static.lolesports.com/teams/1704458610869_6596f892741d1355702004.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 3
+                },
+                "record": {
+                  "wins": 3,
+                  "losses": 0
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-04T20:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Finals",
+          "league": {
+            "name": "LCS",
+            "slug": "lcs"
+          },
+          "match": {
+            "id": "115565004607949429",
+            "flags": [
+              "hasVod",
+              "isSpoiler"
+            ],
+            "teams": [
+              {
+                "name": "Team Liquid Alienware",
+                "code": "TLAW",
+                "image": "http://static.lolesports.com/teams/1769357207762_TLAlienware_Minimal_Bug-White.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 3
+                },
+                "record": {
+                  "wins": 3,
+                  "losses": 0
+                }
+              },
+              {
+                "name": "LYON",
+                "code": "LYON",
+                "image": "http://static.lolesports.com/teams/1743717443673_isotypelyon-03.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 1
+                },
+                "record": {
+                  "wins": 2,
+                  "losses": 2
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-05T07:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "DCGI",
+            "slug": "demacia_cup"
+          },
+          "match": {
+            "id": "117133805552262401",
+            "flags": [
+              "hasVod"
+            ],
+            "teams": [
+              {
+                "name": "Team Vitality",
+                "code": "VIT",
+                "image": "http://static.lolesports.com/teams/1675865863968_Vitality_FullColor.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 2
+                },
+                "record": {
+                  "wins": 2,
+                  "losses": 1
+                }
+              },
+              {
+                "name": "GAM Esports",
+                "code": "GAM",
+                "image": "http://static.lolesports.com/teams/1643263093448_GAMyellow.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 2
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 3
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-05T09:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "DCGI",
+            "slug": "demacia_cup"
+          },
+          "match": {
+            "id": "117133805552262405",
+            "flags": [
+              "hasVod"
+            ],
+            "teams": [
+              {
+                "name": "FlyQuest",
+                "code": "FLY",
+                "image": "http://static.lolesports.com/teams/flyquest-new-on-dark.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 2
+                }
+              },
+              {
+                "name": "Natus Vincere",
+                "code": "NAVI",
+                "image": "http://static.lolesports.com/teams/1752746833620_NAVI_FullColor.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 2
+                },
+                "record": {
+                  "wins": 1,
+                  "losses": 2
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 3
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-05T11:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "DCGI",
+            "slug": "demacia_cup"
+          },
+          "match": {
+            "id": "117133805552262409",
+            "flags": [
+              "hasVod"
+            ],
+            "teams": [
+              {
+                "name": "Beijing JDG Esports",
+                "code": "JDG",
+                "image": "http://static.lolesports.com/teams/1627457924722_29.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 2
+                },
+                "record": {
+                  "wins": 1,
+                  "losses": 2
+                }
+              },
+              {
+                "name": "Shopify Rebellion",
+                "code": "SR",
+                "image": "http://static.lolesports.com/teams/1701424227458_Teams204_Shopify_1632869404072.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 2
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 3
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-05T21:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Regional Qualifier",
+          "league": {
+            "name": "CBLOL Promotion",
+            "slug": "cblol_promotion"
+          },
+          "match": {
+            "id": "117275453885353230",
+            "flags": [
+              "hasVod",
+              "isSpoiler"
+            ],
+            "teams": [
+              {
+                "name": "9z Globant",
+                "code": "9ZG",
+                "image": "http://static.lolesports.com/teams/1771234194177_FULL_COLOR_FOR_DARK_BG-2.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 1
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 2
+                }
+              },
+              {
+                "name": "KaBuM! Eports",
+                "code": "KBM",
+                "image": "http://static.lolesports.com/teams/1774199720854_kbm_c_w.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 3
+                },
+                "record": {
+                  "wins": 3,
+                  "losses": 1
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-05T21:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Regional Qualifier",
+          "league": {
+            "name": "LCS Promotion",
+            "slug": "lcs_promotion"
+          },
+          "match": {
+            "id": "117322953110545728",
+            "flags": [
+              "hasVod"
+            ],
+            "teams": [
+              {
+                "name": "Maryville University",
+                "code": "MU",
+                "image": "http://static.lolesports.com/teams/1773762488904_maryvilleesportslogo.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 3
+                },
+                "record": {
+                  "wins": 3,
+                  "losses": 0
+                }
+              },
+              {
+                "name": "Zeu5 Esports",
+                "code": "Z5",
+                "image": "http://static.lolesports.com/teams/1742462885664_FULL_COLOR_FOR_DARK_BG7.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 1
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 1
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-06T07:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "DCGI",
+            "slug": "demacia_cup"
+          },
+          "match": {
+            "id": "117133805552262413",
+            "flags": [
+              "hasVod"
+            ],
+            "teams": [
+              {
+                "name": "HANJIN BRION",
+                "code": "BRO",
+                "image": "http://static.lolesports.com/teams/1716454325887_Nowyprojekt.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 2
+                },
+                "record": {
+                  "wins": 2,
+                  "losses": 1
+                }
+              },
+              {
+                "name": "Natus Vincere",
+                "code": "NAVI",
+                "image": "http://static.lolesports.com/teams/1752746833620_NAVI_FullColor.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 1
+                },
+                "record": {
+                  "wins": 1,
+                  "losses": 2
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 3
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-06T09:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "DCGI",
+            "slug": "demacia_cup"
+          },
+          "match": {
+            "id": "117133805552262417",
+            "flags": [
+              "hasVod"
+            ],
+            "teams": [
+              {
+                "name": "RED Kalunga",
+                "code": "RED",
+                "image": "http://static.lolesports.com/teams/1631820575924_red-2021-worlds.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 1,
+                  "losses": 2
+                }
+              },
+              {
+                "name": "Team Vitality",
+                "code": "VIT",
+                "image": "http://static.lolesports.com/teams/1675865863968_Vitality_FullColor.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 2
+                },
+                "record": {
+                  "wins": 2,
+                  "losses": 1
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 3
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-06T11:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "DCGI",
+            "slug": "demacia_cup"
+          },
+          "match": {
+            "id": "117133805552262421",
+            "flags": [
+              "hasVod"
+            ],
+            "teams": [
+              {
+                "name": "Beijing JDG Esports",
+                "code": "JDG",
+                "image": "http://static.lolesports.com/teams/1627457924722_29.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 1,
+                  "losses": 2
+                }
+              },
+              {
+                "name": "LGD GAMING",
+                "code": "LGD",
+                "image": "http://static.lolesports.com/teams/LGD-FullonDark-1.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 2
+                },
+                "record": {
+                  "wins": 2,
+                  "losses": 1
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 3
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-06T16:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Playoffs",
+          "league": {
+            "name": "EMEA Masters",
+            "slug": "emea_masters"
+          },
+          "match": {
+            "id": "117173205319911357",
+            "flags": [
+              "hasVod"
+            ],
+            "teams": [
+              {
+                "name": "Valerion",
+                "code": "VLR",
+                "image": "http://static.lolesports.com/teams/1782280666367_ValerionGold.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 1
+                }
+              },
+              {
+                "name": "Solary",
+                "code": "SLY",
+                "image": "http://static.lolesports.com/teams/LFL-SLY-logo.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 3
+                },
+                "record": {
+                  "wins": 3,
+                  "losses": 0
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-06T16:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Playoffs",
+          "league": {
+            "name": "EMEA Masters",
+            "slug": "emea_masters"
+          },
+          "match": {
+            "id": "117173205319911381",
+            "flags": [
+              "hasVod"
+            ],
+            "teams": [
+              {
+                "name": "Frites Esports Club",
+                "code": "FEC",
+                "image": "http://static.lolesports.com/teams/1767711449006_Frites_Esports_Club_Black-removebg-preview.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 1
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 1
+                }
+              },
+              {
+                "name": "Movistar KOI F\u00e9nix",
+                "code": "MKF",
+                "image": "http://static.lolesports.com/teams/1704458610869_6596f892741d1355702004.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 3
+                },
+                "record": {
+                  "wins": 3,
+                  "losses": 0
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-06T16:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Playoffs",
+          "league": {
+            "name": "EMEA Masters",
+            "slug": "emea_masters"
+          },
+          "match": {
+            "id": "117173205319911387",
+            "flags": [
+              "hasVod"
+            ],
+            "teams": [
+              {
+                "name": "Bushido Wildcats",
+                "code": "BW",
+                "image": "http://static.lolesports.com/teams/1767799893163_BW-KEDI-SARI-2.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 1
+                }
+              },
+              {
+                "name": "TLN Pirates",
+                "code": "TLNP",
+                "image": "http://static.lolesports.com/teams/1766134058603_TLNPirates.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 3
+                },
+                "record": {
+                  "wins": 1,
+                  "losses": 1
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-06T16:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Playoffs",
+          "league": {
+            "name": "EMEA Masters",
+            "slug": "emea_masters"
+          },
+          "match": {
+            "id": "117173205319911393",
+            "flags": [
+              "hasVod"
+            ],
+            "teams": [
+              {
+                "name": "Berlin International Gaming",
+                "code": "BIG",
+                "image": "http://static.lolesports.com/teams/1674839453682_PRM_BIG-MonochromeLightBG.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 1
+                }
+              },
+              {
+                "name": "Galions",
+                "code": "GL",
+                "image": "http://static.lolesports.com/teams/1734090136444_WHITE_GALIONS_LOGO.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 3
+                },
+                "record": {
+                  "wins": 3,
+                  "losses": 0
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-06T21:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Regional Qualifier",
+          "league": {
+            "name": "CBLOL Promotion",
+            "slug": "cblol_promotion"
+          },
+          "match": {
+            "id": "117275453885353236",
+            "flags": [
+              "hasVod",
+              "isSpoiler"
+            ],
+            "teams": [
+              {
+                "name": "Estral Esports",
+                "code": "EST",
+                "image": "http://static.lolesports.com/teams/1774200288247_estral_c.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 2
+                },
+                "record": {
+                  "wins": 1,
+                  "losses": 2
+                }
+              },
+              {
+                "name": "KaBuM! Eports",
+                "code": "KBM",
+                "image": "http://static.lolesports.com/teams/1774199720854_kbm_c_w.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 3
+                },
+                "record": {
+                  "wins": 3,
+                  "losses": 1
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-06T21:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Regional Qualifier",
+          "league": {
+            "name": "LCS Promotion",
+            "slug": "lcs_promotion"
+          },
+          "match": {
+            "id": "117322971012796382",
+            "flags": [
+              "hasVod"
+            ],
+            "teams": [
+              {
+                "name": "Cupid Esports",
+                "code": "CPD",
+                "image": "http://static.lolesports.com/teams/1783409729340_logocupid.jpg",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 3
+                },
+                "record": {
+                  "wins": 1,
+                  "losses": 2
+                }
+              },
+              {
+                "name": "FUEGO",
+                "code": "FUE",
+                "image": "http://static.lolesports.com/teams/1711010140737_FUEGO-C.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 2
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-07T07:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "DCGI",
+            "slug": "demacia_cup"
+          },
+          "match": {
+            "id": "117133816701918794",
+            "flags": [
+              "hasVod"
+            ],
+            "teams": [
+              {
+                "name": "FlyQuest",
+                "code": "FLY",
+                "image": "http://static.lolesports.com/teams/flyquest-new-on-dark.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 2
+                },
+                "record": {
+                  "wins": 2,
+                  "losses": 0
+                }
+              },
+              {
+                "name": "GAM Esports",
+                "code": "GAM",
+                "image": "http://static.lolesports.com/teams/1643263093448_GAMyellow.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 2
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 3
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-07T09:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "DCGI",
+            "slug": "demacia_cup"
+          },
+          "match": {
+            "id": "117133816701918798",
+            "flags": [
+              "hasVod"
+            ],
+            "teams": [
+              {
+                "name": "GAM Esports",
+                "code": "GAM",
+                "image": "http://static.lolesports.com/teams/1643263093448_GAMyellow.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 2
+                }
+              },
+              {
+                "name": "Shopify Rebellion",
+                "code": "SR",
+                "image": "http://static.lolesports.com/teams/1701424227458_Teams204_Shopify_1632869404072.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 2
+                },
+                "record": {
+                  "wins": 1,
+                  "losses": 1
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 3
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-07T11:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "DCGI",
+            "slug": "demacia_cup"
+          },
+          "match": {
+            "id": "117133816701918802",
+            "flags": [
+              "hasVod"
+            ],
+            "teams": [
+              {
+                "name": "Shopify Rebellion",
+                "code": "SR",
+                "image": "http://static.lolesports.com/teams/1701424227458_Teams204_Shopify_1632869404072.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 1
+                },
+                "record": {
+                  "wins": 1,
+                  "losses": 1
+                }
+              },
+              {
+                "name": "FlyQuest",
+                "code": "FLY",
+                "image": "http://static.lolesports.com/teams/flyquest-new-on-dark.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 2
+                },
+                "record": {
+                  "wins": 2,
+                  "losses": 0
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 3
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-07T16:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Playoffs",
+          "league": {
+            "name": "EMEA Masters",
+            "slug": "emea_masters"
+          },
+          "match": {
+            "id": "117173205319911363",
+            "flags": [],
+            "teams": [
+              {
+                "name": "Heretics Academy",
+                "code": "HRTS",
+                "image": "http://static.lolesports.com/teams/1661502137823_LOGOHERETICSPNG.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 2
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 1
+                }
+              },
+              {
+                "name": "G2 NORD",
+                "code": "G2N",
+                "image": "http://static.lolesports.com/teams/1767714240621_G2_Nord_White.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 3
+                },
+                "record": {
+                  "wins": 1,
+                  "losses": 1
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-07T16:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Playoffs",
+          "league": {
+            "name": "EMEA Masters",
+            "slug": "emea_masters"
+          },
+          "match": {
+            "id": "117173205319911369",
+            "flags": [
+              "hasVod"
+            ],
+            "teams": [
+              {
+                "name": "Karmine Corp Blue",
+                "code": "KCB",
+                "image": "http://static.lolesports.com/teams/1765897112519_WHITE.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 3
+                },
+                "record": {
+                  "wins": 1,
+                  "losses": 1
+                }
+              },
+              {
+                "name": "Skillcamp",
+                "code": "SC",
+                "image": "http://static.lolesports.com/teams/1766134108028_Skillcamp.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 1
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-07T16:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Playoffs",
+          "league": {
+            "name": "EMEA Masters",
+            "slug": "emea_masters"
+          },
+          "match": {
+            "id": "117173205319911375",
+            "flags": [
+              "hasVod"
+            ],
+            "teams": [
+              {
+                "name": "Ruddy Corporation",
+                "code": "RUD",
+                "image": "http://static.lolesports.com/teams/1767962931112_rud.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 2
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 1
+                }
+              },
+              {
+                "name": "Anubis Gaming",
+                "code": "ANB",
+                "image": "http://static.lolesports.com/teams/1738571697908_logo.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 3
+                },
+                "record": {
+                  "wins": 2,
+                  "losses": 0
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-07T16:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Playoffs",
+          "league": {
+            "name": "EMEA Masters",
+            "slug": "emea_masters"
+          },
+          "match": {
+            "id": "117173205319911399",
+            "flags": [],
+            "teams": [
+              {
+                "name": "Unicorns of Love Sexy Edition",
+                "code": "USE",
+                "image": "http://static.lolesports.com/teams/1674832383233_PRM_USE-FullColorDarkBG.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 1
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 1
+                }
+              },
+              {
+                "name": "Kaufland Hangry Knights",
+                "code": "KHK",
+                "image": "http://static.lolesports.com/teams/1734307355268_KHK.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 3
+                },
+                "record": {
+                  "wins": 1,
+                  "losses": 1
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-07T21:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Regional Qualifier",
+          "league": {
+            "name": "LCS Promotion",
+            "slug": "lcs_promotion"
+          },
+          "match": {
+            "id": "117322971012796388",
+            "flags": [
+              "hasVod"
+            ],
+            "teams": [
+              {
+                "name": "Maryville University",
+                "code": "MU",
+                "image": "http://static.lolesports.com/teams/1773762488904_maryvilleesportslogo.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 3
+                },
+                "record": {
+                  "wins": 3,
+                  "losses": 0
+                }
+              },
+              {
+                "name": "Disguised",
+                "code": "DSG",
+                "image": "http://static.lolesports.com/teams/1731496922454_Disguised-Wordmark-Yellow-Main.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 1
+                },
+                "record": {
+                  "wins": 2,
+                  "losses": 1
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-08T09:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "DCGI",
+            "slug": "demacia_cup"
+          },
+          "match": {
+            "id": "117133830114188936",
+            "flags": [
+              "hasVod"
+            ],
+            "teams": [
+              {
+                "name": "RED Kalunga",
+                "code": "RED",
+                "image": "http://static.lolesports.com/teams/1631820575924_red-2021-worlds.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 1
+                }
+              },
+              {
+                "name": "FlyQuest",
+                "code": "FLY",
+                "image": "http://static.lolesports.com/teams/flyquest-new-on-dark.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 2
+                },
+                "record": {
+                  "wins": 1,
+                  "losses": 0
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 3
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-08T11:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "DCGI",
+            "slug": "demacia_cup"
+          },
+          "match": {
+            "id": "117133830114188940",
+            "flags": [
+              "hasVod"
+            ],
+            "teams": [
+              {
+                "name": "Beijing JDG Esports",
+                "code": "JDG",
+                "image": "http://static.lolesports.com/teams/1627457924722_29.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 2
+                },
+                "record": {
+                  "wins": 1,
+                  "losses": 0
+                }
+              },
+              {
+                "name": "Natus Vincere",
+                "code": "NAVI",
+                "image": "http://static.lolesports.com/teams/1752746833620_NAVI_FullColor.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 1
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 1
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 3
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-08T21:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Regional Qualifier",
+          "league": {
+            "name": "LCS Promotion",
+            "slug": "lcs_promotion"
+          },
+          "match": {
+            "id": "117322971012796394",
+            "flags": [
+              "hasVod",
+              "isSpoiler"
+            ],
+            "teams": [
+              {
+                "name": "Maryville University",
+                "code": "MU",
+                "image": "http://static.lolesports.com/teams/1773762488904_maryvilleesportslogo.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 3
+                },
+                "record": {
+                  "wins": 3,
+                  "losses": 0
+                }
+              },
+              {
+                "name": "Cupid Esports",
+                "code": "CPD",
+                "image": "http://static.lolesports.com/teams/1783409729340_logocupid.jpg",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 1,
+                  "losses": 2
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-09T16:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Playoffs",
+          "league": {
+            "name": "EMEA Masters",
+            "slug": "emea_masters"
+          },
+          "match": {
+            "id": "117173205319911417",
+            "flags": [
+              "isSpoiler"
+            ],
+            "teams": [
+              {
+                "name": "Movistar KOI F\u00e9nix",
+                "code": "MKF",
+                "image": "http://static.lolesports.com/teams/1704458610869_6596f892741d1355702004.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 3
+                },
+                "record": {
+                  "wins": 3,
+                  "losses": 0
+                }
+              },
+              {
+                "name": "TLN Pirates",
+                "code": "TLNP",
+                "image": "http://static.lolesports.com/teams/1766134058603_TLNPirates.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 1
+                },
+                "record": {
+                  "wins": 1,
+                  "losses": 1
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-09T16:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Playoffs",
+          "league": {
+            "name": "EMEA Masters",
+            "slug": "emea_masters"
+          },
+          "match": {
+            "id": "117173205319911423",
+            "flags": [
+              "hasVod",
+              "isSpoiler"
+            ],
+            "teams": [
+              {
+                "name": "Galions",
+                "code": "GL",
+                "image": "http://static.lolesports.com/teams/1734090136444_WHITE_GALIONS_LOGO.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 3
+                },
+                "record": {
+                  "wins": 3,
+                  "losses": 0
+                }
+              },
+              {
+                "name": "Kaufland Hangry Knights",
+                "code": "KHK",
+                "image": "http://static.lolesports.com/teams/1734307355268_KHK.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 1,
+                  "losses": 1
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-09T21:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Regional Qualifier",
+          "league": {
+            "name": "LCS Promotion",
+            "slug": "lcs_promotion"
+          },
+          "match": {
+            "id": "117322971012796400",
+            "flags": [
+              "hasVod",
+              "isSpoiler"
+            ],
+            "teams": [
+              {
+                "name": "Disguised",
+                "code": "DSG",
+                "image": "http://static.lolesports.com/teams/1731496922454_Disguised-Wordmark-Yellow-Main.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 3
+                },
+                "record": {
+                  "wins": 2,
+                  "losses": 1
+                }
+              },
+              {
+                "name": "FUEGO",
+                "code": "FUE",
+                "image": "http://static.lolesports.com/teams/1711010140737_FUEGO-C.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 2
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-10T16:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Playoffs",
+          "league": {
+            "name": "EMEA Masters",
+            "slug": "emea_masters"
+          },
+          "match": {
+            "id": "117173205319911405",
+            "flags": [
+              "hasVod",
+              "isSpoiler"
+            ],
+            "teams": [
+              {
+                "name": "Solary",
+                "code": "SLY",
+                "image": "http://static.lolesports.com/teams/LFL-SLY-logo.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 3
+                },
+                "record": {
+                  "wins": 3,
+                  "losses": 0
+                }
+              },
+              {
+                "name": "G2 NORD",
+                "code": "G2N",
+                "image": "http://static.lolesports.com/teams/1767714240621_G2_Nord_White.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 1
+                },
+                "record": {
+                  "wins": 1,
+                  "losses": 1
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-10T16:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Playoffs",
+          "league": {
+            "name": "EMEA Masters",
+            "slug": "emea_masters"
+          },
+          "match": {
+            "id": "117173205319911411",
+            "flags": [
+              "isSpoiler"
+            ],
+            "teams": [
+              {
+                "name": "Karmine Corp Blue",
+                "code": "KCB",
+                "image": "http://static.lolesports.com/teams/1765897112519_WHITE.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 1,
+                  "losses": 1
+                }
+              },
+              {
+                "name": "Anubis Gaming",
+                "code": "ANB",
+                "image": "http://static.lolesports.com/teams/1738571697908_logo.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 3
+                },
+                "record": {
+                  "wins": 2,
+                  "losses": 0
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-10T16:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Finals",
+          "league": {
+            "name": "CBLOL",
+            "slug": "cblol-brazil"
+          },
+          "match": {
+            "id": "115565671526468647",
+            "flags": [
+              "hasVod",
+              "isSpoiler"
+            ],
+            "teams": [
+              {
+                "name": "FURIA",
+                "code": "FUR",
+                "image": "http://static.lolesports.com/teams/FURIA---black.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 2
+                },
+                "record": {
+                  "wins": 3,
+                  "losses": 2
+                }
+              },
+              {
+                "name": "LOS",
+                "code": "LOS",
+                "image": "http://static.lolesports.com/teams/1784013312149_LOS-OLaranja.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 3
+                },
+                "record": {
+                  "wins": 3,
+                  "losses": 0
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-10T21:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Regional Qualifier",
+          "league": {
+            "name": "LCS Promotion",
+            "slug": "lcs_promotion"
+          },
+          "match": {
+            "id": "117322971012796406",
+            "flags": [
+              "hasVod",
+              "isSpoiler"
+            ],
+            "teams": [
+              {
+                "name": "Disguised",
+                "code": "DSG",
+                "image": "http://static.lolesports.com/teams/1731496922454_Disguised-Wordmark-Yellow-Main.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 3
+                },
+                "record": {
+                  "wins": 2,
+                  "losses": 1
+                }
+              },
+              {
+                "name": "Cupid Esports",
+                "code": "CPD",
+                "image": "http://static.lolesports.com/teams/1783409729340_logocupid.jpg",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 1,
+                  "losses": 2
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-11T10:00:00Z",
+          "state": "completed",
+          "type": "match",
+          "blockName": "Finals",
+          "league": {
+            "name": "VCS",
+            "slug": "vcs"
+          },
+          "match": {
+            "id": "116952475624364075",
+            "flags": [
+              "hasVod",
+              "isSpoiler"
+            ],
+            "teams": [
+              {
+                "name": "Saigon Warrior",
+                "code": "SGW",
+                "image": "http://static.lolesports.com/teams/1771230875226_logo_SW-removebg-preview.png",
+                "result": {
+                  "outcome": "loss",
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 2,
+                  "losses": 1
+                }
+              },
+              {
+                "name": "Saigon MVKE Academy",
+                "code": "MVKA",
+                "image": "http://static.lolesports.com/teams/1771230115237_Orange_Black_Logo.png",
+                "result": {
+                  "outcome": "win",
+                  "gameWins": 3
+                },
+                "record": {
+                  "wins": 3,
+                  "losses": 1
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-12T06:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Quarterfinals",
+          "league": {
+            "name": "DCGI",
+            "slug": "demacia_cup"
+          },
+          "match": {
+            "id": "117133830110912099",
+            "flags": [],
+            "teams": [
+              {
+                "name": "kt Rolster",
+                "code": "KT",
+                "image": "http://static.lolesports.com/teams/kt_darkbackground.png",
+                "result": {
+                  "outcome": null,
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 0
+                }
+              },
+              {
+                "name": "Team Vitality",
+                "code": "VIT",
+                "image": "http://static.lolesports.com/teams/1675865863968_Vitality_FullColor.png",
+                "result": {
+                  "outcome": null,
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 0
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-12T09:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Quarterfinals",
+          "league": {
+            "name": "DCGI",
+            "slug": "demacia_cup"
+          },
+          "match": {
+            "id": "117133830110912093",
+            "flags": [],
+            "teams": [
+              {
+                "name": "BNK FEARX",
+                "code": "BFX",
+                "image": "http://static.lolesports.com/teams/1734691810721_BFXfullcolorfordarkbg.png",
+                "result": {
+                  "outcome": null,
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 0
+                }
+              },
+              {
+                "name": "Beijing JDG Esports",
+                "code": "JDG",
+                "image": "http://static.lolesports.com/teams/1627457924722_29.png",
+                "result": {
+                  "outcome": null,
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 0
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-12T21:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Finals",
+          "league": {
+            "name": "CBLOL Promotion",
+            "slug": "cblol_promotion"
+          },
+          "match": {
+            "id": "117275453885353242",
+            "flags": [
+              "isSpoiler"
+            ],
+            "teams": [
+              {
+                "name": "KaBuM! Eports",
+                "code": "KBM",
+                "image": "http://static.lolesports.com/teams/1774199720854_kbm_c_w.png",
+                "result": {
+                  "outcome": null,
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 3,
+                  "losses": 1
+                }
+              },
+              {
+                "name": "LOS",
+                "code": "LOS",
+                "image": "http://static.lolesports.com/teams/1784013312149_LOS-OLaranja.png",
+                "result": {
+                  "outcome": null,
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 2,
+                  "losses": 0
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-12T23:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Finals",
+          "league": {
+            "name": "LCS Promotion",
+            "slug": "lcs_promotion"
+          },
+          "match": {
+            "id": "117322971012796412",
+            "flags": [
+              "isSpoiler"
+            ],
+            "teams": [
+              {
+                "name": "Disguised",
+                "code": "DSG",
+                "image": "http://static.lolesports.com/teams/1731496922454_Disguised-Wordmark-Yellow-Main.png",
+                "result": {
+                  "outcome": null,
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 2,
+                  "losses": 1
+                }
+              },
+              {
+                "name": "Maryville University",
+                "code": "MU",
+                "image": "http://static.lolesports.com/teams/1773762488904_maryvilleesportslogo.png",
+                "result": {
+                  "outcome": null,
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 3,
+                  "losses": 0
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-13T06:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Quarterfinals",
+          "league": {
+            "name": "DCGI",
+            "slug": "demacia_cup"
+          },
+          "match": {
+            "id": "117133830110912105",
+            "flags": [],
+            "teams": [
+              {
+                "name": "Xi'an Team WE",
+                "code": "WE",
+                "image": "http://static.lolesports.com/teams/1634763008788_220px-Team_WE_logo.png",
+                "result": {
+                  "outcome": null,
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 0
+                }
+              },
+              {
+                "name": "FlyQuest",
+                "code": "FLY",
+                "image": "http://static.lolesports.com/teams/flyquest-new-on-dark.png",
+                "result": {
+                  "outcome": null,
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 0
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-13T09:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Quarterfinals",
+          "league": {
+            "name": "DCGI",
+            "slug": "demacia_cup"
+          },
+          "match": {
+            "id": "117133830110912111",
+            "flags": [],
+            "teams": [
+              {
+                "name": "HANJIN BRION",
+                "code": "BRO",
+                "image": "http://static.lolesports.com/teams/1716454325887_Nowyprojekt.png",
+                "result": {
+                  "outcome": null,
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 0
+                }
+              },
+              {
+                "name": "LGD GAMING",
+                "code": "LGD",
+                "image": "http://static.lolesports.com/teams/LGD-FullonDark-1.png",
+                "result": {
+                  "outcome": null,
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 0
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-13T16:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Playoffs",
+          "league": {
+            "name": "EMEA Masters",
+            "slug": "emea_masters"
+          },
+          "match": {
+            "id": "117173205319911435",
+            "flags": [
+              "isSpoiler"
+            ],
+            "teams": [
+              {
+                "name": "Galions",
+                "code": "GL",
+                "image": "http://static.lolesports.com/teams/1734090136444_WHITE_GALIONS_LOGO.png",
+                "result": {
+                  "outcome": null,
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 3,
+                  "losses": 0
+                }
+              },
+              {
+                "name": "Movistar KOI F\u00e9nix",
+                "code": "MKF",
+                "image": "http://static.lolesports.com/teams/1704458610869_6596f892741d1355702004.png",
+                "result": {
+                  "outcome": null,
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 3,
+                  "losses": 0
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-14T09:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Semifinals",
+          "league": {
+            "name": "DCGI",
+            "slug": "demacia_cup"
+          },
+          "match": {
+            "id": "117133830110912117",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-14T16:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Playoffs",
+          "league": {
+            "name": "EMEA Masters",
+            "slug": "emea_masters"
+          },
+          "match": {
+            "id": "117173205319911429",
+            "flags": [
+              "isSpoiler"
+            ],
+            "teams": [
+              {
+                "name": "Anubis Gaming",
+                "code": "ANB",
+                "image": "http://static.lolesports.com/teams/1738571697908_logo.png",
+                "result": {
+                  "outcome": null,
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 2,
+                  "losses": 0
+                }
+              },
+              {
+                "name": "Solary",
+                "code": "SLY",
+                "image": "http://static.lolesports.com/teams/LFL-SLY-logo.png",
+                "result": {
+                  "outcome": null,
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 3,
+                  "losses": 0
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-15T09:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Semifinals",
+          "league": {
+            "name": "DCGI",
+            "slug": "demacia_cup"
+          },
+          "match": {
+            "id": "117133830110912123",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-15T18:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Play-Ins",
+          "league": {
+            "name": "Worlds",
+            "slug": "worlds"
+          },
+          "match": {
+            "id": "115660588583040710",
+            "flags": [],
+            "teams": [
+              {
+                "name": "FURIA",
+                "code": "FUR",
+                "image": "http://static.lolesports.com/teams/FURIA---black.png",
+                "result": {
+                  "outcome": null,
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 0
+                }
+              },
+              {
+                "name": "MVK Esports",
+                "code": "MVK",
+                "image": "http://static.lolesports.com/teams/1767089709161_White_Logo.png",
+                "result": {
+                  "outcome": null,
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 0
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-15T23:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Play-Ins",
+          "league": {
+            "name": "Worlds",
+            "slug": "worlds"
+          },
+          "match": {
+            "id": "115660588583171786",
+            "flags": [],
+            "teams": [
+              {
+                "name": "Cloud9 Kia",
+                "code": "C9",
+                "image": "http://static.lolesports.com/teams/1736924120254_C9Kia_IconBlue_Transparent_2000x2000.png",
+                "result": {
+                  "outcome": null,
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 0
+                }
+              },
+              {
+                "name": "Karmine Corp",
+                "code": "KC",
+                "image": "http://static.lolesports.com/teams/1704714951336_KC.png",
+                "result": {
+                  "outcome": null,
+                  "gameWins": 0
+                },
+                "record": {
+                  "wins": 0,
+                  "losses": 0
+                }
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-16T18:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Play-Ins",
+          "league": {
+            "name": "Worlds",
+            "slug": "worlds"
+          },
+          "match": {
+            "id": "115660588583171790",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-16T23:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Play-Ins",
+          "league": {
+            "name": "Worlds",
+            "slug": "worlds"
+          },
+          "match": {
+            "id": "115660588583171794",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-17T09:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Finals",
+          "league": {
+            "name": "DCGI",
+            "slug": "demacia_cup"
+          },
+          "match": {
+            "id": "117133830110912129",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-17T18:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Play-Ins",
+          "league": {
+            "name": "Worlds",
+            "slug": "worlds"
+          },
+          "match": {
+            "id": "115660588583171798",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-18T18:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Play-Ins",
+          "league": {
+            "name": "Worlds",
+            "slug": "worlds"
+          },
+          "match": {
+            "id": "116299649498303884",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-23T16:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Finals",
+          "league": {
+            "name": "EMEA Masters",
+            "slug": "emea_masters"
+          },
+          "match": {
+            "id": "117173205319911441",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 5
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-23T17:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "Worlds",
+            "slug": "worlds"
+          },
+          "match": {
+            "id": "115660540726095005",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 1
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-23T18:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "Worlds",
+            "slug": "worlds"
+          },
+          "match": {
+            "id": "115660540726095007",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 1
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-23T19:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "Worlds",
+            "slug": "worlds"
+          },
+          "match": {
+            "id": "115660540726095009",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 1
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-23T20:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "Worlds",
+            "slug": "worlds"
+          },
+          "match": {
+            "id": "115660540726095011",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 1
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-23T21:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "Worlds",
+            "slug": "worlds"
+          },
+          "match": {
+            "id": "115660540726095013",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 1
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-23T22:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "Worlds",
+            "slug": "worlds"
+          },
+          "match": {
+            "id": "115660540726095015",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 1
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-23T23:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "Worlds",
+            "slug": "worlds"
+          },
+          "match": {
+            "id": "115660540726095017",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 1
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-24T00:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "Worlds",
+            "slug": "worlds"
+          },
+          "match": {
+            "id": "115660540726095019",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 1
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-24T17:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "Worlds",
+            "slug": "worlds"
+          },
+          "match": {
+            "id": "115660540726095021",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 1
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-24T18:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "Worlds",
+            "slug": "worlds"
+          },
+          "match": {
+            "id": "115660540726095023",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 1
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-24T19:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "Worlds",
+            "slug": "worlds"
+          },
+          "match": {
+            "id": "115660540726095025",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 1
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-24T20:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "Worlds",
+            "slug": "worlds"
+          },
+          "match": {
+            "id": "115660540726095027",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 1
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-24T21:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "Worlds",
+            "slug": "worlds"
+          },
+          "match": {
+            "id": "115660540726095029",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 1
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-24T22:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "Worlds",
+            "slug": "worlds"
+          },
+          "match": {
+            "id": "115660540726095031",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 1
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-24T23:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "Worlds",
+            "slug": "worlds"
+          },
+          "match": {
+            "id": "115660540726095033",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 1
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-25T00:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "Worlds",
+            "slug": "worlds"
+          },
+          "match": {
+            "id": "115660540726095035",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 1
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-25T17:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "Worlds",
+            "slug": "worlds"
+          },
+          "match": {
+            "id": "115660540726095045",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 1
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-25T18:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "Worlds",
+            "slug": "worlds"
+          },
+          "match": {
+            "id": "115660540726095047",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 1
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-25T19:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "Worlds",
+            "slug": "worlds"
+          },
+          "match": {
+            "id": "115660540726095037",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 3
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-25T22:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "Worlds",
+            "slug": "worlds"
+          },
+          "match": {
+            "id": "115660540726095041",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 3
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-26T17:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "Worlds",
+            "slug": "worlds"
+          },
+          "match": {
+            "id": "115660540726095049",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 1
+            }
+          }
+        },
+        {
+          "startTime": "2026-10-26T18:00:00Z",
+          "state": "unstarted",
+          "type": "match",
+          "blockName": "Swiss",
+          "league": {
+            "name": "Worlds",
+            "slug": "worlds"
+          },
+          "match": {
+            "id": "115660540726095051",
+            "flags": [],
+            "teams": [
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              },
+              {
+                "name": "TBD",
+                "code": "TBD",
+                "image": "https://static.lolesports.com/teams/team-tbd.png",
+                "result": null,
+                "record": null
+              }
+            ],
+            "strategy": {
+              "type": "bestOf",
+              "count": 1
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,526 @@
+{
+  "type": "champion",
+  "format": "standAloneComplex",
+  "version": "16.20.1",
+  "data": {
+    "Aatrox": {
+      "name": "Aatrox"
+    },
+    "Ahri": {
+      "name": "Ahri"
+    },
+    "Akali": {
+      "name": "Akali"
+    },
+    "Akshan": {
+      "name": "Akshan"
+    },
+    "Alistar": {
+      "name": "Alistar"
+    },
+    "Ambessa": {
+      "name": "Ambessa"
+    },
+    "Amumu": {
+      "name": "Amumu"
+    },
+    "Anivia": {
+      "name": "Anivia"
+    },
+    "Annie": {
+      "name": "Annie"
+    },
+    "Aphelios": {
+      "name": "Aphelios"
+    },
+    "Ashe": {
+      "name": "Ashe"
+    },
+    "AurelionSol": {
+      "name": "Aurelion Sol"
+    },
+    "Aurora": {
+      "name": "Aurora"
+    },
+    "Azir": {
+      "name": "Azir"
+    },
+    "Bard": {
+      "name": "Bard"
+    },
+    "Belveth": {
+      "name": "Bel'Veth"
+    },
+    "Blitzcrank": {
+      "name": "Blitzcrank"
+    },
+    "Brand": {
+      "name": "Brand"
+    },
+    "Braum": {
+      "name": "Braum"
+    },
+    "Briar": {
+      "name": "Briar"
+    },
+    "Caitlyn": {
+      "name": "Caitlyn"
+    },
+    "Camille": {
+      "name": "Camille"
+    },
+    "Cassiopeia": {
+      "name": "Cassiopeia"
+    },
+    "Chogath": {
+      "name": "Cho'Gath"
+    },
+    "Corki": {
+      "name": "Corki"
+    },
+    "Darius": {
+      "name": "Darius"
+    },
+    "Diana": {
+      "name": "Diana"
+    },
+    "Draven": {
+      "name": "Draven"
+    },
+    "DrMundo": {
+      "name": "Dr. Mundo"
+    },
+    "Ekko": {
+      "name": "Ekko"
+    },
+    "Elise": {
+      "name": "Elise"
+    },
+    "Evelynn": {
+      "name": "Evelynn"
+    },
+    "Ezreal": {
+      "name": "Ezreal"
+    },
+    "Fiddlesticks": {
+      "name": "Fiddlesticks"
+    },
+    "Fiora": {
+      "name": "Fiora"
+    },
+    "Fizz": {
+      "name": "Fizz"
+    },
+    "Galio": {
+      "name": "Galio"
+    },
+    "Gangplank": {
+      "name": "Gangplank"
+    },
+    "Garen": {
+      "name": "Garen"
+    },
+    "Gnar": {
+      "name": "Gnar"
+    },
+    "Gragas": {
+      "name": "Gragas"
+    },
+    "Graves": {
+      "name": "Graves"
+    },
+    "Gwen": {
+      "name": "Gwen"
+    },
+    "Hecarim": {
+      "name": "Hecarim"
+    },
+    "Heimerdinger": {
+      "name": "Heimerdinger"
+    },
+    "Hwei": {
+      "name": "Hwei"
+    },
+    "Illaoi": {
+      "name": "Illaoi"
+    },
+    "Irelia": {
+      "name": "Irelia"
+    },
+    "Ivern": {
+      "name": "Ivern"
+    },
+    "Janna": {
+      "name": "Janna"
+    },
+    "JarvanIV": {
+      "name": "Jarvan IV"
+    },
+    "Jax": {
+      "name": "Jax"
+    },
+    "Jayce": {
+      "name": "Jayce"
+    },
+    "Jhin": {
+      "name": "Jhin"
+    },
+    "Jinx": {
+      "name": "Jinx"
+    },
+    "Kaisa": {
+      "name": "Kai'Sa"
+    },
+    "Kalista": {
+      "name": "Kalista"
+    },
+    "Karma": {
+      "name": "Karma"
+    },
+    "Karthus": {
+      "name": "Karthus"
+    },
+    "Kassadin": {
+      "name": "Kassadin"
+    },
+    "Katarina": {
+      "name": "Katarina"
+    },
+    "Kayle": {
+      "name": "Kayle"
+    },
+    "Kayn": {
+      "name": "Kayn"
+    },
+    "Kennen": {
+      "name": "Kennen"
+    },
+    "Khazix": {
+      "name": "Kha'Zix"
+    },
+    "Kindred": {
+      "name": "Kindred"
+    },
+    "Kled": {
+      "name": "Kled"
+    },
+    "KogMaw": {
+      "name": "Kog'Maw"
+    },
+    "KSante": {
+      "name": "K'Sante"
+    },
+    "Leblanc": {
+      "name": "LeBlanc"
+    },
+    "LeeSin": {
+      "name": "Lee Sin"
+    },
+    "Leona": {
+      "name": "Leona"
+    },
+    "Lillia": {
+      "name": "Lillia"
+    },
+    "Lissandra": {
+      "name": "Lissandra"
+    },
+    "Locke": {
+      "name": "Locke"
+    },
+    "Lucian": {
+      "name": "Lucian"
+    },
+    "Lulu": {
+      "name": "Lulu"
+    },
+    "Lux": {
+      "name": "Lux"
+    },
+    "Malphite": {
+      "name": "Malphite"
+    },
+    "Malzahar": {
+      "name": "Malzahar"
+    },
+    "Maokai": {
+      "name": "Maokai"
+    },
+    "MasterYi": {
+      "name": "Master Yi"
+    },
+    "Mel": {
+      "name": "Mel"
+    },
+    "Milio": {
+      "name": "Milio"
+    },
+    "MissFortune": {
+      "name": "Miss Fortune"
+    },
+    "MonkeyKing": {
+      "name": "Wukong"
+    },
+    "Mordekaiser": {
+      "name": "Mordekaiser"
+    },
+    "Morgana": {
+      "name": "Morgana"
+    },
+    "Naafiri": {
+      "name": "Naafiri"
+    },
+    "Nami": {
+      "name": "Nami"
+    },
+    "Nasus": {
+      "name": "Nasus"
+    },
+    "Nautilus": {
+      "name": "Nautilus"
+    },
+    "Neeko": {
+      "name": "Neeko"
+    },
+    "Nidalee": {
+      "name": "Nidalee"
+    },
+    "Nilah": {
+      "name": "Nilah"
+    },
+    "Nocturne": {
+      "name": "Nocturne"
+    },
+    "Nunu": {
+      "name": "Nunu & Willump"
+    },
+    "Olaf": {
+      "name": "Olaf"
+    },
+    "Orianna": {
+      "name": "Orianna"
+    },
+    "Ornn": {
+      "name": "Ornn"
+    },
+    "Pantheon": {
+      "name": "Pantheon"
+    },
+    "Poppy": {
+      "name": "Poppy"
+    },
+    "Pyke": {
+      "name": "Pyke"
+    },
+    "Qiyana": {
+      "name": "Qiyana"
+    },
+    "Quinn": {
+      "name": "Quinn"
+    },
+    "Rakan": {
+      "name": "Rakan"
+    },
+    "Rammus": {
+      "name": "Rammus"
+    },
+    "RekSai": {
+      "name": "Rek'Sai"
+    },
+    "Rell": {
+      "name": "Rell"
+    },
+    "Renata": {
+      "name": "Renata Glasc"
+    },
+    "Renekton": {
+      "name": "Renekton"
+    },
+    "Rengar": {
+      "name": "Rengar"
+    },
+    "Riven": {
+      "name": "Riven"
+    },
+    "Rumble": {
+      "name": "Rumble"
+    },
+    "Ryze": {
+      "name": "Ryze"
+    },
+    "Samira": {
+      "name": "Samira"
+    },
+    "Sejuani": {
+      "name": "Sejuani"
+    },
+    "Senna": {
+      "name": "Senna"
+    },
+    "Seraphine": {
+      "name": "Seraphine"
+    },
+    "Sett": {
+      "name": "Sett"
+    },
+    "Shaco": {
+      "name": "Shaco"
+    },
+    "Shen": {
+      "name": "Shen"
+    },
+    "Shyvana": {
+      "name": "Shyvana"
+    },
+    "Singed": {
+      "name": "Singed"
+    },
+    "Sion": {
+      "name": "Sion"
+    },
+    "Sivir": {
+      "name": "Sivir"
+    },
+    "Skarner": {
+      "name": "Skarner"
+    },
+    "Smolder": {
+      "name": "Smolder"
+    },
+    "Sona": {
+      "name": "Sona"
+    },
+    "Soraka": {
+      "name": "Soraka"
+    },
+    "Swain": {
+      "name": "Swain"
+    },
+    "Sylas": {
+      "name": "Sylas"
+    },
+    "Syndra": {
+      "name": "Syndra"
+    },
+    "TahmKench": {
+      "name": "Tahm Kench"
+    },
+    "Taliyah": {
+      "name": "Taliyah"
+    },
+    "Talon": {
+      "name": "Talon"
+    },
+    "Taric": {
+      "name": "Taric"
+    },
+    "Teemo": {
+      "name": "Teemo"
+    },
+    "Thresh": {
+      "name": "Thresh"
+    },
+    "Tristana": {
+      "name": "Tristana"
+    },
+    "Trundle": {
+      "name": "Trundle"
+    },
+    "Tryndamere": {
+      "name": "Tryndamere"
+    },
+    "TwistedFate": {
+      "name": "Twisted Fate"
+    },
+    "Twitch": {
+      "name": "Twitch"
+    },
+    "Udyr": {
+      "name": "Udyr"
+    },
+    "Urgot": {
+      "name": "Urgot"
+    },
+    "Varus": {
+      "name": "Varus"
+    },
+    "Vayne": {
+      "name": "Vayne"
+    },
+    "Veigar": {
+      "name": "Veigar"
+    },
+    "Velkoz": {
+      "name": "Vel'Koz"
+    },
+    "Vex": {
+      "name": "Vex"
+    },
+    "Vi": {
+      "name": "Vi"
+    },
+    "Viego": {
+      "name": "Viego"
+    },
+    "Viktor": {
+      "name": "Viktor"
+    },
+    "Vladimir": {
+      "name": "Vladimir"
+    },
+    "Volibear": {
+      "name": "Volibear"
+    },
+    "Warwick": {
+      "name": "Warwick"
+    },
+    "Xayah": {
+      "name": "Xayah"
+    },
+    "Xerath": {
+      "name": "Xerath"
+    },
+    "XinZhao": {
+      "name": "Xin Zhao"
+    },
+    "Yasuo": {
+      "name": "Yasuo"
+    },
+    "Yone": {
+      "name": "Yone"
+    },
+    "Yorick": {
+      "name": "Yorick"
+    },
+    "Yunara": {
+      "name": "Yunara"
+    },
+    "Yuumi": {
+      "name": "Yuumi"
+    },
+    "Zaahen": {
+      "name": "Zaahen"
+    },
+    "Zac": {
+      "name": "Zac"
+    },
+    "Zed": {
+      "name": "Zed"
+    },
+    "Zeri": {
+      "name": "Zeri"
+    },
+    "Ziggs": {
+      "name": "Ziggs"
+    },
+    "Zilean": {
+      "name": "Zilean"
+    },
+    "Zoe": {
+      "name": "Zoe"
+    },
+    "Zyra": {
+      "name": "Zyra"
+    }
+  }
+}

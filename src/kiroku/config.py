@@ -78,6 +78,7 @@ class Settings:
     data_dir: Path  # audio archive: <data_dir>/audio/<channel>/<session>/<leg>.opus
     secrets: Secrets
     caps: Caps  # D8 Budget caps, in USD
+    lolesports_api_key: str | None = None  # public website key override; not a Secret
 
     @classmethod
     def load(cls, env: Mapping[str, str] | None = None) -> Settings:
@@ -95,6 +96,7 @@ class Settings:
                 session_usd=_usd(env, "KIROKU_SESSION_CAP_USD", DEFAULT_CAPS.session_usd),
                 month_usd=_usd(env, "KIROKU_MONTH_CAP_USD", DEFAULT_CAPS.month_usd),
             ),
+            lolesports_api_key=env.get("KIROKU_LOLESPORTS_API_KEY"),
         )
 
 

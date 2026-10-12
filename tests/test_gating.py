@@ -448,3 +448,81 @@ async def test_a_failing_rule_test_still_records_every_paid_call(
         await dry_run.run(pool, gate, Unlimited(), rule_question(winner), windows)
     assert len(gate.requests) == 4
     assert await rows(conn, "SELECT count(*) FROM cost_ledger") == [(3,)]
+
+
+async def test_gate_waits_for_a_pending_segment_write_before_scoping_later_windows(
+    pool: Pool,
+    session: int,
+    conn: AsyncConnection,
+) -> None:
+    from kiroku import segments
+
+    await rules.add(pool, "global", "Does he say words?", threshold=Decimal("0.7"))
+    await rules.add(pool, "league", "Does he say words?", threshold=Decimal("0.7"), pack="league")
+    await segments.record(
+        pool, session, 0, StreamMeta("broadcast-a", "League", "League of Legends"), "league"
+    )
+    await speak(pool, session, 0, 90, "old category", "new category")
+    pending: int | None = 45_000
+    gate = FakeGate(0.8)
+    gate_loop = GateLoop(
+        pool,
+        session,
+        NAME,
+        gate,
+        Unlimited(),
+        lambda: {"title": "now"},
+        use_segments=True,
+        blocked_from=lambda: pending,
+        poll_s=0.05,
+    )
+    task = asyncio.create_task(gate_loop.run())
+    try:
+        await gate.wait_for_requests(1)
+        await asyncio.sleep(0.1)
+        assert len(gate.requests) == 1
+        await segments.record(
+            pool, session, 45_000, StreamMeta("broadcast-a", "chat", "Just Chatting"), None
+        )
+        pending = None
+        gate_loop.finish(session_ended=True)
+        await task
+    finally:
+        task.cancel()
+    cur = await conn.execute("""
+        SELECT w.start_ms, r.name FROM gate_decision d JOIN gate_window w ON w.id=d.window_id
+        JOIN rule r ON r.id=d.rule_id ORDER BY w.start_ms,r.name
+    """)
+    assert await cur.fetchall() == [(0, "global"), (0, "league"), (45000, "global")]
+
+
+async def test_backlog_before_the_first_segment_stays_unscoped(
+    pool: Pool,
+    session: int,
+    conn: AsyncConnection,
+) -> None:
+    from kiroku import segments
+
+    await rules.add(pool, "global", "Does he say words?", threshold=Decimal("0.7"))
+    await rules.add(pool, "league", "Does he say words?", threshold=Decimal("0.7"), pack="league")
+    await speak(pool, session, 0, 90, "historical speech", "historical speech")
+    await segments.record(
+        pool, session, 90_000, StreamMeta("broadcast-a", "now", "League of Legends"), "league"
+    )
+    gate = FakeGate(0.8)
+    loop = GateLoop(
+        pool,
+        session,
+        NAME,
+        gate,
+        Unlimited(),
+        lambda: {"title": "now", "category": "League of Legends"},
+        pack=lambda: "league",
+        use_segments=True,
+    )
+    loop.finish(session_ended=True)
+    await loop.run()
+    assert [q.name for request in gate.requests for q in request.rules] == ["global", "global"]
+    assert all(request.state.context["stream"] == {"title": "now"} for request in gate.requests)
+    cur = await conn.execute("SELECT count(*) FROM gate_decision")
+    assert await cur.fetchone() == (2,)

@@ -1,0 +1,4299 @@
+{
+  "type": "item",
+  "version": "16.20.1",
+  "basic": {
+    "name": "",
+    "rune": {
+      "isrune": false,
+      "tier": 1,
+      "type": "red"
+    },
+    "gold": {
+      "base": 0,
+      "total": 0,
+      "sell": 0,
+      "purchasable": false
+    },
+    "group": "",
+    "description": "",
+    "colloq": ";",
+    "plaintext": "",
+    "consumed": false,
+    "stacks": 1,
+    "depth": 1,
+    "consumeOnFull": false,
+    "from": [],
+    "into": [],
+    "specialRecipe": 0,
+    "inStore": true,
+    "hideFromAll": false,
+    "requiredChampion": "",
+    "requiredAlly": "",
+    "stats": {
+      "FlatHPPoolMod": 0,
+      "rFlatHPModPerLevel": 0,
+      "FlatMPPoolMod": 0,
+      "rFlatMPModPerLevel": 0,
+      "PercentHPPoolMod": 0,
+      "PercentMPPoolMod": 0,
+      "FlatHPRegenMod": 0,
+      "rFlatHPRegenModPerLevel": 0,
+      "PercentHPRegenMod": 0,
+      "FlatMPRegenMod": 0,
+      "rFlatMPRegenModPerLevel": 0,
+      "PercentMPRegenMod": 0,
+      "FlatArmorMod": 0,
+      "rFlatArmorModPerLevel": 0,
+      "PercentArmorMod": 0,
+      "rFlatArmorPenetrationMod": 0,
+      "rFlatArmorPenetrationModPerLevel": 0,
+      "rPercentArmorPenetrationMod": 0,
+      "rPercentArmorPenetrationModPerLevel": 0,
+      "FlatPhysicalDamageMod": 0,
+      "rFlatPhysicalDamageModPerLevel": 0,
+      "PercentPhysicalDamageMod": 0,
+      "FlatMagicDamageMod": 0,
+      "rFlatMagicDamageModPerLevel": 0,
+      "PercentMagicDamageMod": 0,
+      "FlatMovementSpeedMod": 0,
+      "rFlatMovementSpeedModPerLevel": 0,
+      "PercentMovementSpeedMod": 0,
+      "rPercentMovementSpeedModPerLevel": 0,
+      "FlatAttackSpeedMod": 0,
+      "PercentAttackSpeedMod": 0,
+      "rPercentAttackSpeedModPerLevel": 0,
+      "rFlatDodgeMod": 0,
+      "rFlatDodgeModPerLevel": 0,
+      "PercentDodgeMod": 0,
+      "FlatCritChanceMod": 0,
+      "rFlatCritChanceModPerLevel": 0,
+      "PercentCritChanceMod": 0,
+      "FlatCritDamageMod": 0,
+      "rFlatCritDamageModPerLevel": 0,
+      "PercentCritDamageMod": 0,
+      "FlatBlockMod": 0,
+      "PercentBlockMod": 0,
+      "FlatSpellBlockMod": 0,
+      "rFlatSpellBlockModPerLevel": 0,
+      "PercentSpellBlockMod": 0,
+      "FlatEXPBonus": 0,
+      "PercentEXPBonus": 0,
+      "rPercentCooldownMod": 0,
+      "rPercentCooldownModPerLevel": 0,
+      "rFlatTimeDeadMod": 0,
+      "rFlatTimeDeadModPerLevel": 0,
+      "rPercentTimeDeadMod": 0,
+      "rPercentTimeDeadModPerLevel": 0,
+      "rFlatGoldPer10Mod": 0,
+      "rFlatMagicPenetrationMod": 0,
+      "rFlatMagicPenetrationModPerLevel": 0,
+      "rPercentMagicPenetrationMod": 0,
+      "rPercentMagicPenetrationModPerLevel": 0,
+      "FlatEnergyRegenMod": 0,
+      "rFlatEnergyRegenModPerLevel": 0,
+      "FlatEnergyPoolMod": 0,
+      "rFlatEnergyModPerLevel": 0,
+      "PercentLifeStealMod": 0,
+      "PercentSpellVampMod": 0
+    },
+    "tags": [],
+    "maps": {
+      "1": true,
+      "8": true,
+      "10": true,
+      "12": true
+    }
+  },
+  "data": {
+    "1001": {
+      "name": "Boots"
+    },
+    "1004": {
+      "name": "Faerie Charm"
+    },
+    "1006": {
+      "name": "Rejuvenation Bead"
+    },
+    "1011": {
+      "name": "Giant's Belt"
+    },
+    "1018": {
+      "name": "Cloak of Agility"
+    },
+    "1026": {
+      "name": "Blasting Wand"
+    },
+    "1027": {
+      "name": "Sapphire Crystal"
+    },
+    "1028": {
+      "name": "Ruby Crystal"
+    },
+    "1029": {
+      "name": "Cloth Armor"
+    },
+    "1031": {
+      "name": "Chain Vest"
+    },
+    "1033": {
+      "name": "Null-Magic Mantle"
+    },
+    "1035": {
+      "name": "Emberknife"
+    },
+    "1036": {
+      "name": "Long Sword"
+    },
+    "1037": {
+      "name": "Pickaxe"
+    },
+    "1038": {
+      "name": "B. F. Sword"
+    },
+    "1039": {
+      "name": "Hailblade"
+    },
+    "1040": {
+      "name": "Obsidian Edge"
+    },
+    "1042": {
+      "name": "Dagger"
+    },
+    "1043": {
+      "name": "Recurve Bow"
+    },
+    "1052": {
+      "name": "Amplifying Tome"
+    },
+    "1053": {
+      "name": "Vampiric Scepter"
+    },
+    "1054": {
+      "name": "Doran's Shield"
+    },
+    "1055": {
+      "name": "Doran's Blade"
+    },
+    "1056": {
+      "name": "Doran's Ring"
+    },
+    "1057": {
+      "name": "Negatron Cloak"
+    },
+    "1058": {
+      "name": "Needlessly Large Rod"
+    },
+    "1082": {
+      "name": "Dark Seal"
+    },
+    "1083": {
+      "name": "Cull"
+    },
+    "1086": {
+      "name": "Doran's Bow"
+    },
+    "1090": {
+      "name": "Quest: Top"
+    },
+    "1091": {
+      "name": "Quest: Mid"
+    },
+    "1092": {
+      "name": "Quest: Bot"
+    },
+    "1093": {
+      "name": "Quest: Support"
+    },
+    "1094": {
+      "name": "Quest: Jungle"
+    },
+    "1101": {
+      "name": "Scorchclaw Pup"
+    },
+    "1102": {
+      "name": "Gustwalker Hatchling"
+    },
+    "1103": {
+      "name": "Mosstomper Seedling"
+    },
+    "1104": {
+      "name": "Eye of the Herald"
+    },
+    "1105": {
+      "name": "Mosstomper Seedling"
+    },
+    "1106": {
+      "name": "Gustwalker Hatchling"
+    },
+    "1107": {
+      "name": "Scorchclaw Pup"
+    },
+    "1111": {
+      "name": "Jarvan I's"
+    },
+    "1120": {
+      "name": "Doran's Helm"
+    },
+    "1200": {
+      "name": "Top Lane Quest"
+    },
+    "1201": {
+      "name": "Mid Lane Quest"
+    },
+    "1202": {
+      "name": "Bot Lane Quest"
+    },
+    "1203": {
+      "name": "Support Quest"
+    },
+    "1204": {
+      "name": "Jungle Quest"
+    },
+    "1205": {
+      "name": "Jungle Quest Reward"
+    },
+    "1206": {
+      "name": "Mid Lane Quest Reward"
+    },
+    "1207": {
+      "name": "Bot Lane Quest Reward"
+    },
+    "1208": {
+      "name": "Support Quest Reward"
+    },
+    "1209": {
+      "name": "Jungle Quest Reward"
+    },
+    "1210": {
+      "name": "Jungle Quest Reward"
+    },
+    "1211": {
+      "name": "Jungle Quest Reward"
+    },
+    "1220": {
+      "name": "Unleashed Teleport (Top Lane Quest Reward)"
+    },
+    "1221": {
+      "name": "Top Lane Quest Reward"
+    },
+    "1222": {
+      "name": "Top Lane Quest"
+    },
+    "123430": {
+      "name": "Rite of Ruin"
+    },
+    "124011": {
+      "name": "Sword of Blossoming Dawn"
+    },
+    "126697": {
+      "name": "Hubris"
+    },
+    "1500": {
+      "name": "Penetrating Bullets"
+    },
+    "1501": {
+      "name": "Fortification"
+    },
+    "1502": {
+      "name": "Reinforced Armor"
+    },
+    "1503": {
+      "name": "Warden's Eye"
+    },
+    "1504": {
+      "name": "Vanguard"
+    },
+    "1505": {
+      "name": "Reinforced Armor"
+    },
+    "1506": {
+      "name": "Reinforced Armor"
+    },
+    "1507": {
+      "name": "Overcharged"
+    },
+    "1508": {
+      "name": "Anti-tower Socks"
+    },
+    "1509": {
+      "name": "Gusto"
+    },
+    "1510": {
+      "name": "Phreakish Gusto"
+    },
+    "1511": {
+      "name": "Super Mech Armor"
+    },
+    "1512": {
+      "name": "Super Mech Power Field"
+    },
+    "1515": {
+      "name": "Turret Plating"
+    },
+    "1516": {
+      "name": "Structure Bounty"
+    },
+    "1517": {
+      "name": "Structure Bounty"
+    },
+    "1518": {
+      "name": "Structure Bounty"
+    },
+    "1519": {
+      "name": "Structure Bounty"
+    },
+    "1520": {
+      "name": "OvererchargedHA"
+    },
+    "1521": {
+      "name": "Fortification"
+    },
+    "1522": {
+      "name": "Tower Power-Up"
+    },
+    "1523": {
+      "name": "Overcharged"
+    },
+    "1524": {
+      "name": "Overgrowth"
+    },
+    "2001": {
+      "name": "Recall"
+    },
+    "2002": {
+      "name": "Enhanced Recall"
+    },
+    "2003": {
+      "name": "Health Potion"
+    },
+    "2007": {
+      "name": "Disabled Recall"
+    },
+    "2008": {
+      "name": ""
+    },
+    "2010": {
+      "name": "Total Biscuit of Everlasting Will"
+    },
+    "2015": {
+      "name": "Kircheis Shard"
+    },
+    "2019": {
+      "name": "Steel Sigil"
+    },
+    "2020": {
+      "name": "The Brutalizer"
+    },
+    "2021": {
+      "name": "Tunneler"
+    },
+    "2022": {
+      "name": "Glowing Mote"
+    },
+    "2031": {
+      "name": "Refillable Potion"
+    },
+    "2033": {
+      "name": "Corrupting Potion"
+    },
+    "2049": {
+      "name": "Guardian's Amulet"
+    },
+    "2050": {
+      "name": "Guardian's Shroud"
+    },
+    "2051": {
+      "name": "Guardian's Horn"
+    },
+    "2052": {
+      "name": "Poro-Snax"
+    },
+    "2055": {
+      "name": "Control Ward"
+    },
+    "2056": {
+      "name": "Stealth Ward"
+    },
+    "2065": {
+      "name": "Shurelya's Battlesong"
+    },
+    "2138": {
+      "name": "Elixir of Iron"
+    },
+    "2139": {
+      "name": "Elixir of Sorcery"
+    },
+    "2140": {
+      "name": "Elixir of Wrath"
+    },
+    "2141": {
+      "name": "Cappa Juice"
+    },
+    "2142": {
+      "name": "Juice of Power"
+    },
+    "2143": {
+      "name": "Juice of Vitality"
+    },
+    "2144": {
+      "name": "Juice of Haste"
+    },
+    "2145": {
+      "name": "Lucky Dice"
+    },
+    "2146": {
+      "name": "Enhanced Lucky Dice"
+    },
+    "2147": {
+      "name": "Augment Level"
+    },
+    "2150": {
+      "name": "Elixir of Skill"
+    },
+    "2151": {
+      "name": "Elixir of Avarice"
+    },
+    "2152": {
+      "name": "Elixir of Force"
+    },
+    "2161": {
+      "name": "Bandle Juice of Power"
+    },
+    "2162": {
+      "name": "Bandle Juice of Vitality"
+    },
+    "2163": {
+      "name": "Bandle Juice of Haste"
+    },
+    "220000": {
+      "name": "Stat Bonus"
+    },
+    "220001": {
+      "name": "Legendary Fighter Item"
+    },
+    "220002": {
+      "name": "Legendary Marksman Item"
+    },
+    "220003": {
+      "name": "Legendary Assassin Item"
+    },
+    "220004": {
+      "name": "Legendary Mage Item"
+    },
+    "220005": {
+      "name": "Legendary Tank Item"
+    },
+    "220006": {
+      "name": "Legendary Support Item"
+    },
+    "220007": {
+      "name": "Prismatic Item"
+    },
+    "220008": {
+      "name": "Anvil Voucher"
+    },
+    "220009": {
+      "name": "Gold Stat Anvil Voucher"
+    },
+    "220010": {
+      "name": "Prismatic Stat Voucher"
+    },
+    "220011": {
+      "name": "Bravery Voucher"
+    },
+    "220012": {
+      "name": "Shardblade"
+    },
+    "220013": {
+      "name": "Poro-Snax"
+    },
+    "221011": {
+      "name": "Giant's Belt"
+    },
+    "221026": {
+      "name": "Blasting Wand"
+    },
+    "221031": {
+      "name": "Chain Vest"
+    },
+    "221038": {
+      "name": "B. F. Sword"
+    },
+    "221043": {
+      "name": "Recurve Bow"
+    },
+    "221053": {
+      "name": "Vampiric Scepter"
+    },
+    "221057": {
+      "name": "Negatron Cloak"
+    },
+    "221058": {
+      "name": "Needlessly Large Rod"
+    },
+    "222022": {
+      "name": "Glowing Mote"
+    },
+    "222051": {
+      "name": "Guardian's Horn"
+    },
+    "222065": {
+      "name": "Shurelya's Battlesong"
+    },
+    "222141": {
+      "name": "Cappa Juice"
+    },
+    "222502": {
+      "name": "Unending Despair"
+    },
+    "222503": {
+      "name": "Blackfire Torch"
+    },
+    "222504": {
+      "name": "Kaenic Rookern"
+    },
+    "222510": {
+      "name": "Dusk and Dawn"
+    },
+    "222512": {
+      "name": "Fiendhunter Bolts"
+    },
+    "222517": {
+      "name": "Endless Hunger"
+    },
+    "222522": {
+      "name": "Actualizer"
+    },
+    "222523": {
+      "name": "Hexoptics C44"
+    },
+    "222524": {
+      "name": "Bandlepipes"
+    },
+    "222525": {
+      "name": "Protoplasm Harness"
+    },
+    "222526": {
+      "name": "Whispering Circlet"
+    },
+    "222530": {
+      "name": "Diadem of Songs"
+    },
+    "223001": {
+      "name": "Evenshroud"
+    },
+    "223002": {
+      "name": "Trailblazer"
+    },
+    "223003": {
+      "name": "Archangel's Staff"
+    },
+    "223004": {
+      "name": "Manamune"
+    },
+    "223005": {
+      "name": "Ghostcrawlers"
+    },
+    "223006": {
+      "name": "Berserker's Greaves"
+    },
+    "223008": {
+      "name": "Gluttonous Greaves"
+    },
+    "223009": {
+      "name": "Boots of Swiftness"
+    },
+    "223011": {
+      "name": "Chemtech Putrifier"
+    },
+    "223020": {
+      "name": "Sorcerer's Shoes"
+    },
+    "223026": {
+      "name": "Guardian Angel"
+    },
+    "223031": {
+      "name": "Infinity Edge"
+    },
+    "223032": {
+      "name": "Yun Tal Wildarrows"
+    },
+    "223033": {
+      "name": "Mortal Reminder"
+    },
+    "223036": {
+      "name": "Lord Dominik's Regards"
+    },
+    "223039": {
+      "name": "Atma's Reckoning"
+    },
+    "223040": {
+      "name": "Seraph's Embrace"
+    },
+    "223042": {
+      "name": "Muramana"
+    },
+    "223046": {
+      "name": "Phantom Dancer"
+    },
+    "223047": {
+      "name": "Plated Steelcaps"
+    },
+    "223050": {
+      "name": "Zeke's Convergence"
+    },
+    "223053": {
+      "name": "Sterak's Gage"
+    },
+    "223057": {
+      "name": "Sheen"
+    },
+    "223065": {
+      "name": "Spirit Visage"
+    },
+    "223067": {
+      "name": "Kindlegem"
+    },
+    "223068": {
+      "name": "Sunfire Aegis"
+    },
+    "223069": {
+      "name": "Void Immolation"
+    },
+    "223071": {
+      "name": "Black Cleaver"
+    },
+    "223072": {
+      "name": "Bloodthirster"
+    },
+    "223073": {
+      "name": "Experimental Hexplate"
+    },
+    "223074": {
+      "name": "Ravenous Hydra"
+    },
+    "223075": {
+      "name": "Thornmail"
+    },
+    "223078": {
+      "name": "Trinity Force"
+    },
+    "223084": {
+      "name": "Heartsteel"
+    },
+    "223085": {
+      "name": "Runaan's Hurricane"
+    },
+    "223087": {
+      "name": "Statikk Shiv"
+    },
+    "223089": {
+      "name": "Rabadon's Deathcap"
+    },
+    "223091": {
+      "name": "Wit's End"
+    },
+    "223094": {
+      "name": "Rapid Firecannon"
+    },
+    "223095": {
+      "name": "Stormrazor"
+    },
+    "223100": {
+      "name": "Lich Bane"
+    },
+    "223102": {
+      "name": "Banshee's Veil"
+    },
+    "223105": {
+      "name": "Aegis of the Legion"
+    },
+    "223107": {
+      "name": "Redemption"
+    },
+    "223109": {
+      "name": "Knight's Vow"
+    },
+    "223110": {
+      "name": "Frozen Heart"
+    },
+    "223111": {
+      "name": "Mercury's Treads"
+    },
+    "223112": {
+      "name": "Guardian's Orb"
+    },
+    "223115": {
+      "name": "Nashor's Tooth"
+    },
+    "223116": {
+      "name": "Rylai's Crystal Scepter"
+    },
+    "223118": {
+      "name": "Malignance"
+    },
+    "223119": {
+      "name": "Winter's Approach"
+    },
+    "223121": {
+      "name": "Fimbulwinter"
+    },
+    "223124": {
+      "name": "Guinsoo's Rageblade"
+    },
+    "223135": {
+      "name": "Void Staff"
+    },
+    "223137": {
+      "name": "Cryptbloom"
+    },
+    "223139": {
+      "name": "Mercurial Scimitar"
+    },
+    "223142": {
+      "name": "Youmuu's Ghostblade"
+    },
+    "223143": {
+      "name": "Randuin's Omen"
+    },
+    "223146": {
+      "name": "Hextech Gunblade"
+    },
+    "223152": {
+      "name": "Hextech Rocketbelt"
+    },
+    "223153": {
+      "name": "Blade of The Ruined King"
+    },
+    "223156": {
+      "name": "Maw of Malmortius"
+    },
+    "223157": {
+      "name": "Zhonya's Hourglass"
+    },
+    "223158": {
+      "name": "Ionian Boots of Lucidity"
+    },
+    "223161": {
+      "name": "Spear of Shojin"
+    },
+    "223165": {
+      "name": "Morellonomicon"
+    },
+    "223172": {
+      "name": "Zephyr"
+    },
+    "223177": {
+      "name": "Guardian's Blade"
+    },
+    "223181": {
+      "name": "Hullbreaker"
+    },
+    "223184": {
+      "name": "Guardian's Hammer"
+    },
+    "223185": {
+      "name": "Guardian's Dirk"
+    },
+    "223190": {
+      "name": "Locket of the Iron Solari"
+    },
+    "223193": {
+      "name": "Gargoyle Stoneplate"
+    },
+    "223222": {
+      "name": "Mikael's Blessing"
+    },
+    "223302": {
+      "name": "Terminus"
+    },
+    "223504": {
+      "name": "Ardent Censer"
+    },
+    "223508": {
+      "name": "Essence Reaver"
+    },
+    "223742": {
+      "name": "Dead Man's Plate"
+    },
+    "223748": {
+      "name": "Titanic Hydra"
+    },
+    "223814": {
+      "name": "Edge of Night"
+    },
+    "224004": {
+      "name": "Spectral Cutlass"
+    },
+    "224005": {
+      "name": "Imperial Mandate"
+    },
+    "224401": {
+      "name": "Force of Nature"
+    },
+    "224403": {
+      "name": "The Golden Spatula"
+    },
+    "224628": {
+      "name": "Horizon Focus"
+    },
+    "224629": {
+      "name": "Cosmic Drive"
+    },
+    "224633": {
+      "name": "Riftmaker"
+    },
+    "224636": {
+      "name": "Night Harvester"
+    },
+    "224637": {
+      "name": "Demonic Embrace"
+    },
+    "224644": {
+      "name": "Crown of the Shattered Queen"
+    },
+    "224645": {
+      "name": "Shadowflame"
+    },
+    "224646": {
+      "name": "Stormsurge"
+    },
+    "226035": {
+      "name": "Silvermere Dawn"
+    },
+    "226333": {
+      "name": "Death's Dance"
+    },
+    "226609": {
+      "name": "Chempunk Chainsword"
+    },
+    "226610": {
+      "name": "Sundered Sky"
+    },
+    "226616": {
+      "name": "Staff of Flowing Water"
+    },
+    "226617": {
+      "name": "Moonstone Renewer"
+    },
+    "226620": {
+      "name": "Echoes of Helia"
+    },
+    "226621": {
+      "name": "Dawncore"
+    },
+    "226630": {
+      "name": "Goredrinker"
+    },
+    "226631": {
+      "name": "Stridebreaker"
+    },
+    "226632": {
+      "name": "Divine Sunderer"
+    },
+    "226653": {
+      "name": "Liandry's Anguish"
+    },
+    "226655": {
+      "name": "Luden's Echo"
+    },
+    "226656": {
+      "name": "Everfrost"
+    },
+    "226657": {
+      "name": "Rod of Ages"
+    },
+    "226660": {
+      "name": ""
+    },
+    "226662": {
+      "name": "Iceborn Gauntlet"
+    },
+    "226664": {
+      "name": "Hollow Radiance"
+    },
+    "226665": {
+      "name": "Jak'Sho, The Protean"
+    },
+    "226667": {
+      "name": "Radiant Virtue"
+    },
+    "226668": {
+      "name": "Ultra Hydra"
+    },
+    "226671": {
+      "name": "Galeforce"
+    },
+    "226672": {
+      "name": "Kraken Slayer"
+    },
+    "226673": {
+      "name": "Immortal Shieldbow"
+    },
+    "226675": {
+      "name": "Navori Flickerblades"
+    },
+    "226676": {
+      "name": "The Collector"
+    },
+    "226691": {
+      "name": "Duskblade of Draktharr"
+    },
+    "226692": {
+      "name": "Eclipse"
+    },
+    "226693": {
+      "name": "Prowler's Claw"
+    },
+    "226694": {
+      "name": "Serylda's Grudge"
+    },
+    "226695": {
+      "name": "Serpent's Fang"
+    },
+    "226696": {
+      "name": "Axiom Arc"
+    },
+    "226697": {
+      "name": "Hubris"
+    },
+    "226698": {
+      "name": "Profane Hydra"
+    },
+    "226699": {
+      "name": "Voltaic Cyclosword"
+    },
+    "226701": {
+      "name": "Opportunity"
+    },
+    "228001": {
+      "name": "Anathema's Chains"
+    },
+    "228002": {
+      "name": "Wooglet's Witchcap"
+    },
+    "228003": {
+      "name": "Deathblade"
+    },
+    "228004": {
+      "name": "Adaptive Helm"
+    },
+    "228005": {
+      "name": "Obsidian Cleaver"
+    },
+    "228006": {
+      "name": "Sanguine Blade"
+    },
+    "228008": {
+      "name": "Runeglaive"
+    },
+    "228009": {
+      "name": "Multitool"
+    },
+    "228020": {
+      "name": "Abyssal Mask"
+    },
+    "2403": {
+      "name": "Minion Dematerializer"
+    },
+    "2420": {
+      "name": "Seeker's Armguard"
+    },
+    "2421": {
+      "name": "Shattered Armguard"
+    },
+    "2422": {
+      "name": "Slightly Magical Footwear"
+    },
+    "2501": {
+      "name": "Overlord's Bloodmail"
+    },
+    "2502": {
+      "name": "Unending Despair"
+    },
+    "2503": {
+      "name": "Blackfire Torch"
+    },
+    "2504": {
+      "name": "Kaenic Rookern"
+    },
+    "2508": {
+      "name": "Fated Ashes"
+    },
+    "2510": {
+      "name": "Dusk and Dawn"
+    },
+    "2512": {
+      "name": "Fiendhunter Bolts"
+    },
+    "2517": {
+      "name": "Endless Hunger"
+    },
+    "2520": {
+      "name": "Bastionbreaker"
+    },
+    "2522": {
+      "name": "Actualizer"
+    },
+    "2523": {
+      "name": "Hexoptics C44"
+    },
+    "2524": {
+      "name": "Bandlepipes"
+    },
+    "2525": {
+      "name": "Protoplasm Harness"
+    },
+    "2526": {
+      "name": "Whispering Circlet"
+    },
+    "2530": {
+      "name": "Diadem of Songs"
+    },
+    "3001": {
+      "name": "Evenshroud"
+    },
+    "3002": {
+      "name": "Trailblazer"
+    },
+    "3003": {
+      "name": "Archangel's Staff"
+    },
+    "3004": {
+      "name": "Manamune"
+    },
+    "3005": {
+      "name": "Ghostcrawlers"
+    },
+    "3006": {
+      "name": "Berserker's Greaves"
+    },
+    "3008": {
+      "name": "Gluttonous Greaves"
+    },
+    "3009": {
+      "name": "Boots of Swiftness"
+    },
+    "3010": {
+      "name": "Symbiotic Soles"
+    },
+    "3011": {
+      "name": "Chemtech Putrifier"
+    },
+    "3012": {
+      "name": "Chalice of Blessing"
+    },
+    "3013": {
+      "name": "Synchronized Souls"
+    },
+    "3020": {
+      "name": "Sorcerer's Shoes"
+    },
+    "3023": {
+      "name": "Lifewell Pendant"
+    },
+    "3024": {
+      "name": "Glacial Buckler"
+    },
+    "3026": {
+      "name": "Guardian Angel"
+    },
+    "3031": {
+      "name": "Infinity Edge"
+    },
+    "3032": {
+      "name": "Yun Tal Wildarrows"
+    },
+    "3033": {
+      "name": "Mortal Reminder"
+    },
+    "3035": {
+      "name": "Last Whisper"
+    },
+    "3036": {
+      "name": "Lord Dominik's Regards"
+    },
+    "3039": {
+      "name": "Atma's Reckoning"
+    },
+    "3040": {
+      "name": "Seraph's Embrace"
+    },
+    "3041": {
+      "name": "Mejai's Soulstealer"
+    },
+    "3042": {
+      "name": "Muramana"
+    },
+    "3044": {
+      "name": "Phage"
+    },
+    "3046": {
+      "name": "Phantom Dancer"
+    },
+    "3047": {
+      "name": "Plated Steelcaps"
+    },
+    "3050": {
+      "name": "Zeke's Convergence"
+    },
+    "3051": {
+      "name": "Hearthbound Axe"
+    },
+    "3053": {
+      "name": "Sterak's Gage"
+    },
+    "3057": {
+      "name": "Sheen"
+    },
+    "3065": {
+      "name": "Spirit Visage"
+    },
+    "3066": {
+      "name": "Winged Moonplate"
+    },
+    "3067": {
+      "name": "Kindlegem"
+    },
+    "3068": {
+      "name": "Sunfire Aegis"
+    },
+    "3070": {
+      "name": "Tear of the Goddess"
+    },
+    "3071": {
+      "name": "Black Cleaver"
+    },
+    "3072": {
+      "name": "Bloodthirster"
+    },
+    "3073": {
+      "name": "Experimental Hexplate"
+    },
+    "3074": {
+      "name": "Ravenous Hydra"
+    },
+    "3075": {
+      "name": "Thornmail"
+    },
+    "3076": {
+      "name": "Bramble Vest"
+    },
+    "3077": {
+      "name": "Tiamat"
+    },
+    "3078": {
+      "name": "Trinity Force"
+    },
+    "3082": {
+      "name": "Warden's Mail"
+    },
+    "3083": {
+      "name": "Warmog's Armor"
+    },
+    "3084": {
+      "name": "Heartsteel"
+    },
+    "3085": {
+      "name": "Runaan's Hurricane"
+    },
+    "3086": {
+      "name": "Zeal"
+    },
+    "3087": {
+      "name": "Statikk Shiv"
+    },
+    "3089": {
+      "name": "Rabadon's Deathcap"
+    },
+    "3091": {
+      "name": "Wit's End"
+    },
+    "3094": {
+      "name": "Rapid Firecannon"
+    },
+    "3095": {
+      "name": "Stormrazor"
+    },
+    "3100": {
+      "name": "Lich Bane"
+    },
+    "3102": {
+      "name": "Banshee's Veil"
+    },
+    "3105": {
+      "name": "Aegis of the Legion"
+    },
+    "3107": {
+      "name": "Redemption"
+    },
+    "3108": {
+      "name": "Fiendish Codex"
+    },
+    "3109": {
+      "name": "Knight's Vow"
+    },
+    "3110": {
+      "name": "Frozen Heart"
+    },
+    "3111": {
+      "name": "Mercury's Treads"
+    },
+    "3112": {
+      "name": "Guardian's Orb"
+    },
+    "3113": {
+      "name": "Aether Wisp"
+    },
+    "3114": {
+      "name": "Forbidden Idol"
+    },
+    "3115": {
+      "name": "Nashor's Tooth"
+    },
+    "3116": {
+      "name": "Rylai's Crystal Scepter"
+    },
+    "3117": {
+      "name": "Mobility Boots"
+    },
+    "3118": {
+      "name": "Malignance"
+    },
+    "3119": {
+      "name": "Winter's Approach"
+    },
+    "3121": {
+      "name": "Fimbulwinter"
+    },
+    "3123": {
+      "name": "Executioner's Calling"
+    },
+    "3124": {
+      "name": "Guinsoo's Rageblade"
+    },
+    "3128": {
+      "name": "Deathfire Grasp"
+    },
+    "3131": {
+      "name": "Sword of the Divine"
+    },
+    "3133": {
+      "name": "Caulfield's Warhammer"
+    },
+    "3134": {
+      "name": "Serrated Dirk"
+    },
+    "3135": {
+      "name": "Void Staff"
+    },
+    "3137": {
+      "name": "Cryptbloom"
+    },
+    "3139": {
+      "name": "Mercurial Scimitar"
+    },
+    "3140": {
+      "name": "Quicksilver Sash"
+    },
+    "3142": {
+      "name": "Youmuu's Ghostblade"
+    },
+    "3143": {
+      "name": "Randuin's Omen"
+    },
+    "3144": {
+      "name": "Scout's Slingshot"
+    },
+    "3145": {
+      "name": "Hextech Alternator"
+    },
+    "3146": {
+      "name": "Hextech Gunblade"
+    },
+    "3147": {
+      "name": "Haunting Guise"
+    },
+    "3152": {
+      "name": "Hextech Rocketbelt"
+    },
+    "3153": {
+      "name": "Blade of The Ruined King"
+    },
+    "3155": {
+      "name": "Hexdrinker"
+    },
+    "3156": {
+      "name": "Maw of Malmortius"
+    },
+    "3157": {
+      "name": "Zhonya's Hourglass"
+    },
+    "3158": {
+      "name": "Ionian Boots of Lucidity"
+    },
+    "3161": {
+      "name": "Spear of Shojin"
+    },
+    "3165": {
+      "name": "Morellonomicon"
+    },
+    "3168": {
+      "name": "Immortal Path"
+    },
+    "3170": {
+      "name": "Swiftmarch"
+    },
+    "3171": {
+      "name": "Crimson Lucidity"
+    },
+    "3172": {
+      "name": "Gunmetal Greaves"
+    },
+    "3173": {
+      "name": "Chainlaced Crushers"
+    },
+    "3174": {
+      "name": "Armored Advance"
+    },
+    "3175": {
+      "name": "Spellslinger's Shoes"
+    },
+    "3176": {
+      "name": "Forever Forward"
+    },
+    "3177": {
+      "name": "Guardian's Blade"
+    },
+    "3179": {
+      "name": "Umbral Glaive"
+    },
+    "3181": {
+      "name": "Hullbreaker"
+    },
+    "3184": {
+      "name": "Guardian's Hammer"
+    },
+    "3190": {
+      "name": "Locket of the Iron Solari"
+    },
+    "3193": {
+      "name": "Gargoyle Stoneplate"
+    },
+    "3211": {
+      "name": "Spectre's Cowl"
+    },
+    "322065": {
+      "name": "Shurelya's Battlesong"
+    },
+    "3222": {
+      "name": "Mikael's Blessing"
+    },
+    "322526": {
+      "name": "Whispering Circlet"
+    },
+    "322530": {
+      "name": "Diadem of Songs"
+    },
+    "323002": {
+      "name": "Trailblazer"
+    },
+    "323003": {
+      "name": "Archangel's Staff"
+    },
+    "323004": {
+      "name": "Manamune"
+    },
+    "323040": {
+      "name": "Seraph's Embrace"
+    },
+    "323042": {
+      "name": "Muramana"
+    },
+    "323050": {
+      "name": "Zeke's Convergence"
+    },
+    "323070": {
+      "name": "Tear of the Goddess"
+    },
+    "323075": {
+      "name": "Thornmail"
+    },
+    "323107": {
+      "name": "Redemption"
+    },
+    "323109": {
+      "name": "Knight's Vow"
+    },
+    "323110": {
+      "name": "Frozen Heart"
+    },
+    "323119": {
+      "name": "Winter's Approach"
+    },
+    "323121": {
+      "name": "Fimbulwinter"
+    },
+    "323190": {
+      "name": "Locket of the Iron Solari"
+    },
+    "323222": {
+      "name": "Mikael's Blessing"
+    },
+    "323504": {
+      "name": "Ardent Censer"
+    },
+    "324005": {
+      "name": "Imperial Mandate"
+    },
+    "326616": {
+      "name": "Staff of Flowing Water"
+    },
+    "326617": {
+      "name": "Moonstone Renewer"
+    },
+    "326620": {
+      "name": "Echoes of Helia"
+    },
+    "326621": {
+      "name": "Dawncore"
+    },
+    "326657": {
+      "name": "Rod of Ages"
+    },
+    "328020": {
+      "name": "Abyssal Mask"
+    },
+    "3302": {
+      "name": "Terminus"
+    },
+    "3330": {
+      "name": "Scarecrow Effigy"
+    },
+    "3340": {
+      "name": "Stealth Ward"
+    },
+    "3348": {
+      "name": "Arcane Sweeper"
+    },
+    "3349": {
+      "name": "Lucent Singularity"
+    },
+    "3363": {
+      "name": "Farsight Alteration"
+    },
+    "3364": {
+      "name": "Oracle Lens"
+    },
+    "3398": {
+      "name": "Small Party Favor"
+    },
+    "3399": {
+      "name": "Party Favor"
+    },
+    "3400": {
+      "name": "Your Cut"
+    },
+    "3430": {
+      "name": "Rite Of Ruin"
+    },
+    "3504": {
+      "name": "Ardent Censer"
+    },
+    "3508": {
+      "name": "Essence Reaver"
+    },
+    "3513": {
+      "name": "Eye of the Herald"
+    },
+    "3599": {
+      "name": "Kalista's Black Spear"
+    },
+    "3600": {
+      "name": "Kalista's Black Spear"
+    },
+    "3742": {
+      "name": "Dead Man's Plate"
+    },
+    "3748": {
+      "name": "Titanic Hydra"
+    },
+    "3801": {
+      "name": "Crystalline Bracer"
+    },
+    "3802": {
+      "name": "Lost Chapter"
+    },
+    "3803": {
+      "name": "Catalyst of Aeons"
+    },
+    "3814": {
+      "name": "Edge of Night"
+    },
+    "3850": {
+      "name": "Spellthief's Edge"
+    },
+    "3851": {
+      "name": "Frostfang"
+    },
+    "3853": {
+      "name": "Shard of True Ice"
+    },
+    "3854": {
+      "name": "Steel Shoulderguards"
+    },
+    "3855": {
+      "name": "Runesteel Spaulders"
+    },
+    "3857": {
+      "name": "Pauldrons of Whiterock"
+    },
+    "3858": {
+      "name": "Relic Shield"
+    },
+    "3859": {
+      "name": "Targon's Buckler"
+    },
+    "3860": {
+      "name": "Bulwark of the Mountain"
+    },
+    "3862": {
+      "name": "Spectral Sickle"
+    },
+    "3863": {
+      "name": "Harrowing Crescent"
+    },
+    "3864": {
+      "name": "Black Mist Scythe"
+    },
+    "3865": {
+      "name": "World Atlas"
+    },
+    "3866": {
+      "name": "Runic Compass"
+    },
+    "3867": {
+      "name": "Bounty of Worlds"
+    },
+    "3869": {
+      "name": "Celestial Opposition"
+    },
+    "3870": {
+      "name": "Dream Maker"
+    },
+    "3871": {
+      "name": "Zaz'Zak's Realmspike"
+    },
+    "3876": {
+      "name": "Solstice Sleigh"
+    },
+    "3877": {
+      "name": "Bloodsong"
+    },
+    "3901": {
+      "name": "<rarityLegendary>Fire at Will</rarityLegendary><br><subtitleLeft><silver>500 Silver Serpents</silver></subtitleLeft>"
+    },
+    "3902": {
+      "name": "<rarityLegendary>Death's Daughter</rarityLegendary><br><subtitleLeft><silver>500 Silver Serpents</silver></subtitleLeft>"
+    },
+    "3903": {
+      "name": "<rarityLegendary>Raise Morale</rarityLegendary><br><subtitleLeft><silver>500 Silver Serpents</silver></subtitleLeft>"
+    },
+    "3916": {
+      "name": "Oblivion Orb"
+    },
+    "4003": {
+      "name": "Lifeline"
+    },
+    "4004": {
+      "name": "Spectral Cutlass"
+    },
+    "4005": {
+      "name": "Imperial Mandate"
+    },
+    "4010": {
+      "name": "Bloodletter's Curse"
+    },
+    "4011": {
+      "name": "Sword of Blossoming Dawn"
+    },
+    "4012": {
+      "name": "Sin Eater"
+    },
+    "4013": {
+      "name": "Lightning Braid"
+    },
+    "4014": {
+      "name": "Frozen Mallet"
+    },
+    "4015": {
+      "name": "Perplexity"
+    },
+    "4016": {
+      "name": "Wordless Promise"
+    },
+    "4017": {
+      "name": "Hellfire Hatchet"
+    },
+    "4401": {
+      "name": "Force of Nature"
+    },
+    "4402": {
+      "name": "Innervating Locket"
+    },
+    "4403": {
+      "name": "The Golden Spatula"
+    },
+    "443054": {
+      "name": "Darksteel Talons"
+    },
+    "443055": {
+      "name": "Fulmination"
+    },
+    "443056": {
+      "name": "Demon King's Crown"
+    },
+    "443058": {
+      "name": "Shield of Molten Stone"
+    },
+    "443059": {
+      "name": "Cloak of Starry Night"
+    },
+    "443060": {
+      "name": "Sword of the Divine"
+    },
+    "443061": {
+      "name": "Force Of Entropy"
+    },
+    "443062": {
+      "name": "Sanguine Gift"
+    },
+    "443063": {
+      "name": "Eleisa's Miracle"
+    },
+    "443064": {
+      "name": "Talisman Of Ascension"
+    },
+    "443069": {
+      "name": "Hamstringer"
+    },
+    "443079": {
+      "name": "Turbo Chemtank"
+    },
+    "443080": {
+      "name": "Twin Mask"
+    },
+    "443081": {
+      "name": "Hexbolt Companion"
+    },
+    "443083": {
+      "name": "Warmog's Armor"
+    },
+    "443090": {
+      "name": "Reaper's Toll"
+    },
+    "443193": {
+      "name": "Gargoyle Stoneplate"
+    },
+    "444636": {
+      "name": "Night Harvester"
+    },
+    "444637": {
+      "name": "Demonic Embrace"
+    },
+    "444644": {
+      "name": "Crown of the Shattered Queen"
+    },
+    "446632": {
+      "name": "Divine Sunderer"
+    },
+    "446656": {
+      "name": "Everfrost"
+    },
+    "446667": {
+      "name": "Radiant Virtue"
+    },
+    "446671": {
+      "name": "Galeforce"
+    },
+    "446691": {
+      "name": "Duskblade of Draktharr"
+    },
+    "446693": {
+      "name": "Prowler's Claw"
+    },
+    "447100": {
+      "name": "Mirage Blade"
+    },
+    "447101": {
+      "name": "Gambler's Blade"
+    },
+    "447102": {
+      "name": "Reality Fracture"
+    },
+    "447103": {
+      "name": "Hemomancer's Helm"
+    },
+    "447104": {
+      "name": "Innervating Locket"
+    },
+    "447105": {
+      "name": "Empyrean Promise"
+    },
+    "447106": {
+      "name": "Dragonheart"
+    },
+    "447107": {
+      "name": "Decapitator"
+    },
+    "447108": {
+      "name": "Runecarver"
+    },
+    "447109": {
+      "name": "Cruelty"
+    },
+    "447110": {
+      "name": "Moonflair Spellblade"
+    },
+    "447111": {
+      "name": "Overlord's Bloodmail"
+    },
+    "447112": {
+      "name": "Flesheater"
+    },
+    "447113": {
+      "name": "Detonation Orb"
+    },
+    "447114": {
+      "name": "Reverberation"
+    },
+    "447115": {
+      "name": "Regicide"
+    },
+    "447116": {
+      "name": "Kinkou Jitte"
+    },
+    "447118": {
+      "name": "Pyromancer's Cloak"
+    },
+    "447119": {
+      "name": "Lightning Rod"
+    },
+    "447120": {
+      "name": "Diamond-Tipped Spear"
+    },
+    "447121": {
+      "name": "Twilight's Edge"
+    },
+    "447122": {
+      "name": "Black Hole Gauntlet"
+    },
+    "447123": {
+      "name": "Puppeteer"
+    },
+    "4628": {
+      "name": "Horizon Focus"
+    },
+    "4629": {
+      "name": "Cosmic Drive"
+    },
+    "4630": {
+      "name": "Blighting Jewel"
+    },
+    "4632": {
+      "name": "Verdant Barrier"
+    },
+    "4633": {
+      "name": "Riftmaker"
+    },
+    "4635": {
+      "name": "Leeching Leer"
+    },
+    "4636": {
+      "name": "Night Harvester"
+    },
+    "4637": {
+      "name": "Demonic Embrace"
+    },
+    "4638": {
+      "name": "Watchful Wardstone"
+    },
+    "4641": {
+      "name": "Stirring Wardstone"
+    },
+    "4642": {
+      "name": "Bandleglass Mirror"
+    },
+    "4643": {
+      "name": "Vigilant Wardstone"
+    },
+    "4644": {
+      "name": "Crown of the Shattered Queen"
+    },
+    "4645": {
+      "name": "Shadowflame"
+    },
+    "4646": {
+      "name": "Stormsurge"
+    },
+    "550001": {
+      "name": "Healthbar Splash: Blue"
+    },
+    "550002": {
+      "name": "Healthbar Splash: Orange"
+    },
+    "550003": {
+      "name": "Healthbar Splash: Green"
+    },
+    "550004": {
+      "name": "Healthbar Splash: Pink"
+    },
+    "550005": {
+      "name": "Healthbar Cleanup: Reset Color"
+    },
+    "550006": {
+      "name": "Healthbar Splash: Rainbow"
+    },
+    "550007": {
+      "name": "Party Favor"
+    },
+    "6029": {
+      "name": "Ironspike Whip"
+    },
+    "6032": {
+      "name": "Stat Bonus"
+    },
+    "6035": {
+      "name": "Silvermere Dawn"
+    },
+    "6333": {
+      "name": "Death's Dance"
+    },
+    "6609": {
+      "name": "Chempunk Chainsword"
+    },
+    "6610": {
+      "name": "Sundered Sky"
+    },
+    "6616": {
+      "name": "Staff of Flowing Water"
+    },
+    "6617": {
+      "name": "Moonstone Renewer"
+    },
+    "6620": {
+      "name": "Echoes of Helia"
+    },
+    "6621": {
+      "name": "Dawncore"
+    },
+    "6630": {
+      "name": "Goredrinker"
+    },
+    "663039": {
+      "name": "Atma's Reckoning"
+    },
+    "663056": {
+      "name": "Demon King's Crown"
+    },
+    "663058": {
+      "name": "Shield of Molten Stone"
+    },
+    "663059": {
+      "name": "Cloak of Starry Night"
+    },
+    "663060": {
+      "name": "Sword of the Divine"
+    },
+    "663064": {
+      "name": "Veigar's Talisman of Ascension"
+    },
+    "6631": {
+      "name": "Stridebreaker"
+    },
+    "663146": {
+      "name": "Hextech Gunblade"
+    },
+    "663172": {
+      "name": "Zephyr"
+    },
+    "663193": {
+      "name": "Gargoyle Stoneplate"
+    },
+    "6632": {
+      "name": "Divine Sunderer"
+    },
+    "664011": {
+      "name": "Sword of Blossoming Dawn"
+    },
+    "664403": {
+      "name": "The Golden Spatula"
+    },
+    "664644": {
+      "name": "Crown of the Shattered Queen"
+    },
+    "6653": {
+      "name": "Liandry's Torment"
+    },
+    "6655": {
+      "name": "Luden's Echo"
+    },
+    "6656": {
+      "name": "Everfrost"
+    },
+    "6657": {
+      "name": "Rod of Ages"
+    },
+    "6660": {
+      "name": "Bami's Cinder"
+    },
+    "6662": {
+      "name": "Iceborn Gauntlet"
+    },
+    "6664": {
+      "name": "Hollow Radiance"
+    },
+    "6665": {
+      "name": "Jak'Sho, The Protean"
+    },
+    "6667": {
+      "name": "Radiant Virtue"
+    },
+    "6670": {
+      "name": "Noonquiver"
+    },
+    "6671": {
+      "name": "Galeforce"
+    },
+    "667101": {
+      "name": "Gambler's Blade"
+    },
+    "667109": {
+      "name": "Cruelty"
+    },
+    "667112": {
+      "name": "Flesheater"
+    },
+    "6672": {
+      "name": "Kraken Slayer"
+    },
+    "6673": {
+      "name": "Immortal Shieldbow"
+    },
+    "6675": {
+      "name": "Navori Flickerblade"
+    },
+    "6676": {
+      "name": "The Collector"
+    },
+    "667666": {
+      "name": "The Collector"
+    },
+    "6677": {
+      "name": "Rageknife"
+    },
+    "6690": {
+      "name": "Rectrix"
+    },
+    "6691": {
+      "name": "Duskblade of Draktharr"
+    },
+    "6692": {
+      "name": "Eclipse"
+    },
+    "6693": {
+      "name": "Prowler's Claw"
+    },
+    "6694": {
+      "name": "Serylda's Grudge"
+    },
+    "6695": {
+      "name": "Serpent's Fang"
+    },
+    "6696": {
+      "name": "Axiom Arc"
+    },
+    "6697": {
+      "name": "Hubris"
+    },
+    "6698": {
+      "name": "Profane Hydra"
+    },
+    "6699": {
+      "name": "Voltaic Cyclosword"
+    },
+    "6700": {
+      "name": "Shield of the Rakkor"
+    },
+    "6701": {
+      "name": "Opportunity"
+    },
+    "6702": {
+      "name": "Scouting Ahead"
+    },
+    "7050": {
+      "name": "Gangplank Placeholder"
+    },
+    "771001": {
+      "name": "Boots of Speed"
+    },
+    "771004": {
+      "name": "Faerie Charm"
+    },
+    "771006": {
+      "name": "Rejuvenation Bead"
+    },
+    "771011": {
+      "name": "Giant's Belt"
+    },
+    "771018": {
+      "name": "Cloak of Agility"
+    },
+    "771026": {
+      "name": "Blasting Wand"
+    },
+    "771027": {
+      "name": "Sapphire Crystal"
+    },
+    "771028": {
+      "name": "Ruby Crystal"
+    },
+    "771029": {
+      "name": "Cloth Armor"
+    },
+    "771031": {
+      "name": "Chain Vest"
+    },
+    "771033": {
+      "name": "Null-Magic Mantle"
+    },
+    "771036": {
+      "name": "Long Sword"
+    },
+    "771037": {
+      "name": "Pickaxe"
+    },
+    "771038": {
+      "name": "B. F. Sword"
+    },
+    "771039": {
+      "name": "Hunter's Machete"
+    },
+    "771042": {
+      "name": "Dagger"
+    },
+    "771043": {
+      "name": "Recurve Bow"
+    },
+    "771051": {
+      "name": "Brawler's Gloves"
+    },
+    "771052": {
+      "name": "Amplifying Tome"
+    },
+    "771053": {
+      "name": "Vampiric Scepter"
+    },
+    "771054": {
+      "name": "Doran's Shield"
+    },
+    "771055": {
+      "name": "Doran's Blade"
+    },
+    "771056": {
+      "name": "Doran's Ring"
+    },
+    "771057": {
+      "name": "Negatron Cloak"
+    },
+    "771058": {
+      "name": "Needlessly Large Rod"
+    },
+    "771080": {
+      "name": "Spirit Stone"
+    },
+    "771500": {
+      "name": "Penetrating Bullets"
+    },
+    "772001": {
+      "name": "Recall"
+    },
+    "772003": {
+      "name": "Health Potion"
+    },
+    "772004": {
+      "name": "Mana Potion"
+    },
+    "772009": {
+      "name": "Total Biscuit of Rejuvenation"
+    },
+    "772037": {
+      "name": "Elixir of Fortitude"
+    },
+    "772038": {
+      "name": "Elixir of Agility"
+    },
+    "772039": {
+      "name": "Elixir of Brilliance"
+    },
+    "772041": {
+      "name": "Crystalline Flask"
+    },
+    "772042": {
+      "name": "Oracle's Elixir"
+    },
+    "772043": {
+      "name": "Vision Ward"
+    },
+    "772044": {
+      "name": "Sight Ward"
+    },
+    "772045": {
+      "name": "Ruby Sightstone"
+    },
+    "772049": {
+      "name": "Sightstone"
+    },
+    "772050": {
+      "name": "Explorer's Ward"
+    },
+    "772139": {
+      "name": ""
+    },
+    "772140": {
+      "name": ""
+    },
+    "773001": {
+      "name": "Abyssal Scepter"
+    },
+    "773003": {
+      "name": "Archangel's Staff"
+    },
+    "773004": {
+      "name": "Manamune"
+    },
+    "773005": {
+      "name": "Atma's Impaler"
+    },
+    "773006": {
+      "name": "Berserker's Greaves"
+    },
+    "773009": {
+      "name": "Boots of Swiftness"
+    },
+    "773010": {
+      "name": "Catalyst the Protector"
+    },
+    "773020": {
+      "name": "Sorcerer's Shoes"
+    },
+    "773022": {
+      "name": "Frozen Mallet"
+    },
+    "773023": {
+      "name": "Twin Shadows"
+    },
+    "773024": {
+      "name": "Glacial Shroud"
+    },
+    "773025": {
+      "name": "Iceborn Gauntlet"
+    },
+    "773026": {
+      "name": "Guardian Angel"
+    },
+    "773027": {
+      "name": "Rod of Ages"
+    },
+    "773028": {
+      "name": "Chalice of Harmony"
+    },
+    "773031": {
+      "name": "Infinity Edge"
+    },
+    "773035": {
+      "name": "Last Whisper"
+    },
+    "773037": {
+      "name": "Mana Manipulator"
+    },
+    "773040": {
+      "name": "Seraph's Embrace"
+    },
+    "773041": {
+      "name": "Mejai's Soulstealer"
+    },
+    "773042": {
+      "name": "Muramana"
+    },
+    "773044": {
+      "name": "Phage"
+    },
+    "773046": {
+      "name": "Phantom Dancer"
+    },
+    "773047": {
+      "name": "Ninja Tabi"
+    },
+    "773050": {
+      "name": "Stark's Fervor"
+    },
+    "773052": {
+      "name": "Emblem of Valor"
+    },
+    "773056": {
+      "name": "Ohmwrecker"
+    },
+    "773057": {
+      "name": "Sheen"
+    },
+    "773060": {
+      "name": "Banner of Command"
+    },
+    "773063": {
+      "name": "Soul Shroud"
+    },
+    "773064": {
+      "name": "Force of Nature"
+    },
+    "773065": {
+      "name": "Spirit Visage"
+    },
+    "773067": {
+      "name": "Kindlegem"
+    },
+    "773068": {
+      "name": "Sunfire Cape"
+    },
+    "773069": {
+      "name": "Shurelya's Reverie"
+    },
+    "773070": {
+      "name": "Tear of the Goddess"
+    },
+    "773071": {
+      "name": "The Black Cleaver"
+    },
+    "773072": {
+      "name": "The Bloodthirster"
+    },
+    "773073": {
+      "name": "Stack of Sunfire Capes"
+    },
+    "773074": {
+      "name": "Ravenous Hydra"
+    },
+    "773075": {
+      "name": "Thornmail"
+    },
+    "773077": {
+      "name": "Tiamat"
+    },
+    "773078": {
+      "name": "Trinity Force"
+    },
+    "773082": {
+      "name": "Warden's Mail"
+    },
+    "773083": {
+      "name": "Warmog's Armor"
+    },
+    "773084": {
+      "name": "Innervating Locket"
+    },
+    "773085": {
+      "name": "Runaan's Hurricane"
+    },
+    "773086": {
+      "name": "Zeal"
+    },
+    "773087": {
+      "name": "Statikk Shiv"
+    },
+    "773089": {
+      "name": "Rabadon's Deathcap"
+    },
+    "773091": {
+      "name": "Wit's End"
+    },
+    "773092": {
+      "name": "Shard of True Ice"
+    },
+    "773093": {
+      "name": "Avarice Blade"
+    },
+    "773096": {
+      "name": "Philosopher's Stone"
+    },
+    "773098": {
+      "name": "Lucky Pick"
+    },
+    "773100": {
+      "name": "Lich Bane"
+    },
+    "773101": {
+      "name": "Stinger"
+    },
+    "773102": {
+      "name": "Banshee's Veil"
+    },
+    "773105": {
+      "name": "Aegis of the Legion"
+    },
+    "773106": {
+      "name": "Madred's Razors"
+    },
+    "773107": {
+      "name": "Runic Bulwark"
+    },
+    "773108": {
+      "name": "Fiendish Codex"
+    },
+    "773109": {
+      "name": "Madred's Bloodrazor"
+    },
+    "773110": {
+      "name": "Frozen Heart"
+    },
+    "773111": {
+      "name": "Mercury's Treads"
+    },
+    "773114": {
+      "name": "Malady"
+    },
+    "773115": {
+      "name": "Nashor's Tooth"
+    },
+    "773116": {
+      "name": "Rylai's Crystal Scepter"
+    },
+    "773117": {
+      "name": "Boots of Mobility"
+    },
+    "773123": {
+      "name": "Executioner's Calling"
+    },
+    "773124": {
+      "name": "Guinsoo's Rageblade"
+    },
+    "773128": {
+      "name": "Deathfire Grasp"
+    },
+    "773131": {
+      "name": "Sword of the Divine"
+    },
+    "773132": {
+      "name": "Heart of Gold"
+    },
+    "773134": {
+      "name": "The Brutalizer"
+    },
+    "773135": {
+      "name": "Void Staff"
+    },
+    "773136": {
+      "name": "Haunting Guise"
+    },
+    "773138": {
+      "name": "Leviathan"
+    },
+    "773139": {
+      "name": "Mercurial Scimitar"
+    },
+    "773140": {
+      "name": "Quicksilver Sash"
+    },
+    "773141": {
+      "name": "Sword of the Occult"
+    },
+    "773142": {
+      "name": "Youmuu's Ghostblade"
+    },
+    "773143": {
+      "name": "Randuin's Omen"
+    },
+    "773144": {
+      "name": "Bilgewater Cutlass"
+    },
+    "773145": {
+      "name": "Hextech Revolver"
+    },
+    "773146": {
+      "name": "Hextech Gunblade"
+    },
+    "773151": {
+      "name": "Liandry's Torment"
+    },
+    "773152": {
+      "name": "Will of the Ancients"
+    },
+    "773153": {
+      "name": "Blade of The Ruined King"
+    },
+    "773154": {
+      "name": "Wriggle's Lantern"
+    },
+    "773155": {
+      "name": "Hexdrinker"
+    },
+    "773156": {
+      "name": "Maw of Malmortius"
+    },
+    "773157": {
+      "name": "Zhonya's Hourglass"
+    },
+    "773158": {
+      "name": "Ionian Boots of Lucidity"
+    },
+    "773160": {
+      "name": "Feral Flare"
+    },
+    "773161": {
+      "name": "Moonflair Spellblade"
+    },
+    "773162": {
+      "name": "Cloak and Dagger"
+    },
+    "773165": {
+      "name": "Morellonomicon"
+    },
+    "773172": {
+      "name": "Zephyr"
+    },
+    "773173": {
+      "name": "Eleisa's Miracle"
+    },
+    "773174": {
+      "name": "Shushei's Mana Jug"
+    },
+    "773178": {
+      "name": "Ionic Spark"
+    },
+    "773190": {
+      "name": "Locket of the Iron Solari"
+    },
+    "773191": {
+      "name": "Seeker's Armguard"
+    },
+    "773206": {
+      "name": "Spirit of the Spectral Wraith"
+    },
+    "773207": {
+      "name": "Spirit of the Ancient Golem"
+    },
+    "773209": {
+      "name": "Spirit of the Elder Lizard"
+    },
+    "773211": {
+      "name": "Spectre's Cowl"
+    },
+    "773222": {
+      "name": "Mikael's Crucible"
+    },
+    "773340": {
+      "name": "Yellow Trinket"
+    },
+    "773348": {
+      "name": "Red Trinket"
+    },
+    "773504": {
+      "name": "Ardent Censer"
+    },
+    "773512": {
+      "name": "Zz'Rot Portal"
+    },
+    "773513": {
+      "name": "Prototype Hex Core"
+    },
+    "773514": {
+      "name": "Hex Core mk-1"
+    },
+    "773515": {
+      "name": "Hex Core mk-2"
+    },
+    "773516": {
+      "name": "Perfect Hex Core"
+    },
+    "773517": {
+      "name": "Eggnog"
+    },
+    "773518": {
+      "name": "Bag of Tea"
+    },
+    "773519": {
+      "name": "Candy Corn"
+    },
+    "773521": {
+      "name": "Health Potion"
+    },
+    "8001": {
+      "name": "Anathema's Chains"
+    },
+    "8010": {
+      "name": "Bloodletter's Curse"
+    },
+    "8020": {
+      "name": "Abyssal Mask"
+    },
+    "9168": {
+      "name": "Locked Weapon Slot"
+    },
+    "9171": {
+      "name": "Cyclonic Slicers"
+    },
+    "9172": {
+      "name": "YuumiBot"
+    },
+    "9173": {
+      "name": "Radiant Field"
+    },
+    "9174": {
+      "name": "Statikk Sword"
+    },
+    "9175": {
+      "name": "Lioness's Lament"
+    },
+    "9176": {
+      "name": "Gatling Bunny-Guns"
+    },
+    "9177": {
+      "name": "Searing Shortbow"
+    },
+    "9178": {
+      "name": "The Annihilator"
+    },
+    "9179": {
+      "name": "Battle Bunny Crossbow"
+    },
+    "9180": {
+      "name": "UwU Blaster"
+    },
+    "9181": {
+      "name": "Vortex Glove"
+    },
+    "9183": {
+      "name": "Blade-o-rang"
+    },
+    "9184": {
+      "name": "Bunny Mega-Blast"
+    },
+    "9185": {
+      "name": "Anti-Shark Sea Mine"
+    },
+    "9187": {
+      "name": "T.I.B.B.E.R.S"
+    },
+    "9188": {
+      "name": "Ani-Mines"
+    },
+    "9189": {
+      "name": "Final City Transit"
+    },
+    "9190": {
+      "name": "Echoing Batblades"
+    },
+    "9192": {
+      "name": "Paw Print Poisoner"
+    },
+    "9193": {
+      "name": "Iceblast Armor"
+    },
+    "9271": {
+      "name": "Unceasing Cyclone"
+    },
+    "9272": {
+      "name": "YuumiBot_Final_FINAL"
+    },
+    "9273": {
+      "name": "Explosive Embrace"
+    },
+    "9274": {
+      "name": "Prumbis's Electrocarver"
+    },
+    "9275": {
+      "name": "Enveloping Light"
+    },
+    "9276": {
+      "name": "Double Bun-Bun Barrage"
+    },
+    "9277": {
+      "name": "Evolved Embershot"
+    },
+    "9278": {
+      "name": "Animapocalypse"
+    },
+    "9279": {
+      "name": "Bunny Prime Ballista"
+    },
+    "9280": {
+      "name": "OwO Blaster"
+    },
+    "9281": {
+      "name": "Tempest's Gauntlet"
+    },
+    "9283": {
+      "name": "Quad-o-rang"
+    },
+    "9284": {
+      "name": "Rapid Rabbit Raindown"
+    },
+    "9285": {
+      "name": "Neverending Mobstomper"
+    },
+    "9287": {
+      "name": "T.I.B.B.E.R.S (B.E.E.G Edition)"
+    },
+    "9288": {
+      "name": "Jinx's Tri-Namite"
+    },
+    "9289": {
+      "name": "FC Limited Express"
+    },
+    "9290": {
+      "name": "Vayne's Chromablades"
+    },
+    "9292": {
+      "name": "Bearfoot Chem-Dispenser"
+    },
+    "9293": {
+      "name": "Deep Freeze"
+    },
+    "9300": {
+      "name": "Meow Meow"
+    },
+    "9301": {
+      "name": "Shield Slam"
+    },
+    "9302": {
+      "name": "Sound Wave"
+    },
+    "9303": {
+      "name": "Pillory Swipe"
+    },
+    "9304": {
+      "name": "Steel Tempest"
+    },
+    "9305": {
+      "name": "Tentacle Slam"
+    },
+    "9306": {
+      "name": "Winged Dagger"
+    },
+    "9307": {
+      "name": "Guiding Hex"
+    },
+    "9308": {
+      "name": "Bunny Hop"
+    },
+    "9400": {
+      "name": "Battle Cat Barrage"
+    },
+    "9401": {
+      "name": "Light of the Lion"
+    },
+    "9402": {
+      "name": "Anima Echo"
+    },
+    "9403": {
+      "name": "Savage Slice"
+    },
+    "9404": {
+      "name": "Wandering Storms"
+    },
+    "9405": {
+      "name": "Grizzly Smash"
+    },
+    "9406": {
+      "name": "Lover's Ricochet"
+    },
+    "9407": {
+      "name": "Hopped-Up Hex"
+    },
+    "9408": {
+      "name": "Carrot Crash"
+    },
+    "994403": {
+      "name": "Golden Spatula"
+    }
+  },
+  "groups": [
+    {
+      "id": "HuntersTalismanGroup",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "HuntersMacheteGroup",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "AHCapstone",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "APMultiplier",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "AnnulItems",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "ArenaAllItemLockOutGroup",
+      "MaxGroupOwnable": "99"
+    },
+    {
+      "id": "ArenaItemAnvils",
+      "MaxGroupOwnable": "99"
+    },
+    {
+      "id": "ArenaLegendaryItems",
+      "MaxGroupOwnable": "99"
+    },
+    {
+      "id": "ArenaPrismaticItemAnvil",
+      "MaxGroupOwnable": "99"
+    },
+    {
+      "id": "ArenaStatAnvil",
+      "MaxGroupOwnable": "99"
+    },
+    {
+      "id": "AweItems",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "BaseJungleItems",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "BlackMarketConsumables",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "BloodstoneItems",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "Boots",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "BootsOfSpeed",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "BootsWithoutActives",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "BuildsFromStopwatchGroup",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "BurnItems",
+      "MaxGroupOwnable": "2"
+    },
+    {
+      "id": "CleaveItems",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "Consumable",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "ControlWardItems",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "Default",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "DisabledOnFIRSTBLOODMode",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "DoransItems",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "Elixir",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "EmptyList",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "EnchanterCapstone",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "EnergizedItems",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "EternityItems",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "GangplankRUpgrade01",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "GangplankRUpgrade02",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "GangplankRUpgrade03",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "Glory",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "GoldItems",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "GrievousWoundsItems",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "GuardianItems",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "HarmonyItems",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "HelpingHandItems",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "HurricaneMeleeRestrictionAugments",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "ImmolateItems",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "ItemGroupSwapToSummonerDot",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "ItemGroupSwapToSummonerFlash",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "ItemGroupSwapToSummonerHaste",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "ItemGroupSwapToSummonerHeal",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "ItemGroupSwapToSummonerSmite",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "ItemGroupSwapToSummonerTeleport",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "JadeCompletedBoots",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "JadeCompletedJungle",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "Jade_WrigglesFeralFlare",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "Juices",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "JungleEnchantments",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "JungleItems",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "KiwiJadeJGItems",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "Kiwi_Apricot",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "Kiwi_Apricot_PartyFavor",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "Kiwi_UltraHydra_Components",
+      "MaxGroupOwnable": "3"
+    },
+    {
+      "id": "LastWhisper",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "LegalLvl1JunglePurchases",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "LegendaryAnvilGroup",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "LifelineItems",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "MagicalOpusItems_Cherry",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "ManaflowItems",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "MarksmanCapstone",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "MythicItems",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "NewDoransItems",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "NonItem",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "OdysseySustainItems",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "OrnnItems",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "OrnnItems_Cherry",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "PerksElixir",
+      "MaxGroupOwnable": "0"
+    },
+    {
+      "id": "PerksElixirAdvanced",
+      "MaxGroupOwnable": "0"
+    },
+    {
+      "id": "Potion",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "PrismaticAssassinItems",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "PrismaticFighterItems",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "PrismaticItems",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "PrismaticMageItems",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "PrismaticMarksmanItems",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "PrismaticTankItems",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "PrismaticUtilityItems",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "Quicksilver",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "RoleQuestGroup",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "SLIMEStarterItems",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "SRIChampItemDisabledGroup",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "SRIChampItemDisabledGroup1",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "SiegeEmergencyShieldGroup",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "SiegeFlashZoneGroup",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "SiegeLaserAffixGroup",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "SiegeMissileBarrageGroup",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "SiegePortableBarracksGroup",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "SiegeRefundGroup",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "SiegeShieldGeneratorGroup",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "SiegeSniperCannonGroup",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "SiegeTeleportPadGroup",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "SiegeTimefieldGroup",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "SightstoneActiveItems",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "SightstoneDisableGroup",
+      "MaxGroupOwnable": "0"
+    },
+    {
+      "id": "SpiritStone",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "StopwatchGroup",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "StrawberryEvolveItems",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "SupportItems",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "TearItems",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "TheBlackSpear",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "ThornmailItems",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "TimeStopItems",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "TotalBiscuit",
+      "MaxGroupOwnable": "0"
+    },
+    {
+      "id": "Trinket",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "226630",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "226693",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "443054",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "443055",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "443056",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "443058",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "443059",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "443060",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "443061",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "443062",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "443063",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "443064",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "443069",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "443079",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "443080",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "443081",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "443083",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "443090",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "443193",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "444636",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "444637",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "444644",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "446632",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "446656",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "446667",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "446671",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "446691",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "447100",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "447101",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "447102",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "447103",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "447104",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "447105",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "447106",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "447107",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "447108",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "447109",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "447110",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "447112",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "447113",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "447114",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "447115",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "447116",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "447118",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "447119",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "447120",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "447121",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "447122",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "447123",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "FulminationShivExclusion",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2065",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2138",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2139",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2140",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2142",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2143",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2144",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "220012",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "222065",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "223001",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "223031",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "223078",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "223084",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "223124",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "223142",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "223152",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "223190",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "224633",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "224636",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "224644",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "226617",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "226620",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "226630",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "226631",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "226632",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "226653",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "226655",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "226656",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "226657",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "226662",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "226665",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "226667",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "226671",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "226675",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "226691",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "226692",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2500",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2501",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2502",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2503",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2504",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2505",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2506",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2507",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2510",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2511",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2512",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2513",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2514",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2515",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2516",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2517",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2518",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2519",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2520",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2521",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2522",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2523",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2524",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2525",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2526",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "2530",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3001",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3002",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3007",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3008",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3011",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3026",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3031",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3032",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3033",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3039",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3040",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3042",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3046",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3050",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3057",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3065",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3068",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3071",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3072",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3073",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3074",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3075",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3078",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3079",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3083",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3084",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3085",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3087",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3089",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3091",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3094",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3095",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3100",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3102",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3107",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3109",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3110",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3115",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3116",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3118",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3119",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3121",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3122",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3124",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3131",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3134",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3136",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3142",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3143",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3146",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3147",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3151",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3152",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3153",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3157",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3161",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3165",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3168",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3169",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3170",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3171",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3172",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3173",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3174",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3175",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3176",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3179",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3181",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3190",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3193",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3222",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3300",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3301",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3302",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3303",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3430",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3504",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3508",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3742",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3748",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "3814",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "4004",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "4005",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "4010",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "4011",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "4012",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "4013",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "4014",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "4016",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "4017",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "4401",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "4402",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "4403",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "447114",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "4628",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "4629",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "4633",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "4637",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "4644",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "4645",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "4646",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "6333",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "6609",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "6610",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "6616",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "6617",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "6620",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "6622",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "663039",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "663056",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "663058",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "663059",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "663060",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "663064",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "6631",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "663146",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "663172",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "663193",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "663430",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "664011",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "664644",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "6653",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "6655",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "6657",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "6662",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "6664",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "6665",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "667101",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "667109",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "667112",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "6672",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "6673",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "6675",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "6676",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "6692",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "6693",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "6695",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "6696",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "6697",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "6698",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "6699",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "6701",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "773068",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "773073",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "8001",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "8010",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "8020",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "CritMultipliers",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "InfinityCoil",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "MomentumItems",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "Quickblades",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "SpellbladeItems",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "SpellshieldItems",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "StasisAndRevive",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "ViktorHexCore",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "VoidPen",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "WardGreen",
+      "MaxGroupOwnable": "1"
+    },
+    {
+      "id": "WardItems",
+      "MaxGroupOwnable": "-1"
+    },
+    {
+      "id": "WardPink",
+      "MaxGroupOwnable": "1"
+    }
+  ],
+  "tree": [
+    {
+      "header": "START",
+      "tags": [
+        "LANE",
+        "JUNGLE"
+      ]
+    },
+    {
+      "header": "TOOLS",
+      "tags": [
+        "GOLDPER",
+        "CONSUMABLE",
+        "VISION"
+      ]
+    },
+    {
+      "header": "DEFENSE",
+      "tags": [
+        "HEALTH",
+        "SPELLBLOCK",
+        "ARMOR",
+        "HEALTHREGEN"
+      ]
+    },
+    {
+      "header": "ATTACK",
+      "tags": [
+        "ATTACKSPEED",
+        "CRITICALSTRIKE",
+        "DAMAGE",
+        "LIFESTEAL"
+      ]
+    },
+    {
+      "header": "MAGIC",
+      "tags": [
+        "MANA",
+        "SPELLDAMAGE",
+        "COOLDOWNREDUCTION",
+        "MANAREGEN"
+      ]
+    },
+    {
+      "header": "MOVEMENT",
+      "tags": [
+        "BOOTS",
+        "NONBOOTSMOVEMENT"
+      ]
+    },
+    {
+      "header": "UNCATEGORIZED",
+      "tags": [
+        "ACTIVE",
+        "ARMORPENETRATION",
+        "STEALTH",
+        "SLOW",
+        "ONHIT",
+        "AURA",
+        "MAGICPENETRATION",
+        "TRINKET",
+        "SPELLVAMP",
+        "TENACITY"
+      ]
+    }
+  ]
+}
