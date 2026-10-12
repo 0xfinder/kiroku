@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
+from typing import Any, cast
 
 import httpx
 import psycopg
@@ -14,7 +15,7 @@ from kiroku import sessions, transcript
 from kiroku.config import Secret
 from kiroku.db import Pool, SchemaOutOfDate, open_pool
 from kiroku.ledger import AudioSeconds, CostEntry, Purpose
-from kiroku.sessions import Channel, claim_channels
+from kiroku.sessions import Channel, UnsealedLeg, claim_channels
 from kiroku.source import Capture, Online, Probe, StreamMeta
 from kiroku.transcriber import Result, Utterance
 from kiroku.transcriber.groq import GroqTranscriber
@@ -58,16 +59,80 @@ async def test_new_broadcast_closes_the_stale_session(
     assert await cur.fetchall() == [(second,)]
 
 
-async def test_next_leg_never_starts_before_committed_audio(pool: Pool, channel: Channel) -> None:
+async def test_next_leg_refuses_an_unsealed_leg(pool: Pool, channel: Channel) -> None:
     session = await sessions.open_session(pool, channel, A, T0)
     leg1 = await sessions.next_leg(pool, channel, session)
     assert (leg1.seq, leg1.audio_start_ms) == (1, 0)
     await sessions.record_leg(pool, leg1, T0)
-    # Crash: leg 1 never got an end, but a span up to 25 s was committed.
+    # Crash: leg 1 never got an end; its archive may hold more than the committed 25 s.
     await transcript.commit(pool, session, NAME, Result(0, 25_000, (), None))
+    with pytest.raises(UnsealedLeg):
+        await sessions.next_leg(pool, channel, session)
+    assert await sessions.end_leg(pool, leg1, 31_000)  # sealed at its archive's length
     leg2 = await sessions.next_leg(pool, channel, session)
-    assert (leg2.seq, leg2.audio_start_ms) == (2, 25_000)
+    assert (leg2.seq, leg2.audio_start_ms) == (2, 31_000)
     assert str(leg2.archive_path) == f"audio/gorgc/{session}/002.opus"
+
+
+async def test_next_leg_never_starts_before_committed_audio(pool: Pool, channel: Channel) -> None:
+    session = await sessions.open_session(pool, channel, A, T0)
+    leg1 = await sessions.next_leg(pool, channel, session)
+    await sessions.record_leg(pool, leg1, T0)
+    await sessions.end_leg(pool, leg1, 20_000)
+    await transcript.commit(pool, session, NAME, Result(20_000, 25_000, (), None))
+    assert (await sessions.next_leg(pool, channel, session)).audio_start_ms == 25_000
+
+
+async def test_a_recorded_leg_end_never_moves(pool: Pool, channel: Channel) -> None:
+    session = await sessions.open_session(pool, channel, A, T0)
+    leg = await sessions.next_leg(pool, channel, session)
+    await sessions.record_leg(pool, leg, T0)
+    assert await sessions.end_leg(pool, leg, 40_000)
+    assert not await sessions.end_leg(pool, leg, 10_000)
+    assert [x.audio_end_ms for x in await sessions.legs(pool, session)] == [40_000]
+
+
+async def test_sealing_for_another_process_skips_a_watched_channel(
+    database_url: str, pool: Pool
+) -> None:
+    """`kiroku backfill` must not seal the leg a running `kiroku watch` is capturing, and
+    must not hold the watch's lock either (a watch starting meanwhile would be refused)."""
+    async with claim_channels(database_url, "twitch", ["gorgc"]) as (watched,):
+        session = await sessions.open_session(pool, watched, A, T0)
+        leg = await sessions.next_leg(pool, watched, session)
+        await sessions.record_leg(pool, leg, T0)
+        assert not await sessions.end_leg(pool, leg, 9_000, unless_watched=watched)
+        assert [x.audio_end_ms for x in await sessions.legs(pool, session)] == [None]
+    # The watch is gone: the leg is a crashed one now.
+    assert await sessions.end_leg(pool, leg, 9_000, unless_watched=watched)
+
+
+class _FlakyPool:
+    """Delegates to a real pool, but the first `fail` connections are lost."""
+
+    def __init__(self, pool: Pool, fail: int) -> None:
+        self._pool = pool
+        self.fail = fail
+
+    def connection(self) -> Any:
+        if self.fail:
+            self.fail -= 1
+            raise psycopg.OperationalError("server closed the connection unexpectedly")
+        return self._pool.connection()
+
+
+async def test_commit_survives_a_lost_connection(
+    pool: Pool, channel: Channel, conn: AsyncConnection
+) -> None:
+    session = await sessions.open_session(pool, channel, A, T0)
+    cost = CostEntry(
+        "groq", "m", Purpose.TRANSCRIBE, AudioSeconds(Decimal(20)), Decimal("0.000222"), 400
+    )
+    flaky = _FlakyPool(pool, fail=1)
+    stored = await transcript.commit(cast(Pool, flaky), session, NAME, Result(0, 20_000, (), cost))
+    assert stored and flaky.fail == 0
+    cur = await conn.execute("SELECT count(*) FROM cost_ledger WHERE session_id = %s", [session])
+    assert await cur.fetchone() == (1,), "the paid Result was kept, once"
 
 
 async def test_commit_is_idempotent_and_derives_wall_clock_time(

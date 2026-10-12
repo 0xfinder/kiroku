@@ -36,6 +36,9 @@ class Result:
 class Context:
     vocabulary: Callable[[], str]  # read per call: the title (later the Pack) can change
     previous_text: str = ""  # tail of the stored transcript, to seed the first prompt
+    # Archived audio (Backfill), not live: it can wait. It must never delay live audio that
+    # shares the Transcriber's limits, and it is read only as fast as it is transcribed.
+    background: bool = False
 
 
 class Transcriber(Protocol):

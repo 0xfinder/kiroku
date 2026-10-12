@@ -153,3 +153,33 @@ Chosen by an architect arena: three design candidates (Opus, Sonnet, Haiku) plus
 - **Stopping cuts the input, not the reader.** The leg ends exactly like a stream drop, so everything ffmpeg received is archived, recorded as the leg's end, and transcribed. SIGTERM (systemd) and SIGINT take this path.
 - **Accepted: a crash loses queued audio from the transcript, not from the archive.** The loss shows up as a gap in `transcript_span` coverage, to be backfilled later (follow-up issue).
 - **Accepted: one Groq request per 15–25 s chunk**, about 1,000–1,400 requests per 6-hour stream. The free tier allows 2,000 requests a day, so two long streams on the same day exceed it.
+
+## D25. Backfill crash gaps on session start (issue #10)
+
+D23 accepted that a crash loses queued audio from the transcript but not from the archive. Backfill recovers that audio. (Numbered D25 because another branch may add D24 at the same time.)
+
+- **Seal before placing a leg.** A leg with no recorded end gets one before the next leg is placed: its archive's decoded length, read with ffprobe as `duration_ts - initial_padding`. Reading it costs one seek, not a full decode. A full decode runs at about 130x real time, which is minutes for a 6-hour leg.
+  - The sealed end is never below the audio already committed, and never past a later leg's start.
+  - `sessions.next_leg` raises `UnsealedLeg` while any leg is open, so a leg can't be placed over an archived tail. A recorded end never moves.
+  - Capture does the sealing, as part of placing a leg. ffprobe has a 10 s timeout. If ffprobe can't finish (timeout, signal, can't start), the leg stays open and capture retries with its reconnect backoff. Capture's own ffmpeg fails under the same conditions, so this doesn't block live audio in any case where live could have run.
+  - An archive that ffprobe rejects, or that is missing, has nothing decodable, so its leg is sealed at the committed audio.
+  - `kiroku watch` checks for ffmpeg and ffprobe at launch.
+  - **Rejected: estimating the end from wall-clock time.** It would leave gaps or overlaps on the session's audio clock.
+- **Gap finding is pure.** `find_gaps(legs, spans)` returns each leg's extent minus the spans of the current Transcriber.
+- **Exactly-once.** Gaps come from committed spans, and a commit of a stored span is a no-op. Two backfills of the same gap would still chunk it differently and pay twice, so each backfill holds a per-session, transaction-level advisory lock. Exclusion is needed only in two places:
+  - backfill against backfill: the per-session lock above.
+  - sealing against live capture: `kiroku backfill` seals a leg only if no `kiroku watch` holds the channel. The check runs in the same UPDATE as the seal.
+
+  `kiroku backfill` never takes the watch lock, so a watch can always start.
+- **The same Transcriber path, one stream per gap.** Each gap is decoded from its leg's archive with a pre-rolled `-ss`, which is bit-exact against a full decode. The audio goes through `Transcriber.transcribe` with `Context.background`, prompted with the stored text just before the gap. Silent chunks still cost nothing. Costs reach the ledger through `transcript.commit`, which retries a lost connection for every caller.
+- **Behind live audio, never instead of it: a background lane at the shared limiter.** Groq's limits are per key, and one GroqTranscriber serves every session, so priority lives there. It works like this:
+  - A background call waits until no live chunk on the key is queued or in flight, and until the key isn't paused after a 429.
+  - Background calls start at most once every 10 s per key, across all sessions. That is 6 requests a minute, or about 2x real time. The free tier allows 20 a minute, and live uses 3-4 per channel.
+  - Background audio gets backpressure instead of a backlog. It is decoded about one chunk ahead and never skipped.
+  - A backfill failure is logged and doesn't stop the session. On stop, backfill finishes the audio it already fed, and the rest resumes on the next start. If the stop itself is cancelled, backfill is cancelled with it.
+  - **Rejected: pacing per session.** One version of this PR fed backfill audio at 2x real time per session. Two channels plus backfill could then exceed the key's limits, and the resulting 429 stalled live transcription on every channel.
+  - **Rejected: backfill before live.** Live latency would grow by the length of the backlog.
+- **`kiroku backfill <channel>`** covers sessions that `kiroku watch` won't resume, for example when the stream ended while kiroku was down. It is safe to run while `kiroku watch` is running.
+- **Revisit if:**
+  - The Transcriber changes mid-session. Gaps are counted per Transcriber, so the new one would backfill every leg.
+  - More channels share a key than the background lane's headroom allows.

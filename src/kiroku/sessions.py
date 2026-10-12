@@ -25,6 +25,10 @@ class ChannelBusy(KirokuError):
     pass
 
 
+class UnsealedLeg(RuntimeError):
+    """A leg was about to be placed while an earlier one has no end (a bug: seal first)."""
+
+
 @dataclass(frozen=True, slots=True)
 class Channel:
     id: int
@@ -38,6 +42,13 @@ class Leg:
     seq: int
     audio_start_ms: int
     archive_path: PurePosixPath  # relative to the data directory
+    audio_end_ms: int | None = None  # None while capturing, or after a crash until sealed
+
+
+@dataclass(frozen=True, slots=True)
+class SessionInfo:
+    id: int
+    title: str
 
 
 @asynccontextmanager
@@ -144,24 +155,28 @@ async def next_leg(pool: Pool, channel: Channel, session_id: int, at_least_ms: i
     """Where the next capture leg starts on the session's audio clock.
 
     After the previous leg's recorded end, after audio a Transcriber already committed, and
-    after `at_least_ms` (the caller's own record of where its last leg ended). After a crash
-    the previous leg's end is unknown; its untranscribed tail then becomes unreachable
-    rather than overlapping the next leg's offsets.
+    after `at_least_ms` (the caller's own record of where its last leg ended). Raises
+    UnsealedLeg while any leg has no end: how much audio it holds is unknown, so any start
+    could overlap its archived tail. A leg a crash left open is sealed first
+    (kiroku.backfill.seal_open_legs).
     """
     async with pool.connection() as conn:
         cur = await conn.execute(
             """
             SELECT coalesce(max(seq), 0) + 1,
                    greatest(
-                       coalesce(max(coalesce(audio_end_ms, audio_start_ms)), 0),
+                       coalesce(max(audio_end_ms), 0),
                        (SELECT coalesce(max(audio_end_ms), 0) FROM transcript_span
-                        WHERE session_id = %(s)s))
+                        WHERE session_id = %(s)s)),
+                   coalesce(bool_or(audio_end_ms IS NULL), false)
             FROM capture_leg WHERE session_id = %(s)s
             """,
             {"s": session_id},
         )
         row = await cur.fetchone()
     assert row is not None
+    if row[2]:
+        raise UnsealedLeg(f"session {session_id} has a leg with no end; seal it first")
     seq, start_ms = row[0], max(row[1], at_least_ms)
     path = PurePosixPath("audio", channel.login, str(session_id), f"{seq:03d}.opus")
     return Leg(session_id, seq, start_ms, path)
@@ -181,9 +196,73 @@ async def record_leg(pool: Pool, leg: Leg, started_at: datetime) -> None:
         )
 
 
-async def end_leg(pool: Pool, leg: Leg, audio_end_ms: int) -> None:
+async def end_leg(
+    pool: Pool, leg: Leg, audio_end_ms: int, *, unless_watched: Channel | None = None
+) -> bool:
+    """Record where a leg ended: by capture when it stops, or when sealing a leg a crash left
+    open. The first end recorded stays; later legs were placed after it. Returns whether
+    this call recorded it.
+
+    `unless_watched`: record nothing while a `kiroku watch` holds that channel, because the
+    leg may be the one it is capturing. Checked in the same statement, so a watch starting
+    concurrently either sees the end or isn't capturing yet.
+    """
     async with pool.connection() as conn:
-        await conn.execute(
-            "UPDATE capture_leg SET audio_end_ms = %s WHERE session_id = %s AND seq = %s",
-            [audio_end_ms, leg.session_id, leg.seq],
+        cur = await conn.execute(
+            """
+            UPDATE capture_leg SET audio_end_ms = %(end)s
+            WHERE session_id = %(s)s AND seq = %(seq)s AND audio_end_ms IS NULL
+              AND NOT (%(channel)s::bigint IS NOT NULL AND EXISTS (
+                  SELECT 1 FROM pg_locks
+                  WHERE locktype = 'advisory' AND granted AND objsubid = 2
+                    AND database = (SELECT oid FROM pg_database
+                                    WHERE datname = current_database())
+                    AND classid::bigint = %(lock)s AND objid::bigint = %(channel)s))
+            """,
+            {
+                "end": audio_end_ms,
+                "s": leg.session_id,
+                "seq": leg.seq,
+                "channel": unless_watched.id if unless_watched else None,
+                "lock": WATCH_LOCK_CLASS,
+            },
         )
+        return cur.rowcount == 1
+
+
+async def legs(pool: Pool, session_id: int) -> list[Leg]:
+    """The session's recorded legs, in order."""
+    async with pool.connection() as conn:
+        cur = await conn.execute(
+            "SELECT seq, audio_start_ms, archive_path, audio_end_ms FROM capture_leg "
+            "WHERE session_id = %s ORDER BY seq",
+            [session_id],
+        )
+        rows = await cur.fetchall()
+    return [Leg(session_id, seq, start, PurePosixPath(path), end) for seq, start, path, end in rows]
+
+
+async def find_channel(pool: Pool, platform: str, login: str) -> Channel | None:
+    """A channel on the watch list, without claiming it (kiroku watch claims channels)."""
+    async with pool.connection() as conn:
+        cur = await conn.execute(
+            "SELECT id, platform, login FROM channel WHERE platform = %s AND login = %s",
+            [platform, login.lower()],
+        )
+        row = await cur.fetchone()
+    return Channel(*row) if row else None
+
+
+async def find_session(pool: Pool, channel: Channel, session_id: int | None) -> SessionInfo | None:
+    """The channel's session with this id, or its latest session when `session_id` is None."""
+    async with pool.connection() as conn:
+        cur = await conn.execute(
+            """
+            SELECT id, coalesce(title, '') FROM stream_session
+            WHERE channel_id = %s AND (%s::bigint IS NULL OR id = %s)
+            ORDER BY started_at DESC, id DESC LIMIT 1
+            """,
+            [channel.id, session_id, session_id],
+        )
+        row = await cur.fetchone()
+    return SessionInfo(row[0], row[1]) if row else None
