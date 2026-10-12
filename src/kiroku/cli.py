@@ -71,6 +71,9 @@ def db_new(name: str) -> None:
 def watch_command(
     channels: Annotated[list[str], typer.Argument(help="Twitch logins, e.g. gorgc caedrel")],
     poll_s: Annotated[float, typer.Option(help="Seconds between live checks.")] = 60.0,
+    no_gate: Annotated[
+        bool, typer.Option("--no-gate", help="Transcribe only; needs no JEV_API_KEY.")
+    ] = False,
 ) -> None:
     """Watch channels, store a live transcript while they stream, and gate it against the
     active Rules. Runs until stopped."""
@@ -87,7 +90,7 @@ def watch_command(
         assert main is not None
         asyncio.get_running_loop().add_signal_handler(signal.SIGTERM, main.cancel)
         groq_key = settings.secrets.require(SecretName.GROQ)
-        jev_key = settings.secrets.require(SecretName.JEV)
+        jev_key = None if no_gate else settings.secrets.require(SecretName.JEV)
         async with (
             open_pool(settings.database_url) as pool,  # refuses a stale schema first
             claim_channels(settings.database_url, "twitch", channels) as claimed,
@@ -100,7 +103,7 @@ def watch_command(
                 GroqTranscriber(http, groq_key),
                 settings.data_dir,
                 budget=Budget(pool, settings.caps),
-                gate=JevGate(http, jev_key),
+                gate=JevGate(http, jev_key) if jev_key else None,
                 poll_s=poll_s,
             )
 

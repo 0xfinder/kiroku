@@ -96,6 +96,10 @@ def _join(texts: Iterable[str]) -> str:
 
 
 def _tail_words(text: str, chars: int) -> str:
+    """The last `chars` characters, without a cut-off word at the start."""
     if len(text) <= chars:
         return text
-    return text[-chars:].split(" ", 1)[-1]
+    tail = text[-chars:]
+    if text[-chars - 1] == " " or " " not in tail:
+        return tail
+    return tail.split(" ", 1)[1]

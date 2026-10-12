@@ -284,3 +284,39 @@ def test_a_rule_test_asks_no_mode() -> None:
 def test_usd_rounds_up() -> None:
     assert usd(1) == Decimal("0.000001")
     assert usd(0) == Decimal(0)
+
+
+async def test_a_long_retry_after_gives_up_instead_of_stalling() -> None:
+    clock = Clock()
+    fake = FakeJev(httpx.Response(429, headers={"retry-after": "3600"}))
+    g = gate(fake, clock)
+    with pytest.raises(GateUnavailable, match="HTTP 429"):
+        await g.evaluate(request())
+    assert clock.sleeps == []
+    # Other sessions honour the pause too, without sending anything.
+    with pytest.raises(GateUnavailable, match="rate limited"):
+        await g.evaluate(request())
+    assert len(fake.requests) == 1
+
+
+async def test_an_undecodable_body_is_retried_like_a_lost_response() -> None:
+    req = httpx.Request("POST", "https://x")
+    fake = FakeJev(
+        httpx.DecodingError("bad gzip", request=req), httpx.Response(200, json=jev_body())
+    )
+    answer = await gate(fake).evaluate(request())
+    assert [c.usage for c in answer.costs] == [Tokens(1400, 80)]
+
+
+@pytest.mark.parametrize(
+    ("text", "chars", "expected"),
+    [
+        ("aa bbb ccc", 7, "bbb ccc"),  # the cut lands on a word start: keep it
+        ("aa bbb ccc", 6, "ccc"),  # mid-word: drop the fragment
+        ("abcdef", 3, "def"),  # no space to cut at
+    ],
+)
+def test_context_tail_never_drops_a_whole_word(text: str, chars: int, expected: str) -> None:
+    policy = WindowPolicy(context_chars=chars)
+    state = build_state(Bounds(60_000, 105_000), [Turn(30_000, text)], {}, policy)
+    assert state.context["earlier"] == expected

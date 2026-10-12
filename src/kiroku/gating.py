@@ -93,6 +93,26 @@ async def progress(pool: Pool, session_id: int, transcriber: str) -> tuple[int, 
     return row[0], row[1]
 
 
+async def ungated_closed_sessions(
+    pool: Pool, channel_id: int, transcriber: str
+) -> list[tuple[int, str | None]]:
+    """Closed sessions of a channel whose transcript runs past their last Window: their final
+    pass failed, or the stream ended while kiroku was down. (id, title), oldest first."""
+    async with pool.connection() as conn:
+        cur = await conn.execute(
+            """
+            SELECT s.id, s.title FROM stream_session s
+            WHERE s.channel_id = %(c)s AND s.ended_at IS NOT NULL
+              AND (SELECT max(audio_end_ms) FROM transcript_span t
+                   WHERE t.session_id = s.id AND t.transcriber = %(t)s)
+                  > (SELECT coalesce(max(end_ms), 0) FROM gate_window w WHERE w.session_id = s.id)
+            ORDER BY s.id
+            """,
+            {"c": channel_id, "t": transcriber},
+        )
+        return list(await cur.fetchall())
+
+
 async def turns(
     pool: Pool, session_id: int, transcriber: str, from_ms: int, to_ms: int
 ) -> list[Turn]:
@@ -233,10 +253,20 @@ class GateLoop:
             except psycopg.OperationalError as e:
                 # Nothing was asked yet for the Window being prepared, so nothing is lost.
                 log.warning("session %d: database error in Gate (%s)", self._session_id, e)
+                if finishing is not None:
+                    # The last pass must still happen; the caller bounds how long it waits.
+                    await asyncio.sleep(1.0)
+                    continue
             except GateAuthError as e:
                 # The transcript is the part that can't be recovered later, so it keeps going.
                 # A restart with a fixed key gates the backlog from where this stopped.
                 log.error("session %d: %s; the Gate is off for this session", self._session_id, e)
+                return
+            except Exception:
+                # Likewise for a bug: log it loudly, but never take transcription down with it.
+                log.exception(
+                    "session %d: Gate crashed; it is off for this session", self._session_id
+                )
                 return
             if finishing is not None:
                 return

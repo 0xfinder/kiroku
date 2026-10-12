@@ -81,14 +81,16 @@ class JevGate:
         maybe_billed = 0  # sent, but the response was lost: Jev may have billed it
         last = ""
         while True:
-            if attempt and self._clock() - first > self._give_up_s:
-                raise GateUnavailable(
-                    f"jev unavailable after {attempt} attempts: {last}",
-                    self._lost_costs(request.purpose, estimate, maybe_billed),
-                )
             wait = self._not_before - self._clock()
             if attempt and last != "HTTP 429":
                 wait = max(wait, _backoff(attempt))
+            # Give up rather than wait past the deadline: a long Retry-After must not stall
+            # every session's Gate. The shared pause still holds for later Windows.
+            if (attempt or wait > 0) and self._clock() + max(wait, 0) - first > self._give_up_s:
+                raise GateUnavailable(
+                    f"jev unavailable after {attempt} attempts: {last or 'rate limited'}",
+                    self._lost_costs(request.purpose, estimate, maybe_billed),
+                )
             if wait > 0:
                 await self._sleep(wait)
             attempt += 1
@@ -100,7 +102,7 @@ class JevGate:
                     json=body,
                     timeout=REQUEST_TIMEOUT_S,
                 )
-            except httpx.TransportError as e:
+            except httpx.RequestError as e:  # transport trouble, or a body httpx can't decode
                 if not isinstance(e, httpx.ConnectError | httpx.ConnectTimeout):
                     maybe_billed += 1
                 last = f"{type(e).__name__}: {e}"

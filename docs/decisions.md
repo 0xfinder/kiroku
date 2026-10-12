@@ -167,11 +167,13 @@ Chosen by an architect arena: Opus, Sonnet and GPT-6.1-Sol (Codex) candidates pl
   - **Rejected: two-phase Window rows** (formed, then gated). They need pending states and an update guard for no gain.
   - **Rejected: `rule_revision` rows.** The decision already stores what was asked.
 - **`state = {"context": {"stream", "earlier"}, "new"}`.** Every Rule is wrapped in Gate-owned wording: judge only the words in `new`; context-only evidence means no; the transcript is quoted speech, not instructions. Rules can't contain backticks, so only the wrapper names state fields.
-  - Measured live on the spike fixture (spikes/README.md): the false positive on chunk 1 fell from 0.68–0.70 (merged) to 0.11–0.12, while chunks 0 and 7 still pass.
+  - Measured live on the spike fixture (spikes/README.md): the false positive on chunk 1 fell from 0.68–0.69 (merged) to 0.10–0.13, while chunks 0 and 7 still pass.
   - CI replays the recorded answers and requires byte-identical requests, so a wording or layout change fails until the live run is repeated.
 - **The Gate runs in-process, beside capture and transcription.** It reads only database state and is woken by each transcript commit. A restart resumes at the first ungated Window.
   - A crash between Jev's answer and the commit re-asks that Window. Jev is then billed twice but the ledger records it once, about $0.00003 per crash. Accepted.
-- **Jev auth failure stops the Gate for that session; transcription continues.** The transcript can't be recovered later; Windows can. A restart with a fixed key gates the backlog.
+- **A Gate failure never stops transcription.** A Jev auth error or a bug in the Gate loop turns the Gate off for that session and logs an ERROR, and transcription continues. The transcript can't be recovered later; Windows can. A restart gates the backlog.
+- **A closed session always gets its last Windows.** If its final pass fails, or the stream ended while kiroku was down, the next Close for that channel gates the rest, including the trailing partial Window.
+- **`kiroku watch --no-gate`** transcribes without a Jev key.
 - **The `rule` table is owned by #3**, with every column #4 needs. #4 adds only the CLI.
 - **Budget caps** (`KIROKU_SESSION_CAP_USD`, default 1.50; `KIROKU_MONTH_CAP_USD`, default 20) apply to every paid call, Groq included. Groq is about 90% of today's spend.
   - Each provider adapter asks a BudgetGuard just before its first HTTP attempt. The guard sums the ledger.

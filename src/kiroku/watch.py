@@ -24,7 +24,7 @@ from pathlib import Path
 
 import psycopg
 
-from kiroku import sessions, transcript
+from kiroku import gating, sessions, transcript
 from kiroku.audio import BYTES_PER_SAMPLE, SAMPLES_PER_MS, AudioBlock, AudioEvent, LegEnded
 from kiroku.budget import Budget
 from kiroku.db import Pool
@@ -170,6 +170,7 @@ async def _watch_channel(
                                 await run.stop(session_ended=True)
                                 run = None
                             await sessions.close_open_sessions(pool, channel, datetime.now(UTC))
+                            await _gate_closed_sessions(services, channel)
                         case Open(meta):
                             session_id = await sessions.open_session(
                                 pool, channel, meta, datetime.now(UTC)
@@ -191,6 +192,29 @@ async def _watch_channel(
         if run is not None:
             # Shutdown: drain, but leave the session open. A restart resumes it.
             await run.stop()
+
+
+async def _gate_closed_sessions(services: Services, channel: Channel) -> None:
+    """Give closed sessions their last Windows. SessionRun.stop does this when a session ends;
+    this catches sessions whose final pass failed or that ended while kiroku was down."""
+    if services.gate is None:
+        return
+    name = services.transcriber.name
+    for session_id, title in await gating.ungated_closed_sessions(services.pool, channel.id, name):
+        stream: dict[str, JSON] = {"title": title or ""}
+        loop = GateLoop(
+            services.pool,
+            session_id,
+            name,
+            services.gate,
+            services.budget.guard(session_id),
+            lambda stream=stream: stream,
+        )
+        loop.finish(session_ended=True)
+        try:
+            await asyncio.wait_for(loop.run(), GATE_DRAIN_TIMEOUT_S)
+        except TimeoutError:
+            log.warning("session %d: Gate did not finish its last pass", session_id)
 
 
 class SessionRun:
@@ -245,7 +269,9 @@ class SessionRun:
             self._gating = asyncio.create_task(self._gate_loop.run())
 
     def raise_if_failed(self) -> None:
-        for task in (self._capturing, self._transcribing, self._gating):
+        # The Gate is not here: GateLoop.run never fails, so a Gate problem never stops
+        # transcription.
+        for task in (self._capturing, self._transcribing):
             if (
                 task is not None
                 and task.done()
@@ -282,22 +308,33 @@ class SessionRun:
                 log.exception("session %d: capture had failed", self.session_id)
         self._queue.put_nowait(None)
         log.info("session %d: capture stopped; draining transcription", self.session_id)
-        if self._transcribing is not None:
-            try:
-                await asyncio.wait_for(self._transcribing, drain_timeout_s)
-                log.info("session %d: drained", self.session_id)
-            except TimeoutError:
-                log.warning(
-                    "session %d: drain timed out; queued audio stays untranscribed", self.session_id
-                )
-        if self._gate_loop is not None and self._gating is not None:
-            self._gate_loop.finish(session_ended=session_ended)
-            try:
-                await asyncio.wait_for(self._gating, GATE_DRAIN_TIMEOUT_S)
-            except TimeoutError:
-                log.warning("session %d: Gate did not finish; restart resumes", self.session_id)
-            except Exception:
-                log.exception("session %d: Gate had failed", self.session_id)
+        try:
+            if self._transcribing is not None:
+                try:
+                    await asyncio.wait_for(self._transcribing, drain_timeout_s)
+                    log.info("session %d: drained", self.session_id)
+                except TimeoutError:
+                    log.warning(
+                        "session %d: drain timed out; queued audio stays untranscribed",
+                        self.session_id,
+                    )
+        finally:
+            # Even when transcription failed: whatever it committed still gets gated, and the
+            # loop never outlives this run. A second SIGTERM skips the wait.
+            cancelled = current is not None and current.cancelling() > cancels_before
+            await self._stop_gating(session_ended=session_ended, cancelled=cancelled)
+
+    async def _stop_gating(self, *, session_ended: bool, cancelled: bool) -> None:
+        if self._gate_loop is None or self._gating is None:
+            return
+        if cancelled:
+            self._gating.cancel()
+            return
+        self._gate_loop.finish(session_ended=session_ended)
+        try:
+            await asyncio.wait_for(self._gating, GATE_DRAIN_TIMEOUT_S)
+        except TimeoutError:
+            log.warning("session %d: Gate did not finish its last pass", self.session_id)
 
     async def _capture(self) -> None:
         delay = 2.0

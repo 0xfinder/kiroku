@@ -334,3 +334,82 @@ async def test_a_rule_cannot_name_state_fields(pool: Pool) -> None:
     # Only the Gate's wrapper points Jev at `new` and `context`.
     with pytest.raises(psycopg.errors.CheckViolation):
         await rules.add(pool, "sneaky", "Is it said in `context`?", threshold=Decimal("0.5"))
+
+
+async def test_a_gate_bug_is_logged_and_never_raised(
+    pool: Pool, session: int, caplog: pytest.LogCaptureFixture
+) -> None:
+    await two_rules(pool)
+    await speak(pool, session, 0, 45, "one")
+    async with asyncio.timeout(10):
+        await loop(pool, session, FakeGate(RuntimeError("boom"))).run()  # returns, no raise
+    assert "Gate crashed" in caplog.text and "boom" in caplog.text
+
+
+async def test_the_last_pass_survives_a_database_blip(
+    pool: Pool, session: int, conn: AsyncConnection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import kiroku.gating
+
+    await two_rules(pool)
+    await speak(pool, session, 0, 20, "the end")
+    real, calls = kiroku.gating.progress, 0
+
+    async def flaky(*args: Any) -> tuple[int, int]:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise psycopg.OperationalError("server closed the connection")
+        return await real(*args)
+
+    monkeypatch.setattr(kiroku.gating, "progress", flaky)
+    await gate_once(pool, session, FakeGate(0.4), ended=True)
+    assert await rows(conn, "SELECT start_ms, end_ms FROM gate_window") == [(0, 20_000)]
+
+
+async def test_sessions_that_closed_ungated_get_their_last_windows(
+    pool: Pool, channel: Channel, session: int, conn: AsyncConnection, tmp_path: Any
+) -> None:
+    from kiroku.source import NotLive
+    from kiroku.watch import watch
+
+    await two_rules(pool)
+    # The stream ran 70 s and ended while kiroku was down: nothing was gated.
+    await speak(pool, session, 0, 70, "first", "second", "third")
+
+    class Offline:
+        platform, login = "twitch", "gorgc"
+
+        async def probe(self) -> NotLive:
+            return NotLive()
+
+        def capture(self, archive: Any) -> Any:
+            raise AssertionError("an offline channel is never captured")
+
+    class Transcriber:
+        name = NAME
+
+        def transcribe(self, audio: Any, context: Any) -> Any:
+            raise AssertionError("nothing to transcribe")
+
+    gate = FakeGate(0.4)
+    task = asyncio.create_task(
+        watch(
+            pool,
+            [(channel, Offline())],
+            Transcriber(),
+            tmp_path,
+            budget=Budget(pool, Caps()),
+            gate=gate,
+            poll_s=0.05,
+        )
+    )
+    await gate.wait_for_requests(2)
+    await asyncio.sleep(0.2)
+    task.cancel()
+    await asyncio.gather(task, return_exceptions=True)
+    assert await rows(conn, "SELECT start_ms, end_ms FROM gate_window ORDER BY 1") == [
+        (0, 45_000),
+        (45_000, 70_000),
+    ]
+    assert await rows(conn, "SELECT count(*) FROM stream_session WHERE ended_at IS NULL") == [(0,)]
