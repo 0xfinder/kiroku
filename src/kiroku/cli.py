@@ -11,19 +11,24 @@ import asyncio
 import contextlib
 import logging
 import signal
-from collections.abc import Generator
+from collections.abc import Awaitable, Callable, Generator
 from contextlib import contextmanager
+from dataclasses import replace
+from decimal import Decimal
 from typing import Annotated
 
 import httpx
 import typer
 
+from kiroku import dry_run, rules
 from kiroku.budget import Budget
 from kiroku.config import SecretName, Settings
-from kiroku.db import connect, open_pool
+from kiroku.db import Pool, connect, open_pool
 from kiroku.db.migrate import migrate, new_migration
 from kiroku.errors import KirokuError
+from kiroku.gate import rule_question
 from kiroku.gate.jev import JevGate
+from kiroku.rules import Rule
 from kiroku.sessions import claim_channels
 from kiroku.source import StreamlinkSource
 from kiroku.transcriber.groq import GroqTranscriber
@@ -32,6 +37,8 @@ from kiroku.watch import watch
 app = typer.Typer(no_args_is_help=True, help="Transcribe live streams, keep Notes, send Alerts.")
 db_app = typer.Typer(no_args_is_help=True, help="Database schema.")
 app.add_typer(db_app, name="db")
+rule_app = typer.Typer(no_args_is_help=True, help="Alert Rules: what the Gate asks about.")
+app.add_typer(rule_app, name="rule")
 
 
 @contextmanager
@@ -113,6 +120,137 @@ def watch_command(
         except* KirokuError as group:
             # One channel's TaskGroup failure arrives as a group; report the first.
             raise group.exceptions[0] from None
+
+
+# ---- rules ---------------------------------------------------------------------------------
+
+Threshold = Annotated[
+    Decimal | None,
+    typer.Option(parser=Decimal, help="Pass at this probability or above, e.g. 0.7."),
+]
+
+
+def _run_with_pool[T](body: Callable[[Pool], Awaitable[T]]) -> T:
+    async def run(settings: Settings) -> T:
+        async with open_pool(settings.database_url) as pool:
+            return await body(pool)
+
+    with _user_errors():
+        return asyncio.run(run(Settings.load()))
+
+
+def _show(rule: Rule) -> None:
+    state = "enabled" if rule.enabled else "disabled"
+    pack = rule.pack or "any pack"
+    typer.echo(
+        f"{rule.name} ({state}, threshold {rule.threshold}, {pack}, cooldown {rule.cooldown_s} s)"
+    )
+    typer.echo(f"  {rule.instructions}")
+
+
+@rule_app.command("add")
+def rule_add(
+    name: Annotated[str, typer.Argument(help="Short id, e.g. predicts_winner.")],
+    instructions: Annotated[str, typer.Argument(help="The yes/no question, about what is said.")],
+    threshold: Threshold = Decimal("0.7"),
+    cooldown_s: Annotated[int, typer.Option(help="Minimum seconds between Alerts.")] = 600,
+    pack: Annotated[str | None, typer.Option(help="Only for this Pack, e.g. league.")] = None,
+) -> None:
+    """Add a Rule. Try it with `kiroku rule test` before relying on it."""
+    assert threshold is not None
+    _show(
+        _run_with_pool(
+            lambda pool: rules.add(
+                pool, name, instructions, threshold=threshold, cooldown_s=cooldown_s, pack=pack
+            )
+        )
+    )
+
+
+@rule_app.command("edit")
+def rule_edit(
+    name: str,
+    instructions: Annotated[str | None, typer.Option(help="New question wording.")] = None,
+    threshold: Threshold = None,
+    cooldown_s: Annotated[int | None, typer.Option()] = None,
+    pack: Annotated[str | None, typer.Option(help="Only for this Pack.")] = None,
+    any_pack: Annotated[bool, typer.Option("--any-pack", help="Apply with any Pack.")] = False,
+) -> None:
+    """Change a Rule. Past decisions keep the wording they were asked with."""
+    _show(
+        _run_with_pool(
+            lambda pool: rules.edit(
+                pool,
+                name,
+                instructions=instructions,
+                threshold=threshold,
+                cooldown_s=cooldown_s,
+                pack=pack,
+                clear_pack=any_pack,
+            )
+        )
+    )
+
+
+@rule_app.command("enable")
+def rule_enable(name: str) -> None:
+    """Ask this Rule in live Gate requests again."""
+    _show(_run_with_pool(lambda pool: rules.set_enabled(pool, name, True)))
+
+
+@rule_app.command("disable")
+def rule_disable(name: str) -> None:
+    """Stop asking this Rule. Its past decisions stay."""
+    _show(_run_with_pool(lambda pool: rules.set_enabled(pool, name, False)))
+
+
+@rule_app.command("list")
+def rule_list() -> None:
+    """Every Rule, enabled or not."""
+    found = _run_with_pool(rules.all_rules)
+    for rule in found:
+        _show(rule)
+    if not found:
+        typer.echo("no rules yet; add one with `kiroku rule add`")
+
+
+@rule_app.command("test")
+def rule_test(
+    name: str,
+    session: Annotated[int | None, typer.Option(help="Every Window of this session.")] = None,
+    last: Annotated[int, typer.Option(help="Otherwise, the latest N Windows.")] = 40,
+    instructions: Annotated[
+        str | None, typer.Option(help="Try this wording instead, without saving it.")
+    ] = None,
+    threshold: Threshold = None,
+) -> None:
+    """Ask the Gate this Rule about stored Windows and show how the scores spread.
+
+    Real Jev calls: they cost money (about $0.00003 each) and count against the monthly
+    Budget cap. With --instructions, NAME may be a Rule that doesn't exist yet.
+    """
+
+    async def body(pool: Pool) -> str:
+        settings = Settings.load()
+        key = settings.secrets.require(SecretName.JEV)
+        if instructions is None:
+            rule = await rules.get(pool, name)
+            if threshold is not None:
+                rule = replace(rule, threshold=threshold)
+        else:
+            t = threshold if threshold is not None else Decimal("0.7")
+            rules.check(name, instructions, t)
+            rule = Rule(0, name, instructions.strip(), t, None, 0)
+        windows = await dry_run.stored_windows(pool, session_id=session, last=last)
+        if not windows:
+            raise KirokuError("no stored Windows with speech yet; run `kiroku watch` first")
+        question = rule_question(rule)
+        async with httpx.AsyncClient() as http:
+            guard = Budget(pool, settings.caps).guard(None)
+            trials = await dry_run.run(pool, JevGate(http, key), guard, question, windows)
+        return dry_run.report(name, question, trials)
+
+    typer.echo(_run_with_pool(body))
 
 
 def main() -> None:

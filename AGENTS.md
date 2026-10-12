@@ -4,7 +4,7 @@ Kiroku transcribes live streams (Twitch first), keeps structured notes, sends al
 
 ## Current status
 
-Phase 1 is in progress. In place: the scaffold (CLI, config, Postgres migrations, cost ledger, CI), the live transcript (`kiroku watch`), and the Gate (Windows, Jev scoring of Rules, Budget caps). Read these before starting work:
+Phase 1 is in progress. In place: the scaffold (CLI, config, Postgres migrations, cost ledger, CI), the live transcript (`kiroku watch`), the Gate (Windows, Jev scoring of Rules, Budget caps), and Rule management (`kiroku rule add|edit|list|enable|disable|test`). Read these before starting work:
 
 - [PLAN.md](PLAN.md): the pipeline, storage, and phases.
 - [docs/decisions.md](docs/decisions.md): what was decided, why, and what was rejected.
@@ -26,6 +26,7 @@ uv run ruff check && uv run ruff format --check && uv run pyright && uv run pyte
 - Tests also need `ffmpeg` on PATH; the end-to-end tests run real ffmpeg on synthetic audio (`tests/fakes/`).
 - Run a live session with `KIROKU_DATA_DIR=/tmp/x .venv/bin/kiroku watch <channel>`. It needs `GROQ_API_KEY` and `JEV_API_KEY`. Budget caps come from `KIROKU_SESSION_CAP_USD` (default 1.50) and `KIROKU_MONTH_CAP_USD` (default 20). Don't use `uv run` when you need a clean stop: `uv run` ends the child during Ctrl-C before it drains the transcript. systemd and the bare binary drain correctly on SIGTERM and SIGINT.
 - Changing the Gate's wording, its `state` layout or the pinned Jev model fails `tests/test_gate_replay.py` until you re-run `uv run python spikes/gate_split.py ...` (see spikes/README.md) and commit the new recording. This is deliberate: CI holds the Gate to what was measured live.
+- Try a Rule's wording with `kiroku rule test <name> [--session ID | --last N] [--instructions "..."]` before relying on it. It makes real Jev calls against stored Windows (about $0.00003 each, counted against the monthly cap) and stores no decisions. Naming concrete events beats abstract categories (spikes/README.md, 2026-10-12).
 - If `docker` says permission denied right after Docker was installed, the session predates the `docker` group. Run commands as `sg docker -c "docker compose up -d --wait"`.
 
 ## Workflow

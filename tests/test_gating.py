@@ -332,8 +332,25 @@ async def test_a_wrong_key_stops_the_gate_but_writes_nothing(
 
 async def test_a_rule_cannot_name_state_fields(pool: Pool) -> None:
     # Only the Gate's wrapper points Jev at `new` and `context`.
-    with pytest.raises(psycopg.errors.CheckViolation):
+    with pytest.raises(rules.RuleError, match="backticks"):
         await rules.add(pool, "sneaky", "Is it said in `context`?", threshold=Decimal("0.5"))
+    async with pool.connection() as conn:  # and the table refuses it too
+        with pytest.raises(psycopg.errors.CheckViolation):
+            await conn.execute(
+                "INSERT INTO rule (name, instructions, threshold) VALUES ('x', '`new`?', 0.5)"
+            )
+
+
+async def test_a_disabled_rule_is_not_asked(
+    pool: Pool, session: int, conn: AsyncConnection
+) -> None:
+    winner, _ = await two_rules(pool)
+    await rules.set_enabled(pool, winner.name, False)
+    await speak(pool, session, 0, 45, "Spirit wins.")
+    gate = FakeGate(0.9)
+    await gate_once(pool, session, gate, ended=False)
+    assert [q.name for q in gate.requests[0].rules] == ["talks_item"]
+    assert await rows(conn, "SELECT count(*) FROM gate_decision") == [(1,)]
 
 
 async def test_a_gate_bug_is_logged_and_never_raised(

@@ -37,6 +37,7 @@ The names kiroku's code, docs, and design discussions use. If a discussion needs
 
 - **Rule** — a natural-language alert condition written by the user, e.g. "he predicts which team wins the current game". Each Rule has a threshold and a cooldown.
 - **Gate** — stage 1 of alerting. One Jev request per Window evaluates every active Rule as a yes/no question and returns a probability for each.
+- **Rule test** — a dry run of one Rule, or a candidate rewording, against stored Windows: the same Gate request without Mode, scored but not stored as Gate decisions. It is billed to the month, not to a session.
 - **Gate decision** — one (Window, Rule) result: the probability, the threshold, and whether it passed. Every Gate decision is logged. When the Rule wasn't asked (no speech, Budget cap, Gate failure), the probability is empty and the Window's status says why.
 - **Extraction** — stage 2. Runs only when a Gate decision passes. Haiku writes the alert content and checks whether the content is new.
 - **Novelty check** — Extraction's comparison with the last Alert sent for the same Rule and Game key. Content that is not new is dropped.
