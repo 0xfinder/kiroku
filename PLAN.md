@@ -53,7 +53,7 @@ Each phase ends with something that can be observed working.
 
 ### Phase 1 — Core + League v1
 
-- Twitch watcher, Source, Muse Transcriber (Groq Fallback), audio archive.
+- Twitch watcher, Source, Muse Transcriber (Groq Fallback), audio archive, Backfill of crash gaps from the archive.
 - Speaker map, Windows, Mode, and the Gate with every Rule in one Jev call.
 - Extraction, Novelty check, and Cooldown; Telegram Notifier with 👍/👎.
 - League Vocabulary and `get_live_match` from the `live-lol-esports` lolesports client are implemented (issue #6). Recorded Caedrel name audit: 15 errors with title-only, 9 with match Vocabulary. Teams and picks reach the Gate in replay; the live feed still needs verification during a pro match. The public endpoints do not expose bans.

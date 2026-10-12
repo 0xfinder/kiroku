@@ -4,7 +4,8 @@ FAKE_STREAM_ID   the broadcast id `--json` reports (unset: offline)
 FAKE_LEGS        comma-separated leg lengths in seconds, e.g. "40,30"
 FAKE_STATE_DIR   where the leg counter lives, so each `--stdout` run plays the next leg
 FAKE_HOLD        if set, a leg streams at FAKE_PACE x real time, then stays open, like a
-                 live stream mid-broadcast (so audio is always in flight when it stops)
+                 live stream mid-broadcast (so audio is always in flight when it stops),
+                 until stopped or until its parent dies (real streamlink then gets EPIPE)
 
 `--stdout` writes the next leg as WAV and exits, which is what a stream drop looks like to
 the pipeline. With no legs left it exits 1 without output, like an offline stream.
@@ -52,10 +53,12 @@ if not os.environ.get("FAKE_HOLD"):
     sys.stdout.buffer.write(data)
     sys.stdout.buffer.flush()
     sys.exit(0)
+parent = os.getppid()
 pace = float(os.environ.get("FAKE_PACE", "10"))
 piece = 3_200  # 0.1 s of audio
 for i in range(0, len(data), piece):
     sys.stdout.buffer.write(data[i : i + piece])
     sys.stdout.buffer.flush()
     time.sleep(0.1 / pace)
-time.sleep(3600)
+while os.getppid() == parent:
+    time.sleep(0.1)

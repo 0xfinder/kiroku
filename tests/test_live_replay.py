@@ -2,7 +2,8 @@
 
 Covers issue #2's acceptance criteria: replayed audio becomes stored Utterances with correct
 timestamps; a stream drop reconnects to the same session without transcribing anything twice;
-a restart of `kiroku watch` resumes the session; the session's cost is in the ledger.
+a restart of `kiroku watch` resumes the session; the session's cost is in the ledger. And
+issue #10's: a watcher killed with audio still queued is backfilled from the archive.
 """
 
 from __future__ import annotations
@@ -11,6 +12,8 @@ import asyncio
 import contextlib
 import itertools
 import json
+import os
+import signal
 import subprocess
 import sys
 from collections.abc import AsyncGenerator, Callable
@@ -22,6 +25,7 @@ import httpx
 import pytest
 from psycopg import AsyncConnection
 
+from kiroku import backfill, sessions, transcript
 from kiroku.budget import Budget, Caps
 from kiroku.config import Secret
 from kiroku.db import Pool, open_pool
@@ -34,6 +38,7 @@ from kiroku.transcriber.groq import GroqTranscriber
 from kiroku.watch import watch
 
 FAKE_STREAMLINK = Path(__file__).parent / "fakes" / "streamlink.py"
+WATCH_PROC = Path(__file__).parent / "fakes" / "watch_proc.py"
 
 
 @pytest.fixture
@@ -104,7 +109,7 @@ async def watch_until(
             watch(
                 pool,
                 [(channels[0], source)],
-                GroqTranscriber(http, Secret("k")),
+                GroqTranscriber(http, Secret("k"), background_interval_s=0),
                 data_dir,
                 budget=Budget(pool, caps or Caps()),
                 gate=gate,
@@ -294,3 +299,110 @@ async def test_the_gate_closes_windows_as_the_transcript_lands_and_at_session_en
     assert decisions == [(Decimal("0.8000"), True)] * 2
     ledger = await query_rows(conn, "SELECT count(*) FROM cost_ledger WHERE purpose = 'gate'")
     assert ledger == [(2,)]
+
+
+def _processes_using(path: Path) -> list[int]:
+    """Pids whose command line mentions `path` (the capture ffmpeg names its archive)."""
+    found: list[int] = []
+    for proc in Path("/proc").iterdir():
+        try:
+            if proc.name.isdigit() and str(path).encode() in (proc / "cmdline").read_bytes():
+                found.append(int(proc.name))
+        except OSError:
+            continue
+    return found
+
+
+async def test_killed_watcher_is_backfilled_on_restart(
+    database_url: str,
+    pool: Pool,
+    conn: AsyncConnection,
+    tmp_path: Path,
+    fake_stream: Callable[[str], None],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_stream("30,20")
+    data = tmp_path / "data"
+    name = "groq:whisper-large-v3-turbo"
+
+    # A watcher process, killed outright once one span is in: the leg is still live (no
+    # recorded end) and Groq is slow, so most of the leg is archived but still queued.
+    monkeypatch.setenv("FAKE_HOLD", "1")
+    monkeypatch.setenv("FAKE_GROQ_DELAY", "3")
+    proc = await asyncio.create_subprocess_exec(
+        sys.executable, str(WATCH_PROC), database_url, str(data)
+    )
+    try:
+        async with asyncio.timeout(30):
+            while not await query_rows(conn, "SELECT 1 FROM transcript_span"):
+                assert proc.returncode is None, "the watcher died on its own"
+                await asyncio.sleep(0.1)
+    finally:
+        os.kill(proc.pid, signal.SIGKILL)
+        await proc.wait()
+    # Its orphaned capture winds down (streamlink sees its parent die; ffmpeg reaches EOF).
+    async with asyncio.timeout(10):
+        while True:
+            if not _processes_using(data):
+                break
+            await asyncio.sleep(0.1)
+
+    (session_id,) = (await query_rows(conn, "SELECT id FROM stream_session"))[0]
+    assert await query_rows(conn, "SELECT seq, audio_end_ms FROM capture_leg") == [(1, None)]
+    killed_spans = await transcript.spans(pool, session_id, name)
+    assert killed_spans[-1][1] < 25_000, "the kill left queued audio untranscribed"
+
+    # Restart: the open leg is sealed at its archive's length, its gap is backfilled, and the
+    # next leg (20 s, ending on its own) starts after it.
+    monkeypatch.delenv("FAKE_HOLD")
+    groq = GroqStub()
+
+    async def covered() -> bool:
+        legs = await sessions.legs(pool, session_id)
+        spans = await transcript.spans(pool, session_id, name)
+        return (
+            len(legs) == 2
+            and legs[1].audio_end_ms is not None
+            and spans[-1][1] == legs[1].audio_end_ms
+            and not backfill.find_gaps(legs, spans)
+        )
+
+    await watch_until(database_url, pool, data, groq, covered)
+
+    legs = await sessions.legs(pool, session_id)
+    first, second = legs
+    assert first.audio_end_ms is not None and second.audio_end_ms is not None
+    archived_ms = round(_decoded_seconds(data / first.archive_path) * 1000)
+    assert first.audio_end_ms == pytest.approx(archived_ms, abs=1), "sealed at the archive"
+    assert first.audio_end_ms == pytest.approx(30_000, abs=50), "the whole leg was archived"
+    assert second.audio_start_ms == first.audio_end_ms
+    assert second.audio_end_ms - second.audio_start_ms == 20_000
+
+    spans = await transcript.spans(pool, session_id, name)
+    assert spans[: len(killed_spans)] == killed_spans, "committed audio is never redone"
+    assert spans[0][0] == 0 and spans[-1][1] == second.audio_end_ms
+    for (_, a_end), (b_start, _) in itertools.pairwise(spans):
+        assert b_start == a_end, "spans tile both legs with no gap or overlap"
+    assert first.audio_end_ms in {end for _, end in spans}, "no span crosses the legs"
+
+    # Each chunk committed exactly once: one ledger row (under the session) per voiced span,
+    # its two utterances stored once, each anchored to its own leg's wall clock.
+    voiced = await query_rows(
+        conn,
+        f"SELECT count(DISTINCT s.audio_start_ms) FROM transcript_span s JOIN utterance u "
+        f"ON u.session_id = s.session_id AND u.audio_start_ms >= s.audio_start_ms "
+        f"AND u.audio_start_ms < s.audio_end_ms WHERE s.session_id = {session_id}",
+    )
+    ledger = await query_rows(
+        conn, f"SELECT count(*) FROM cost_ledger WHERE session_id = {session_id}"
+    )
+    assert ledger[0][0] == voiced[0][0] == len(killed_spans) + groq.calls
+    utterances = await query_rows(
+        conn,
+        "SELECT u.text, u.spoken_at, l.started_at + (u.audio_start_ms - l.audio_start_ms) "
+        "* interval '1 ms' FROM utterance u JOIN capture_leg l ON l.session_id = u.session_id "
+        "AND u.audio_start_ms >= l.audio_start_ms AND u.audio_start_ms < l.audio_end_ms",
+    )
+    assert len(utterances) == 2 * ledger[0][0]
+    assert len({text for text, *_ in utterances}) == len(utterances), "nothing stored twice"
+    assert all(spoken == expected for _, spoken, expected in utterances)

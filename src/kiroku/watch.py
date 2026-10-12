@@ -5,6 +5,7 @@
         SessionRun (while Live)
           _capture   Source legs -> capture_leg rows -> AudioBlocks -> queue  (reconnects)
           _transcribe  queue -> Transcriber -> Results -> transcript.commit     (drains)
+          _backfill  archive gaps a crash left -> Transcriber -> transcript.commit  (yields)
           _gating    GateLoop: committed transcript -> Windows -> Gate -> gating.commit
 
 The lifecycle is a pure state machine (`step`); the shell executes its actions. Every
@@ -24,7 +25,8 @@ from pathlib import Path
 
 import psycopg
 
-from kiroku import gating, segments, sessions, transcript
+from kiroku import backfill, gating, segments, sessions, transcript
+from kiroku.archive import LengthUnknown
 from kiroku.audio import BYTES_PER_SAMPLE, SAMPLES_PER_MS, AudioBlock, AudioEvent, LegEnded
 from kiroku.budget import Budget
 from kiroku.db import Pool
@@ -34,13 +36,14 @@ from kiroku.gating import GateLoop
 from kiroku.pack import LiveContext, Pack, PackSelector
 from kiroku.sessions import Channel
 from kiroku.source import Capture, NotLive, Online, Probe, ProbeFailed, Source, StreamMeta
-from kiroku.transcriber import Context, Result, Transcriber
+from kiroku.transcriber import Context, Transcriber
 
 log = logging.getLogger(__name__)
 
 OFFLINE_PROBES_TO_CLOSE = 2  # one NotLive blip doesn't stop capture
 CAPTURE_STOP_TIMEOUT_S = 15.0
 DRAIN_TIMEOUT_S = 120.0
+BACKFILL_STOP_TIMEOUT_S = 30.0  # one in-flight Transcriber call; the rest waits for next start
 GATE_DRAIN_TIMEOUT_S = 60.0
 PACK_REFRESH_S = 60.0
 
@@ -252,8 +255,8 @@ class SessionRun:
         self._pack_revision = 0
         self._pending_update: tuple[StreamMeta, int, Pack | None] | None = None
         # Latest captured audio, including spans queued but not yet committed.
-        self._clock_ms = 0
-        self._live_from_ms = 0
+        self._clock_ms: int = 0
+        self._live_from_ms: int = 0
         try:
             self._pack = self._selector(meta.category)
         except Exception:
@@ -286,24 +289,18 @@ class SessionRun:
         self._capturing: asyncio.Task[None] | None = None
         self._transcribing: asyncio.Task[None] | None = None
         self._gating: asyncio.Task[None] | None = None
+        self._backfilling: asyncio.Task[None] | None = None
+        self._sealed = asyncio.Event()  # capture sealed the legs a crash left open
+        self._run_segment_recorded = False
 
     async def start(self) -> None:
-        leg = await sessions.next_leg(self._pool, self._channel, self.session_id)
-        self._clock_ms = self._live_from_ms = leg.audio_start_ms
-        await segments.record(
-            self._pool,
-            self.session_id,
-            self._clock_ms,
-            self.meta,
-            self._pack.name if self._pack else None,
-            restart=True,
-        )
         previous = await transcript.tail_text(self._pool, self.session_id, self._transcriber.name)
         self._transcribing = asyncio.create_task(self._transcribe(previous))
         self._capturing = asyncio.create_task(self._capture())
         self._packing = asyncio.create_task(self._refresh_pack())
         if self._gate_loop is not None:
             self._gating = asyncio.create_task(self._gate_loop.run())
+        self._backfilling = asyncio.create_task(self._backfill())
 
     def raise_if_failed(self) -> None:
         # The Gate is not here: GateLoop.run never fails, so a Gate problem never stops
@@ -321,12 +318,30 @@ class SessionRun:
         self, *, session_ended: bool = False, drain_timeout_s: float = DRAIN_TIMEOUT_S
     ) -> None:
         """End the current leg cleanly (everything already received is archived and queued),
-        let transcription drain the queue, then gate what it committed. With `session_ended`
-        the trailing partial Window is gated too; on a shutdown a restart closes it at full
-        length instead. Returns before a new run may start.
+        let transcription drain the queue, gate what it committed, and let backfill finish what
+        it already fed. With `session_ended` the trailing partial Window is gated too; on a
+        shutdown a restart closes it at full length instead. Returns before a new run may
+        start.
 
-        A second cancellation of the caller (another SIGTERM) still propagates.
+        A second cancellation of the caller (another SIGTERM) still propagates, and then
+        backfill is cancelled rather than left running past its run.
         """
+        backfilling = self._backfilling
+        try:
+            await self._stop_live(drain_timeout_s, session_ended=session_ended)
+            if backfilling is not None and self._sealed.is_set():
+                try:
+                    await asyncio.wait_for(backfilling, BACKFILL_STOP_TIMEOUT_S)
+                except TimeoutError:
+                    log.warning(
+                        "session %d: backfill cut short; resumes next start", self.session_id
+                    )
+        finally:
+            if backfilling is not None and not backfilling.done():
+                backfilling.cancel()
+                await asyncio.wait([backfilling])
+
+    async def _stop_live(self, drain_timeout_s: float, *, session_ended: bool) -> None:
         current = asyncio.current_task()
         cancels_before = current.cancelling() if current else 0
         self._stopping.set()
@@ -385,6 +400,9 @@ class SessionRun:
             except psycopg.OperationalError as e:
                 log.warning("session %d: database error in capture (%s)", self.session_id, e)
                 captured = False
+            except LengthUnknown as e:
+                log.warning("session %d: cannot seal a crashed leg yet (%s)", self.session_id, e)
+                captured = False
             if self._stopping.is_set():
                 return
             if captured:
@@ -395,7 +413,25 @@ class SessionRun:
 
     async def _capture_leg(self) -> bool:
         """Run one leg to its end. Returns whether it delivered any audio."""
+        await backfill.seal_open_legs(
+            self._pool, self.session_id, self._transcriber.name, self._data_dir
+        )
+        self._sealed.set()
         leg = await sessions.next_leg(self._pool, self._channel, self.session_id, self._clock_ms)
+        if not self._run_segment_recorded:
+            # Where this run's audio starts on the session clock. Only known once a crash's
+            # open legs are sealed (#10), so not at start(): before this, no audio of this run
+            # exists for a Window to need the Segment.
+            self._clock_ms = self._live_from_ms = max(self._clock_ms, leg.audio_start_ms)
+            await segments.record(
+                self._pool,
+                self.session_id,
+                leg.audio_start_ms,
+                self.meta,
+                self._pack.name if self._pack else None,
+                restart=True,
+            )
+            self._run_segment_recorded = True
         path = self._data_dir / leg.archive_path
         samples = 0
         leftover = b""
@@ -428,6 +464,23 @@ class SessionRun:
                 path.unlink(missing_ok=True)
         return samples > 0
 
+    async def _backfill(self) -> None:
+        """Behind live audio, never instead of it: a failure here leaves the gaps for the next
+        start and does not stop the session. Starts once capture has sealed crashed legs."""
+        try:
+            await self._sealed.wait()
+            await backfill.run(
+                self._pool,
+                self.session_id,
+                self._transcriber,
+                self._data_dir,
+                self._vocabulary,
+                self._guard,
+                stopping=self._stopping,
+            )
+        except Exception:
+            log.exception("session %d: backfill failed; the gaps stay", self.session_id)
+
     async def _events(self) -> AsyncIterator[AudioEvent]:
         while (event := await self._queue.get()) is not None:
             yield event
@@ -435,7 +488,9 @@ class SessionRun:
     async def _transcribe(self, previous_text: str) -> None:
         context = Context(self._vocabulary, self._guard, previous_text)
         async for result in self._transcriber.transcribe(self._events(), context):
-            await self._commit(result)
+            await transcript.commit(self._pool, self.session_id, self._transcriber.name, result)
+            if self._gate_loop is not None:
+                self._gate_loop.wake()
 
     def _stream(self) -> dict[str, JSON]:
         """What the Gate is told about the stream: `context.stream`."""
@@ -447,8 +502,7 @@ class SessionRun:
     def _vocabulary(self) -> str:
         if self._pack_vocabulary is not None:
             return self._pack_vocabulary
-        category = f"{self.meta.category} stream. " if self.meta.category else ""
-        return f"{category}{self.meta.title}".strip()
+        return vocabulary(self.meta.title, self.meta.category)
 
     async def update(self, meta: StreamMeta) -> None:
         if self._pending_update is None or self._pending_update[0] != meta:
@@ -517,16 +571,8 @@ class SessionRun:
             with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(self._pack_wake.wait(), PACK_REFRESH_S)
 
-    async def _commit(self, result: Result) -> None:
-        """Retry the commit, never the paid call that produced the Result."""
-        delay = 1.0
-        while True:
-            try:
-                await transcript.commit(self._pool, self.session_id, self._transcriber.name, result)
-                if self._gate_loop is not None:
-                    self._gate_loop.wake()
-                return
-            except psycopg.OperationalError as e:
-                log.warning("session %d: commit failed (%s); retrying", self.session_id, e)
-                await asyncio.sleep(delay)
-                delay = min(delay * 2, 30.0)
+
+def vocabulary(title: str, category: str | None) -> str:
+    """Title-only Vocabulary, for sessions without a Pack and as the Pack's fallback."""
+    prefix = f"{category} stream. " if category else ""
+    return f"{prefix}{title}".strip()
