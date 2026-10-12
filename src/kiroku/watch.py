@@ -5,7 +5,7 @@
         SessionRun (while Live)
           _capture   Source legs -> capture_leg rows -> AudioBlocks -> queue  (reconnects)
           _transcribe  queue -> Transcriber -> Results -> transcript.commit     (drains)
-          _backfill  archive gaps a crash left -> Transcriber -> transcript.commit  (paced)
+          _backfill  archive gaps a crash left -> Transcriber -> transcript.commit  (yields)
 
 The lifecycle is a pure state machine (`step`); the shell executes its actions. Every
 action is idempotent in the database (kiroku.sessions), so the shell never needs to know
@@ -25,11 +25,12 @@ from pathlib import Path
 import psycopg
 
 from kiroku import backfill, sessions, transcript
+from kiroku.archive import LengthUnknown
 from kiroku.audio import BYTES_PER_SAMPLE, SAMPLES_PER_MS, AudioBlock, AudioEvent, LegEnded
 from kiroku.db import Pool
 from kiroku.sessions import Channel
 from kiroku.source import Capture, NotLive, Online, Probe, ProbeFailed, Source, StreamMeta
-from kiroku.transcriber import Context, Result, Transcriber
+from kiroku.transcriber import Context, Transcriber
 
 log = logging.getLogger(__name__)
 
@@ -194,7 +195,6 @@ class SessionRun:
         data_dir: Path,
         *,
         reconnect_max_s: float = 30.0,
-        backfill_pace: float | None = backfill.BACKFILL_PACE,
     ) -> None:
         self.session_id = session_id
         self.meta = meta
@@ -204,27 +204,22 @@ class SessionRun:
         self._transcriber = transcriber
         self._data_dir = data_dir
         self._reconnect_max_s = reconnect_max_s
-        self._backfill_pace = backfill_pace
         self._queue: asyncio.Queue[AudioEvent | None] = asyncio.Queue()
         self._stopping = asyncio.Event()
         self._capture_handle: Capture | None = None
         self._capturing: asyncio.Task[None] | None = None
         self._transcribing: asyncio.Task[None] | None = None
         self._backfilling: asyncio.Task[None] | None = None
+        self._sealed = asyncio.Event()  # capture sealed the legs a crash left open
         # End of the last leg captured in this run. The database may not know it yet (its
         # spans can still be queued), so the next leg never starts before it.
         self._clock_ms = 0
 
     async def start(self) -> None:
-        # Before the first leg is placed: it must start after the legs a crash left open.
-        gaps = await backfill.prepare(
-            self._pool, self.session_id, self._transcriber.name, self._data_dir
-        )
         previous = await transcript.tail_text(self._pool, self.session_id, self._transcriber.name)
         self._transcribing = asyncio.create_task(self._transcribe(previous))
         self._capturing = asyncio.create_task(self._capture())
-        if gaps:
-            self._backfilling = asyncio.create_task(self._backfill(gaps))
+        self._backfilling = asyncio.create_task(self._backfill())
 
     def raise_if_failed(self) -> None:
         for task in (self._capturing, self._transcribing):
@@ -238,10 +233,28 @@ class SessionRun:
 
     async def stop(self, drain_timeout_s: float = DRAIN_TIMEOUT_S) -> None:
         """End the current leg cleanly (everything already received is archived and queued),
-        then let transcription drain the queue. Returns before a new run may start.
+        then let transcription drain the queue and backfill finish what it already fed.
+        Returns before a new run may start.
 
-        A second cancellation of the caller (another SIGTERM) still propagates.
+        A second cancellation of the caller (another SIGTERM) still propagates, and then
+        backfill is cancelled rather than left running past its run.
         """
+        backfilling = self._backfilling
+        try:
+            await self._stop_live(drain_timeout_s)
+            if backfilling is not None and self._sealed.is_set():
+                try:
+                    await asyncio.wait_for(backfilling, BACKFILL_STOP_TIMEOUT_S)
+                except TimeoutError:
+                    log.warning(
+                        "session %d: backfill cut short; resumes next start", self.session_id
+                    )
+        finally:
+            if backfilling is not None and not backfilling.done():
+                backfilling.cancel()
+                await asyncio.wait([backfilling])
+
+    async def _stop_live(self, drain_timeout_s: float) -> None:
         current = asyncio.current_task()
         cancels_before = current.cancelling() if current else 0
         self._stopping.set()
@@ -268,13 +281,6 @@ class SessionRun:
                 log.warning(
                     "session %d: drain timed out; queued audio stays untranscribed", self.session_id
                 )
-        if self._backfilling is not None:
-            try:
-                await asyncio.wait_for(self._backfilling, BACKFILL_STOP_TIMEOUT_S)
-            except TimeoutError:
-                log.warning(
-                    "session %d: backfill cut short; it resumes on the next start", self.session_id
-                )
 
     async def _capture(self) -> None:
         delay = 2.0
@@ -283,6 +289,9 @@ class SessionRun:
                 captured = await self._capture_leg()
             except psycopg.OperationalError as e:
                 log.warning("session %d: database error in capture (%s)", self.session_id, e)
+                captured = False
+            except LengthUnknown as e:
+                log.warning("session %d: cannot seal a crashed leg yet (%s)", self.session_id, e)
                 captured = False
             if self._stopping.is_set():
                 return
@@ -294,6 +303,10 @@ class SessionRun:
 
     async def _capture_leg(self) -> bool:
         """Run one leg to its end. Returns whether it delivered any audio."""
+        await backfill.seal_open_legs(
+            self._pool, self.session_id, self._transcriber.name, self._data_dir
+        )
+        self._sealed.set()
         leg = await sessions.next_leg(self._pool, self._channel, self.session_id, self._clock_ms)
         path = self._data_dir / leg.archive_path
         samples = 0
@@ -326,19 +339,17 @@ class SessionRun:
                 path.unlink(missing_ok=True)
         return samples > 0
 
-    async def _backfill(self, gaps: list[backfill.Gap]) -> None:
+    async def _backfill(self) -> None:
         """Behind live audio, never instead of it: a failure here leaves the gaps for the next
-        start and does not stop the session."""
+        start and does not stop the session. Starts once capture has sealed crashed legs."""
         try:
+            await self._sealed.wait()
             await backfill.run(
                 self._pool,
                 self.session_id,
                 self._transcriber,
                 self._data_dir,
-                gaps,
                 self._vocabulary,
-                commit=self._commit,
-                pace=self._backfill_pace,
                 stopping=self._stopping,
             )
         except Exception:
@@ -351,21 +362,13 @@ class SessionRun:
     async def _transcribe(self, previous_text: str) -> None:
         context = Context(vocabulary=self._vocabulary, previous_text=previous_text)
         async for result in self._transcriber.transcribe(self._events(), context):
-            await self._commit(result)
+            await transcript.commit(self._pool, self.session_id, self._transcriber.name, result)
 
     def _vocabulary(self) -> str:
-        """Title-only until Packs supply real Vocabulary (#6)."""
-        category = f"{self.meta.category} stream. " if self.meta.category else ""
-        return f"{category}{self.meta.title}".strip()
+        return vocabulary(self.meta.title, self.meta.category)
 
-    async def _commit(self, result: Result) -> None:
-        """Retry the commit, never the paid call that produced the Result."""
-        delay = 1.0
-        while True:
-            try:
-                await transcript.commit(self._pool, self.session_id, self._transcriber.name, result)
-                return
-            except psycopg.OperationalError as e:
-                log.warning("session %d: commit failed (%s); retrying", self.session_id, e)
-                await asyncio.sleep(delay)
-                delay = min(delay * 2, 30.0)
+
+def vocabulary(title: str, category: str | None) -> str:
+    """Title-only until Packs supply real Vocabulary (#6)."""
+    prefix = f"{category} stream. " if category else ""
+    return f"{prefix}{title}".strip()

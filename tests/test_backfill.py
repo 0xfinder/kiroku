@@ -4,11 +4,13 @@ SessionRun that lost queued audio, then is stopped mid-backfill and restarted.""
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import itertools
 import shutil
 import subprocess
 import sys
-from collections.abc import AsyncGenerator, Awaitable, Callable
+from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
 
@@ -17,12 +19,13 @@ import pytest
 from psycopg import AsyncConnection
 
 from kiroku import archive, backfill, sessions, transcript
-from kiroku.archive import ArchiveUnreadable
+from kiroku.archive import ArchiveUnreadable, LengthUnknown
 from kiroku.backfill import Gap, find_gaps, sealed_end
 from kiroku.config import Secret
 from kiroku.db import Pool, open_pool
 from kiroku.sessions import Channel, Leg, claim_channels
-from kiroku.source import StreamlinkSource, StreamMeta, ffmpeg_command
+from kiroku.source import Capture, Online, Probe, StreamlinkSource, StreamMeta, ffmpeg_command
+from kiroku.transcriber import Result
 from kiroku.transcriber.groq import GroqTranscriber
 from kiroku.watch import SessionRun
 from tests.fakes.speech import speechlike, wav
@@ -30,6 +33,7 @@ from tests.fakes.speech import speechlike, wav
 FAKE_STREAMLINK = Path(__file__).parent / "fakes" / "streamlink.py"
 META = StreamMeta("broadcast-1", "fake stream", "Dota 2")
 T0 = datetime(2026, 10, 11, 12, 0, tzinfo=UTC)
+NAME = "groq:whisper-large-v3-turbo"
 
 
 def _leg(seq: int, start: int, end: int | None) -> Leg:
@@ -172,9 +176,11 @@ class Groq:
 
     def __init__(self, hang: bool) -> None:
         self.hang = hang
+        self.sent = 0
         self.prompts: list[str] = []
 
     async def __call__(self, request: httpx.Request) -> httpx.Response:
+        self.sent += 1
         if self.hang:
             await asyncio.Event().wait()
         self.prompts.append(request.content.decode(errors="replace"))
@@ -207,7 +213,7 @@ async def test_lost_queue_is_backfilled_once_across_a_stop_and_restart(
         pytest.fail("ffprobe not on PATH")
     monkeypatch.setenv("FAKE_STREAM_ID", META.stream_id)
     monkeypatch.setenv("FAKE_STATE_DIR", str(tmp_path))
-    monkeypatch.setenv("FAKE_LEGS", "40")
+    monkeypatch.setenv("FAKE_LEGS", "120")
     source = StreamlinkSource("fake", streamlink=(sys.executable, str(FAKE_STREAMLINK)))
     session = await sessions.open_session(pool, channel, META, T0)
     data = tmp_path / "data"
@@ -221,7 +227,7 @@ async def test_lost_queue_is_backfilled_once_across_a_stop_and_restart(
 
     groq = Groq(hang=True)
     async with httpx.AsyncClient(transport=httpx.MockTransport(groq)) as http:
-        transcriber = GroqTranscriber(http, Secret("k"))
+        transcriber = GroqTranscriber(http, Secret("k"), background_interval_s=0)
 
         # Run 1: Groq hangs, so the whole leg is still queued when the drain gives up.
         run = SessionRun(pool, channel, source, session, META, transcriber, data)
@@ -231,8 +237,9 @@ async def test_lost_queue_is_backfilled_once_across_a_stop_and_restart(
         assert await spans() == []
         groq.hang = False
 
-        # Run 2: backfill starts (paced), and is stopped once one span is in.
-        run = SessionRun(pool, channel, source, session, META, transcriber, data, backfill_pace=4)
+        # Run 2: backfill starts (one call a second), and is stopped once one span is in.
+        slow = GroqTranscriber(http, Secret("k"), background_interval_s=1)
+        run = SessionRun(pool, channel, source, session, META, slow, data)
         await run.start()
 
         async def some() -> bool:
@@ -241,23 +248,21 @@ async def test_lost_queue_is_backfilled_once_across_a_stop_and_restart(
         await _until(some)
         await run.stop()
         partial = await spans()
-        assert partial and partial[-1][1] < 40_000, "the stop left part of the gap"
+        assert partial and partial[-1][1] < 120_000, "the stop left part of the gap"
 
         # Run 3: a restart finishes it.
-        run = SessionRun(
-            pool, channel, source, session, META, transcriber, data, backfill_pace=None
-        )
+        run = SessionRun(pool, channel, source, session, META, transcriber, data)
         await run.start()
 
         async def covered() -> bool:
             s = await spans()
-            return bool(s) and s[-1][1] == 40_000
+            return bool(s) and s[-1][1] == 120_000
 
         await _until(covered)
         await run.stop()
 
     final = await spans()
-    assert final[0][0] == 0 and final[-1][1] == 40_000
+    assert final[0][0] == 0 and final[-1][1] == 120_000
     for (_, a_end), (b_start, _) in itertools.pairwise(final):
         assert b_start == a_end, "spans tile the leg with no gap or overlap"
     assert final[: len(partial)] == partial, "a restart never redoes committed audio"
@@ -287,4 +292,155 @@ async def test_lost_queue_is_backfilled_once_across_a_stop_and_restart(
     # Each backfilled chunk was prompted with the transcript just before it.
     assert "fake stream" in groq.prompts[0]
     assert "backfilled 1" in groq.prompts[1]
-    assert await backfill.prepare(pool, session, transcriber.name, data) == []
+    assert await backfill.gaps(pool, session, transcriber.name) == []
+
+
+# ---- failure paths -------------------------------------------------------------------------
+
+
+def _script(tmp_path: Path, name: str, body: str) -> str:
+    path = tmp_path / name
+    path.write_text(f"#!/bin/sh\n{body}\n")
+    path.chmod(0o755)
+    return str(path)
+
+
+async def test_a_probe_that_cannot_finish_says_nothing_about_the_file(
+    recorded: tuple[Path, bytes], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path, _ = recorded
+    monkeypatch.setattr(archive, "PROBE_TIMEOUT_S", 0.3)
+    with pytest.raises(LengthUnknown):
+        await archive.decoded_ms(path, ffprobe=_script(tmp_path, "hung", "exec sleep 30"))
+    with pytest.raises(LengthUnknown):
+        await archive.decoded_ms(path, ffprobe=_script(tmp_path, "oom", "kill -9 $$"))
+
+
+def _write_archive(path: Path, seconds: float) -> None:
+    """An archive written exactly as capture writes one."""
+    pcm, _ = speechlike(seconds, seed=5)
+    path.parent.mkdir(parents=True)
+    subprocess.run(ffmpeg_command("ffmpeg", path), input=wav(pcm), capture_output=True, check=True)
+
+
+async def _crashed_leg(pool: Pool, channel: Channel, data: Path, seconds: float) -> int:
+    """A session whose only leg a crash left open after 5 s were committed."""
+    session = await sessions.open_session(pool, channel, META, T0)
+    leg = await sessions.next_leg(pool, channel, session)
+    await sessions.record_leg(pool, leg, T0)
+    _write_archive(data / leg.archive_path, seconds)
+    await transcript.commit(pool, session, NAME, Result(0, 5_000, (), None))
+    return session
+
+
+async def test_a_failed_probe_leaves_the_leg_open_for_later(
+    pool: Pool, channel: Channel, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    session = await _crashed_leg(pool, channel, tmp_path, 20)
+
+    async def unknown(path: Path) -> int | None:
+        raise LengthUnknown("ffprobe was killed by signal 9")
+
+    with monkeypatch.context() as m:
+        m.setattr(archive, "decoded_ms", unknown)
+        with pytest.raises(LengthUnknown):
+            await backfill.seal_open_legs(pool, session, NAME, tmp_path)
+    assert [leg.audio_end_ms for leg in await sessions.legs(pool, session)] == [None]
+
+    # Readable again: sealed at the archive's length, not at the 5 s committed.
+    await backfill.seal_open_legs(pool, session, NAME, tmp_path)
+    assert [leg.audio_end_ms for leg in await sessions.legs(pool, session)] == [20_000]
+
+
+async def test_an_archive_with_nothing_decodable_seals_at_committed_audio(
+    pool: Pool, channel: Channel, tmp_path: Path
+) -> None:
+    session = await _crashed_leg(pool, channel, tmp_path, 20)
+    for leg in await sessions.legs(pool, session):
+        (tmp_path / leg.archive_path).write_bytes(b"")  # crashed before the Ogg header
+    await backfill.seal_open_legs(pool, session, NAME, tmp_path)
+    assert [leg.audio_end_ms for leg in await sessions.legs(pool, session)] == [5_000]
+
+
+async def test_one_backfill_per_session(
+    pool: Pool, channel: Channel, conn: AsyncConnection, tmp_path: Path
+) -> None:
+    session = await _crashed_leg(pool, channel, tmp_path, 20)
+    await backfill.seal_open_legs(pool, session, NAME, tmp_path)
+    groq = Groq(hang=False)
+    async with (
+        httpx.AsyncClient(transport=httpx.MockTransport(groq)) as http,
+        conn.transaction(),
+    ):
+        await conn.execute(
+            "SELECT pg_advisory_xact_lock(%s, %s)", [backfill.BACKFILL_LOCK_CLASS, session]
+        )
+        transcriber = GroqTranscriber(http, Secret("k"), background_interval_s=0)
+        assert not await backfill.run(pool, session, transcriber, tmp_path, lambda: "")
+    assert groq.prompts == [], "the second backfill paid for nothing"
+
+
+class _OneLegSource:
+    """Delivers `pcm` as one leg, a second after it starts, then nothing (stream gone)."""
+
+    platform = "twitch"
+    login = "fake"
+
+    def __init__(self, pcm: bytes) -> None:
+        self._pcm = pcm
+
+    async def probe(self) -> Probe:
+        return Online(META)
+
+    @asynccontextmanager
+    async def capture(self, archive: Path) -> AsyncGenerator[Capture]:
+        pcm, self._pcm = self._pcm, b""
+        yield _Capture(pcm)
+
+
+class _Capture:
+    def __init__(self, pcm: bytes) -> None:
+        self._data = pcm
+
+    @property
+    def pcm(self) -> AsyncIterator[bytes]:
+        return self._read()
+
+    async def _read(self) -> AsyncIterator[bytes]:
+        if self._data:
+            await asyncio.sleep(1)
+            yield self._data
+
+    async def stop_input(self) -> None:
+        return None
+
+
+async def test_a_cancelled_stop_does_not_leave_backfill_running(
+    pool: Pool, channel: Channel, tmp_path: Path
+) -> None:
+    """A second SIGTERM lands while live transcription drains and a backfill call is in
+    flight: the backfill must end with the stop, not outlive its run."""
+    session = await _crashed_leg(pool, channel, tmp_path, 20)
+    live_pcm, _ = speechlike(20, seed=9)
+    groq = Groq(hang=True)  # the live chunk never comes back, so the drain waits
+    before = asyncio.all_tasks()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(groq)) as http:
+        transcriber = GroqTranscriber(http, Secret("k"), background_interval_s=0)
+        run = SessionRun(
+            pool, channel, _OneLegSource(live_pcm), session, META, transcriber, tmp_path
+        )
+        await run.start()
+
+        async def both_in_flight() -> bool:  # backfill sent first; then the live chunk
+            return groq.sent == 2
+
+        await _until(both_in_flight)
+        stopping = asyncio.create_task(run.stop(drain_timeout_s=60))
+        await asyncio.sleep(0.5)
+        stopping.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await stopping
+        await asyncio.sleep(0.2)
+        current = asyncio.current_task()
+        left = [t for t in asyncio.all_tasks() - before if t is not current and not t.done()]
+        assert left == [], "tasks outlived their SessionRun"

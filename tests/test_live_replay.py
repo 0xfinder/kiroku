@@ -99,7 +99,7 @@ async def _watch_until(
             watch(
                 pool,
                 [(channels[0], source)],
-                GroqTranscriber(http, Secret("k")),
+                GroqTranscriber(http, Secret("k"), background_interval_s=0),
                 data_dir,
                 poll_s=0.5,
             )

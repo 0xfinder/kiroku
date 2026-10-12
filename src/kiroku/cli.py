@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import shutil
 import signal
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -18,16 +19,15 @@ from typing import Annotated
 import httpx
 import typer
 
-from kiroku import backfill, sessions, transcript
+from kiroku import backfill, sessions
 from kiroku.config import SecretName, Settings
 from kiroku.db import connect, open_pool
 from kiroku.db.migrate import migrate, new_migration
 from kiroku.errors import KirokuError
 from kiroku.sessions import claim_channels
-from kiroku.source import StreamlinkSource
-from kiroku.transcriber import Result
+from kiroku.source import StreamlinkSource, ToolMissing
 from kiroku.transcriber.groq import GroqTranscriber
-from kiroku.watch import watch
+from kiroku.watch import vocabulary, watch
 
 app = typer.Typer(no_args_is_help=True, help="Transcribe live streams, keep Notes, send Alerts.")
 db_app = typer.Typer(no_args_is_help=True, help="Database schema.")
@@ -82,6 +82,12 @@ def watch_command(
 ) -> None:
     """Watch channels and store a live transcript while they stream. Runs until stopped."""
     _log_to_stderr()
+    with _user_errors():
+        # Capture needs both, and sealing a crashed leg needs ffprobe before a leg is placed.
+        # Fail at launch rather than when a stream first goes live.
+        for tool in ("ffmpeg", "ffprobe"):
+            if shutil.which(tool) is None:
+                raise ToolMissing(f"{tool} not found; install it or fix PATH")
 
     async def run(settings: Settings) -> None:
         # systemd stops services with SIGTERM. Treat it like Ctrl-C: cancel, so every live
@@ -116,8 +122,9 @@ def backfill_command(
     """Transcribe the gaps a crash left in a session's transcript, from its audio archive.
 
     `kiroku watch` does this by itself when it resumes a session. Use this for a session it
-    won't resume, e.g. one whose stream ended while kiroku was down. Refuses to run while
-    `kiroku watch` holds the channel.
+    won't resume, e.g. one whose stream ended while kiroku was down. Safe beside a running
+    `kiroku watch`: it yields to live audio on the same key, leaves legs a watcher may be
+    capturing alone, and refuses only while another backfill of the session runs.
     """
     _log_to_stderr()
 
@@ -125,38 +132,35 @@ def backfill_command(
         key = settings.secrets.require(SecretName.GROQ)
         async with (
             open_pool(settings.database_url) as pool,
-            claim_channels(settings.database_url, "twitch", [channel]) as claimed,
             httpx.AsyncClient(timeout=60) as http,
         ):
-            found = await sessions.find_session(pool, claimed[0], session)
-            if found is None:
+            found_channel = await sessions.find_channel(pool, "twitch", channel)
+            found = (
+                await sessions.find_session(pool, found_channel, session) if found_channel else None
+            )
+            if found_channel is None or found is None:
                 which = f"session {session}" if session is not None else "session"
                 raise KirokuError(f"no {which} found for {channel}")
             transcriber = GroqTranscriber(http, key)
-            gaps = await backfill.prepare(pool, found.id, transcriber.name, settings.data_dir)
-            missing_s = sum(g.duration_ms for g in gaps) / 1000
-            typer.echo(f"session {found.id}: {len(gaps)} gaps, {missing_s:.1f} s untranscribed")
-
-            async def commit(result: Result) -> None:
-                await transcript.commit(pool, found.id, transcriber.name, result)
-
-            # Nothing live to stay behind, so no pacing.
-            await backfill.run(
-                pool,
-                found.id,
-                transcriber,
-                settings.data_dir,
-                gaps,
-                lambda: found.title,
-                commit=commit,
-                pace=None,
+            data_dir = settings.data_dir
+            await backfill.seal_open_legs(
+                pool, found.id, transcriber.name, data_dir, unless_watched=found_channel
             )
-            left = await backfill.prepare(pool, found.id, transcriber.name, settings.data_dir)
-            left_s = sum(g.duration_ms for g in left) / 1000
-            typer.echo(f"session {found.id}: {len(left)} gaps, {left_s:.1f} s untranscribed")
+            _report(found.id, await backfill.gaps(pool, found.id, transcriber.name))
+            title = found.title
+            if not await backfill.run(
+                pool, found.id, transcriber, data_dir, lambda: vocabulary(title, None)
+            ):
+                raise KirokuError(f"a backfill of session {found.id} is already running")
+            _report(found.id, await backfill.gaps(pool, found.id, transcriber.name))
 
-    with _user_errors():
+    with _user_errors(), contextlib.suppress(KeyboardInterrupt, asyncio.CancelledError):
         asyncio.run(run(Settings.load()))
+
+
+def _report(session_id: int, gaps: list[backfill.Gap]) -> None:
+    seconds = sum(g.duration_ms for g in gaps) / 1000
+    typer.echo(f"session {session_id}: {len(gaps)} gaps, {seconds:.1f} s untranscribed")
 
 
 def main() -> None:

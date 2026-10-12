@@ -20,12 +20,22 @@ from kiroku.source import READ_SIZE, ToolMissing
 PREROLL_MS = 500
 
 
+PROBE_TIMEOUT_S = 10.0  # ffprobe reads one page at the end of a local file: about 80 ms
+
+
 class ArchiveUnreadable(KirokuError):
     pass
 
 
+class LengthUnknown(KirokuError):
+    """ffprobe didn't finish, so nothing is known about the file. Try again later."""
+
+
 async def decoded_ms(path: Path, *, ffprobe: str = "ffprobe") -> int | None:
-    """How many ms of audio a full decode of `path` returns, or None if it can't be read.
+    """How many ms of audio a full decode of `path` returns. None when it holds nothing
+    decodable: the file is missing, or ffprobe rejects it (then ffmpeg can't decode it
+    either). Raises LengthUnknown when ffprobe couldn't finish (timed out, killed, couldn't
+    start): the file may be fine, so ask again later rather than conclude anything.
 
     Read from the last Ogg page's granule position, so it costs one seek, not a decode (a
     full decode runs at about 130x real time here: minutes for a 6-hour leg). ffprobe's
@@ -49,7 +59,18 @@ async def decoded_ms(path: Path, *, ffprobe: str = "ffprobe") -> int | None:
         )
     except FileNotFoundError as e:
         raise ToolMissing(f"{e.filename} not found; install it or fix PATH") from e
-    stdout, _ = await proc.communicate()
+    except OSError as e:
+        raise LengthUnknown(f"ffprobe could not start: {e}") from e
+    try:
+        stdout, _ = await asyncio.wait_for(proc.communicate(), PROBE_TIMEOUT_S)
+    except TimeoutError:
+        raise LengthUnknown(f"ffprobe took over {PROBE_TIMEOUT_S} s on {path}") from None
+    finally:
+        if proc.returncode is None:
+            proc.kill()
+            await proc.communicate()
+    if proc.returncode is not None and proc.returncode < 0:
+        raise LengthUnknown(f"ffprobe was killed by signal {-proc.returncode}")
     if proc.returncode != 0:
         return None
     try:

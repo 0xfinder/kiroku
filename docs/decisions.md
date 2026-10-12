@@ -158,12 +158,28 @@ Chosen by an architect arena: three design candidates (Opus, Sonnet, Haiku) plus
 
 D23 accepted that a crash loses queued audio from the transcript but not from the archive. Backfill recovers that audio. (Numbered D25 because another branch may add D24 at the same time.)
 
-- **Seal first, then place the next leg.** When a session starts, a leg with no recorded end gets one: its archive's decoded length, read with ffprobe as `duration_ts - initial_padding`. This needs one seek, not a decode. A full decode runs at about 130x real time, so a 6-hour leg would take minutes and live capture would wait for it. The sealed end is never below the audio already committed, and never past a later leg's start. Sealing runs before `next_leg`, so the next leg can't share offsets with the archived tail. A recorded end never moves afterwards.
+- **Seal before placing a leg.** A leg with no recorded end gets one before the next leg is placed: its archive's decoded length, read with ffprobe as `duration_ts - initial_padding`. Reading it costs one seek, not a full decode. A full decode runs at about 130x real time, which is minutes for a 6-hour leg.
+  - The sealed end is never below the audio already committed, and never past a later leg's start.
+  - `sessions.next_leg` raises `UnsealedLeg` while any leg is open, so a leg can't be placed over an archived tail. A recorded end never moves.
+  - Capture does the sealing, as part of placing a leg. ffprobe has a 10 s timeout. If ffprobe can't finish (timeout, signal, can't start), the leg stays open and capture retries with its reconnect backoff. Capture's own ffmpeg fails under the same conditions, so this doesn't block live audio in any case where live could have run.
+  - An archive that ffprobe rejects, or that is missing, has nothing decodable, so its leg is sealed at the committed audio.
+  - `kiroku watch` checks for ffmpeg and ffprobe at launch.
   - **Rejected: estimating the end from wall-clock time.** It would leave gaps or overlaps on the session's audio clock.
-- **Gap finding is pure.** `find_gaps(legs, spans)` returns each leg's extent minus the spans of the current Transcriber. Exactly-once follows from three facts: gaps come from committed spans, a commit is a no-op for a span already stored, and the channel lock allows one backfill per session.
-- **The same Transcriber path, one stream per gap.** Each gap is decoded from its leg's archive with a pre-rolled `-ss`, which is bit-exact against a full decode. The audio goes through `Transcriber.transcribe`, prompted with the stored text just before the gap. Silent chunks still cost nothing, and costs reach the ledger through `transcript.commit`.
-- **Behind live audio, never instead of it.** Backfill runs as its own task alongside live transcription and feeds audio at no more than 2x real time. This caps its share of the per-key rate limits at twice the live share. Because the cap comes from pacing the input, it works for any Transcriber, including Muse. A backfill failure is logged and doesn't stop the session. On stop, backfill finishes the audio it has already fed, then yields. Whatever is left resumes on the next start.
+- **Gap finding is pure.** `find_gaps(legs, spans)` returns each leg's extent minus the spans of the current Transcriber.
+- **Exactly-once.** Gaps come from committed spans, and a commit of a stored span is a no-op. Two backfills of the same gap would still chunk it differently and pay twice, so each backfill holds a per-session, transaction-level advisory lock. Exclusion is needed only in two places:
+  - backfill against backfill: the per-session lock above.
+  - sealing against live capture: `kiroku backfill` seals a leg only if no `kiroku watch` holds the channel. The check runs in the same UPDATE as the seal.
+
+  `kiroku backfill` never takes the watch lock, so a watch can always start.
+- **The same Transcriber path, one stream per gap.** Each gap is decoded from its leg's archive with a pre-rolled `-ss`, which is bit-exact against a full decode. The audio goes through `Transcriber.transcribe` with `Context.background`, prompted with the stored text just before the gap. Silent chunks still cost nothing. Costs reach the ledger through `transcript.commit`, which retries a lost connection for every caller.
+- **Behind live audio, never instead of it: a background lane at the shared limiter.** Groq's limits are per key, and one GroqTranscriber serves every session, so priority lives there. It works like this:
+  - A background call waits until no live chunk on the key is queued or in flight, and until the key isn't paused after a 429.
+  - Background calls start at most once every 10 s per key, across all sessions. That is 6 requests a minute, or about 2x real time. The free tier allows 20 a minute, and live uses 3-4 per channel.
+  - Background audio gets backpressure instead of a backlog. It is decoded about one chunk ahead and never skipped.
+  - A backfill failure is logged and doesn't stop the session. On stop, backfill finishes the audio it already fed, and the rest resumes on the next start. If the stop itself is cancelled, backfill is cancelled with it.
+  - **Rejected: pacing per session.** One version of this PR fed backfill audio at 2x real time per session. Two channels plus backfill could then exceed the key's limits, and the resulting 429 stalled live transcription on every channel.
   - **Rejected: backfill before live.** Live latency would grow by the length of the backlog.
-  - **Rejected: priority inside the Groq adapter.** Pacing is simpler and doesn't depend on the Transcriber.
-- **`kiroku backfill <channel>`** covers sessions that `kiroku watch` won't resume, for example when the stream ended while kiroku was down.
-- **Revisit if:** the Transcriber changes mid-session. Gaps are counted per Transcriber, so the new one would backfill every leg.
+- **`kiroku backfill <channel>`** covers sessions that `kiroku watch` won't resume, for example when the stream ended while kiroku was down. It is safe to run while `kiroku watch` is running.
+- **Revisit if:**
+  - The Transcriber changes mid-session. Gaps are counted per Transcriber, so the new one would backfill every leg.
+  - More channels share a key than the background lane's headroom allows.

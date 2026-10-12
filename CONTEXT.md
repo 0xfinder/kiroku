@@ -15,7 +15,7 @@ The names kiroku's code, docs, and design discussions use. If a discussion needs
 - **Capture leg** — one streamlink→ffmpeg run within a Stream session. Each leg has its own archive file. Legs sit back to back on the session's audio clock, and each anchors that clock to wall-clock time. A stream drop or reconnect starts a new leg in the same session. A leg that a crash left open is **sealed** at its archive's decoded length before the next leg is placed.
 - **Transcript span** — a range of the session's audio clock that a Transcriber has finalized, silent ranges included. Its row commits atomically with its Utterances and Cost ledger row. The highest span end is the "transcript complete up to here" watermark.
 - **Gap** — a part of a Capture leg that no Transcript span covers. Gaps appear when a crash loses audio that was queued for transcription.
-- **Backfill** — transcribing Gaps from the archive. It uses the same Transcriber and commit path as live audio and runs behind live audio, never instead of it.
+- **Backfill** — transcribing Gaps from the archive. It uses the same Transcriber and commit path as live audio, as background audio: its calls wait for every live chunk on the same API key and use only spare capacity.
 
 - **Utterance** — one finalized piece of transcript from the Transcriber. It has start and end timestamps and a Speaker label.
 - **Speaker label** — the anonymous speaker id the Transcriber assigns (`speaker_A`). It is only stable within one transcription connection.

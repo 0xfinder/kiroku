@@ -1,3 +1,4 @@
+import asyncio
 import itertools
 from collections.abc import AsyncIterator
 from decimal import Decimal
@@ -11,6 +12,7 @@ from kiroku.config import Secret
 from kiroku.ledger import AudioSeconds
 from kiroku.transcriber import Context, Result
 from kiroku.transcriber.groq import (
+    BACKGROUND_INTERVAL_S,
     GroqAuthError,
     GroqTranscriber,
     billed,
@@ -209,3 +211,89 @@ def test_segments_without_room_merge_into_the_previous_utterance() -> None:
     utterances, text = to_utterances(0, 10_000, body)
     assert [u.text for u in utterances] == ["late one late two"]
     assert text == "late one late two"
+
+
+# ---- background (Backfill) audio ------------------------------------------------------------
+
+
+async def _blocks(pcm: bytes, start_ms: int, fed: list[int]) -> AsyncIterator[AudioEvent]:
+    """1 s AudioBlocks, recording in `fed` how far the consumer has read."""
+    for i in range(0, len(pcm), 32_000):
+        yield AudioBlock(16 * start_ms + i // 2, pcm[i : i + 32_000])
+        fed.append(start_ms + (i + 32_000) // 32)
+
+
+async def test_background_audio_is_read_on_demand_and_never_skipped() -> None:
+    fake = FakeGroq()
+    t = GroqTranscriber(
+        httpx.AsyncClient(transport=httpx.MockTransport(fake)),
+        Secret("gsk_test"),
+        max_backlog_ms=1_000,  # live would skip almost everything past this
+        background_interval_s=0,
+    )
+    pcm, _ = speechlike(180, seed=4)
+    fed: list[int] = []
+    ctx = Context(vocabulary=lambda: "", background=True)
+    results: list[Result] = []
+    read_ahead: list[int] = []
+    async for result in t.transcribe(_blocks(pcm, 0, fed), ctx):
+        read_ahead.append(fed[-1] - result.end_ms)
+        results.append(result)
+
+    assert results[0].start_ms == 0 and results[-1].end_ms == 180_000
+    for a, b in itertools.pairwise(results):
+        assert b.start_ms == a.end_ms, "nothing skipped"
+    # Backpressure: never more than about two chunks (25 s max each) decoded ahead.
+    assert max(read_ahead) <= 2 * 25_000 + 1_000
+
+
+async def test_background_waits_for_live_chunks_on_the_same_key() -> None:
+    release = asyncio.Event()
+    live_sent = asyncio.Event()
+    order: list[str] = []
+
+    async def groq(request: httpx.Request) -> httpx.Response:
+        kind = "live" if b"VOCAB-LIVE" in request.content else "background"
+        order.append(f"{kind} sent")
+        if kind == "live":
+            live_sent.set()
+            await release.wait()
+        order.append(f"{kind} done")
+        return httpx.Response(200, json=_segments((0.5, 1.0, kind)))
+
+    t = GroqTranscriber(
+        httpx.AsyncClient(transport=httpx.MockTransport(groq)),
+        Secret("gsk_test"),
+        background_interval_s=0,
+    )
+    live_pcm, _ = speechlike(10, seed=1)
+    old_pcm, _ = speechlike(10, seed=2)
+
+    async def run(pcm: bytes, ctx: Context) -> list[Result]:
+        return [r async for r in t.transcribe(_events(AudioBlock(0, pcm), LegEnded()), ctx)]
+
+    live = asyncio.create_task(run(live_pcm, Context(vocabulary=lambda: "VOCAB-LIVE")))
+    await asyncio.wait_for(live_sent.wait(), 5)
+    old = asyncio.create_task(run(old_pcm, Context(lambda: "VOCAB-OLD", background=True)))
+    await asyncio.sleep(0.3)
+    assert order == ["live sent"], "background held back while a live chunk is in flight"
+    release.set()
+    await asyncio.gather(live, old)
+    assert order == ["live sent", "live done", "background sent", "background done"]
+
+
+async def test_background_calls_are_spaced_across_sessions() -> None:
+    fake = FakeGroq()
+    sleeps: list[float] = []
+    t = _transcriber(fake, sleeps)  # default interval, fake sleep: records, doesn't wait
+    a, _ = speechlike(40, seed=1)
+    b, _ = speechlike(40, seed=2)
+
+    async def run(pcm: bytes, start_ms: int) -> list[Result]:
+        ctx = Context(vocabulary=lambda: "", background=True)
+        return [r async for r in t.transcribe(_blocks(pcm, start_ms, []), ctx)]
+
+    await asyncio.gather(run(a, 0), run(b, 100_000))
+    assert len(fake.requests) >= 4
+    assert len(sleeps) == len(fake.requests) - 1, "every background call after the first waits"
+    assert all(BACKGROUND_INTERVAL_S - 1 < s <= BACKGROUND_INTERVAL_S for s in sleeps)
