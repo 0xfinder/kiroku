@@ -32,14 +32,14 @@ The names kiroku's code, docs, and design discussions use. If a discussion needs
 
 ## Notes
 
-- **Window** — a fixed slice of a session (about 45 s) that the Gate evaluates.
+- **Window** — a 45 s slice of a session's audio clock that the Gate evaluates. Windows sit back to back; the last one of a session can be shorter. Stored as `gate_window` (`window` is reserved in SQL), with the exact state the Gate saw: `new` (what was said in the Window) and `context` (stream details and a short tail of earlier speech).
 - **Notes** — structured, timestamped summaries produced every few minutes by the Notes model. Their shape comes from the Pack's Notes schema for the current Mode. The notes step is the distillation target.
 
 ## Alerts
 
 - **Rule** — a natural-language alert condition written by the user, e.g. "he predicts which team wins the current game". Each Rule has a threshold and a cooldown.
 - **Gate** — stage 1 of alerting. One Jev request per Window evaluates every active Rule as a yes/no question and returns a probability for each.
-- **Gate decision** — one (Window, Rule) result: the probability, the threshold, and whether it passed. Every Gate decision is logged.
+- **Gate decision** — one (Window, Rule) result: the probability, the threshold, and whether it passed. Every Gate decision is logged. When the Rule wasn't asked (no speech, Budget cap, Gate failure), the probability is empty and the Window's status says why.
 - **Extraction** — stage 2. Runs only when a Gate decision passes. Haiku writes the alert content and checks whether the content is new.
 - **Novelty check** — Extraction's comparison with the last Alert sent for the same Rule and Game key. Content that is not new is dropped.
 - **Cooldown** — the minimum time between Alerts for a Rule.

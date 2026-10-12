@@ -30,6 +30,7 @@ from pathlib import Path
 from kiroku import archive, sessions, transcript
 from kiroku.archive import ArchiveUnreadable
 from kiroku.audio import BYTES_PER_SAMPLE, SAMPLES_PER_MS, AudioBlock, AudioEvent
+from kiroku.budget import BudgetGuard
 from kiroku.db import Pool
 from kiroku.sessions import Channel, Leg
 from kiroku.transcriber import Context, Transcriber
@@ -154,6 +155,7 @@ async def run(
     transcriber: Transcriber,
     data_dir: Path,
     vocabulary: Callable[[], str],
+    guard: BudgetGuard,
     *,
     stopping: asyncio.Event | None = None,
 ) -> bool:
@@ -181,7 +183,7 @@ async def run(
                 pool, session_id, transcriber.name, before_ms=gap.start_ms
             )
             audio = _gap_audio(data_dir, gap, stopping)
-            context = Context(vocabulary, previous, background=True)
+            context = Context(vocabulary, guard, previous, background=True)
             try:
                 async for result in transcriber.transcribe(audio, context):
                     await transcript.commit(pool, session_id, transcriber.name, result)

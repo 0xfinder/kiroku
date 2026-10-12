@@ -12,6 +12,7 @@ from pathlib import Path
 
 import httpx
 
+from kiroku.budget import Budget, Caps
 from kiroku.config import Secret
 from kiroku.db import open_pool
 from kiroku.sessions import claim_channels
@@ -48,7 +49,13 @@ async def main(database_url: str, data_dir: Path) -> None:
     ):
         source = StreamlinkSource("fake", streamlink=(sys.executable, str(FAKE_STREAMLINK)))
         await watch(
-            pool, [(channels[0], source)], GroqTranscriber(http, Secret("k")), data_dir, poll_s=0.5
+            pool,
+            [(channels[0], source)],
+            GroqTranscriber(http, Secret("k")),
+            data_dir,
+            budget=Budget(pool, Caps()),
+            gate=None,
+            poll_s=0.5,
         )
 
 

@@ -1,3 +1,4 @@
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -53,3 +54,17 @@ def test_secret_values_are_not_interpolated(tmp_path: Path) -> None:
     path = _secrets_file(tmp_path, "TELEGRAM_BOT_TOKEN=abc${HOME}def\n")
     settings = Settings.load({"KIROKU_SECRETS_FILE": str(path)})
     assert settings.secrets.require(SecretName.TELEGRAM).reveal() == "abc${HOME}def"
+
+
+def test_budget_caps_default_to_d8_and_can_be_lowered() -> None:
+    caps = Settings.load({"KIROKU_SECRETS_FILE": "/x"}).caps
+    assert (caps.month_usd, caps.session_usd) == (Decimal(20), Decimal("1.50"))
+    env = {"KIROKU_SECRETS_FILE": "/x", "KIROKU_SESSION_CAP_USD": "0.25"}
+    assert Settings.load(env).caps.session_usd == Decimal("0.25")
+
+
+@pytest.mark.parametrize("value", ["1,50", "-1", "NaN", "inf", "$2"])
+def test_an_unreadable_cap_is_an_error_not_no_cap(value: str) -> None:
+    env = {"KIROKU_SECRETS_FILE": "/x", "KIROKU_MONTH_CAP_USD": value}
+    with pytest.raises(ConfigError, match="KIROKU_MONTH_CAP_USD"):
+        Settings.load(env)

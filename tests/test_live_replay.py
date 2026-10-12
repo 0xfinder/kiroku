@@ -11,11 +11,13 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import itertools
+import json
 import os
 import signal
 import subprocess
 import sys
 from collections.abc import AsyncGenerator, Callable
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, LiteralString, cast
 
@@ -24,8 +26,11 @@ import pytest
 from psycopg import AsyncConnection
 
 from kiroku import backfill, sessions, transcript
+from kiroku.budget import Budget, Caps
 from kiroku.config import Secret
 from kiroku.db import Pool, open_pool
+from kiroku.gate import Gate
+from kiroku.gate.jev import JevGate
 from kiroku.sessions import claim_channels
 from kiroku.source import StreamlinkSource
 from kiroku.transcriber.groq import GroqTranscriber
@@ -88,6 +93,9 @@ async def _watch_until(
     groq: GroqStub,
     done: Callable[[], Any],
     timeout_s: float = 60,
+    *,
+    gate: Gate | None = None,
+    caps: Caps | None = None,
 ) -> None:
     """Run `kiroku watch fake` until `done()` (a coroutine) returns True, then stop it."""
     async with (
@@ -101,6 +109,8 @@ async def _watch_until(
                 [(channels[0], source)],
                 GroqTranscriber(http, Secret("k"), background_interval_s=0),
                 data_dir,
+                budget=Budget(pool, caps or Caps()),
+                gate=gate,
                 poll_s=0.5,
             )
         )
@@ -238,6 +248,56 @@ async def test_second_watcher_on_a_channel_is_refused(database_url: str) -> None
         with pytest.raises(ChannelBusy):
             async with claim_channels(database_url, "twitch", ["fake"]):
                 pass
+
+
+def jev_stub(request: httpx.Request) -> httpx.Response:
+    questions = json.loads(request.content)["questions"]
+    answers: dict[str, Any] = {
+        key: {"type": "noul", "noul": 0.8} for key in questions if key.startswith("rule_")
+    }
+    answers["mode"] = {"choice": "chatting", "probabilities": {"chatting": 0.9}}
+    return httpx.Response(
+        200,
+        json={"model": "jev-1.13.0", "answers": answers, "usage": {"input_tokens": 500}},
+    )
+
+
+async def test_the_gate_closes_windows_as_the_transcript_lands_and_at_session_end(
+    database_url: str,
+    pool: Pool,
+    conn: AsyncConnection,
+    tmp_path: Path,
+    fake_stream: Callable[[str], None],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from kiroku import rules
+
+    fake_stream("40,30")
+    await rules.add(pool, "says_words", "Does he say words?", threshold=Decimal("0.5"))
+    covered = _spans_cover(conn, 70_000)
+
+    async def ended() -> bool:
+        if await covered():
+            monkeypatch.delenv("FAKE_STREAM_ID", raising=False)  # the broadcast ends
+        rows = await _rows(conn, "SELECT ended_at FROM stream_session")
+        return bool(rows) and rows[0][0] is not None
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(jev_stub)) as jev:
+        gate = JevGate(jev, Secret("k"))
+        await _watch_until(database_url, pool, tmp_path / "data", GroqStub(), ended, gate=gate)
+
+    windows = await _rows(
+        conn, "SELECT start_ms, end_ms, status, mode FROM gate_window ORDER BY start_ms"
+    )
+    # A full Window while live, then the partial one when the session ended.
+    assert windows == [
+        (0, 45_000, "answered", "chatting"),
+        (45_000, 70_000, "answered", "chatting"),
+    ]
+    decisions = await _rows(conn, "SELECT probability, passed FROM gate_decision")
+    assert decisions == [(Decimal("0.8000"), True)] * 2
+    ledger = await _rows(conn, "SELECT count(*) FROM cost_ledger WHERE purpose = 'gate'")
+    assert ledger == [(2,)]
 
 
 def _processes_using(path: Path) -> list[int]:

@@ -117,6 +117,6 @@ def test_watch_on_an_unmigrated_database_says_to_migrate(blank_database_url: str
         "KIROKU_SECRETS_FILE": "/x",
         "GROQ_API_KEY": "k",
     }
-    result = runner.invoke(app, ["watch", "gorgc"], env=env)
+    result = runner.invoke(app, ["watch", "gorgc", "--no-gate"], env=env)
     assert result.exit_code == 2
     assert "run `kiroku db migrate`" in result.stderr

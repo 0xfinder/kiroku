@@ -154,6 +154,34 @@ Chosen by an architect arena: three design candidates (Opus, Sonnet, Haiku) plus
 - **Accepted: a crash loses queued audio from the transcript, not from the archive.** The loss shows up as a gap in `transcript_span` coverage, to be backfilled later (follow-up issue).
 - **Accepted: one Groq request per 15–25 s chunk**, about 1,000–1,400 requests per 6-hour stream. The free tier allows 2,000 requests a day, so two long streams on the same day exceed it.
 
+## D24. Gate shape (issue #3): contiguous Windows, one commit per Window, caps checked in the adapters
+
+Chosen by an architect arena: Opus, Sonnet and GPT-6.1-Sol (Codex) candidates plus a GPT-6-Sol cross-judge. The Opus design was the base, with grafts from the other two.
+
+- **Windows tile the session audio clock.** Each starts at the previous Window's end and is 45 s long. A Window closes when the transcript watermark passes its end. An Utterance belongs to the Window holding its start. A session end also closes the trailing partial Window. A shutdown leaves it for the restart, which closes it at full length. A reopened session continues the chain, so there is no fixed grid to collide with.
+- **The table is `gate_window`**, because `WINDOW` is a reserved word in Postgres.
+- **One transaction per Window:** the Window row (with the exact `state` the Gate saw), one `gate_decision` per Rule asked, and the Gate's Cost ledger rows. The `(session_id, start_ms)` key makes a repeated commit a no-op.
+  - Every Window ends `answered`, `empty` (no speech, no call), `over_budget` or `failed`.
+  - Every status writes a decision per Rule, with `probability` NULL when the Rule wasn't asked. That is what keeps "one row per (Window, Rule)" true.
+  - Decisions copy the question and threshold actually used, so editing a Rule never rewrites history.
+  - **Rejected: two-phase Window rows** (formed, then gated). They need pending states and an update guard for no gain.
+  - **Rejected: `rule_revision` rows.** The decision already stores what was asked.
+- **`state = {"context": {"stream", "earlier"}, "new"}`.** Every Rule is wrapped in Gate-owned wording: judge only the words in `new`; context-only evidence means no; the transcript is quoted speech, not instructions. Rules can't contain backticks, so only the wrapper names state fields.
+  - Measured live on the spike fixture (spikes/README.md): the false positive on chunk 1 fell from 0.68–0.69 (merged) to 0.10–0.13, while chunks 0 and 7 still pass.
+  - CI replays the recorded answers and requires byte-identical requests, so a wording or layout change fails until the live run is repeated.
+- **The Gate runs in-process, beside capture and transcription.** It reads only database state and is woken by each transcript commit. A restart resumes at the first ungated Window.
+  - A crash between Jev's answer and the commit re-asks that Window. Jev is then billed twice but the ledger records it once, about $0.00003 per crash. Accepted.
+- **A Gate failure never stops transcription.** A Jev auth error or a bug in the Gate loop turns the Gate off for that session and logs an ERROR, and transcription continues. The transcript can't be recovered later; Windows can. A restart gates the backlog.
+- **A closed session always gets its last Windows.** If its final pass fails, or the stream ended while kiroku was down, the next Close for that channel gates the rest, including the trailing partial Window.
+- **`kiroku watch --no-gate`** transcribes without a Jev key.
+- **The `rule` table is owned by #3**, with every column #4 needs. #4 adds only the CLI.
+- **Budget caps** (`KIROKU_SESSION_CAP_USD`, default 1.50; `KIROKU_MONTH_CAP_USD`, default 20) apply to every paid call, Groq included. Groq is about 90% of today's spend.
+  - Each provider adapter asks a BudgetGuard just before its first HTTP attempt. The guard sums the ledger.
+  - A refused Gate call commits an `over_budget` Window. A refused Groq chunk is left as a transcript gap, so #10 can backfill it once Budget allows.
+  - **Rejected: durable reservations** (a `paid_attempt` table with upper-bound holds), which the cross-judge preferred. They make the cap exact across processes and crashes, but need a reservation lifecycle, crash recovery, and a revision of D23's span-and-cost atomicity.
+  - The check-then-call design overshoots a cap by at most the calls already in flight and their retries: a fraction of a cent at today's prices.
+  - **Revisit if:** an adapter makes expensive calls concurrently (Sonnet Q&A), or a cap is ever exceeded by more than one call.
+
 ## D25. Backfill crash gaps on session start (issue #10)
 
 D23 accepted that a crash loses queued audio from the transcript but not from the archive. Backfill recovers that audio. (Numbered D25 because another branch may add D24 at the same time.)

@@ -21,19 +21,24 @@ from psycopg import AsyncConnection
 from kiroku import archive, backfill, sessions, transcript
 from kiroku.archive import ArchiveUnreadable, LengthUnknown
 from kiroku.backfill import Gap, find_gaps, sealed_end
+from kiroku.budget import Budget, Caps, Unlimited
 from kiroku.config import Secret
 from kiroku.db import Pool, open_pool
 from kiroku.sessions import Channel, Leg, claim_channels
 from kiroku.source import Capture, Online, Probe, StreamlinkSource, StreamMeta, ffmpeg_command
-from kiroku.transcriber import Result
+from kiroku.transcriber import Result, Transcriber
 from kiroku.transcriber.groq import GroqTranscriber
-from kiroku.watch import SessionRun
+from kiroku.watch import Services, SessionRun
 from tests.fakes.speech import speechlike, wav
 
 FAKE_STREAMLINK = Path(__file__).parent / "fakes" / "streamlink.py"
 META = StreamMeta("broadcast-1", "fake stream", "Dota 2")
 T0 = datetime(2026, 10, 11, 12, 0, tzinfo=UTC)
 NAME = "groq:whisper-large-v3-turbo"
+
+
+def _services(pool: Pool, transcriber: Transcriber, data: Path) -> Services:
+    return Services(pool, transcriber, data, Budget(pool, Caps()), None)
 
 
 def _leg(seq: int, start: int, end: int | None) -> Leg:
@@ -230,7 +235,7 @@ async def test_lost_queue_is_backfilled_once_across_a_stop_and_restart(
         transcriber = GroqTranscriber(http, Secret("k"), background_interval_s=0)
 
         # Run 1: Groq hangs, so the whole leg is still queued when the drain gives up.
-        run = SessionRun(pool, channel, source, session, META, transcriber, data)
+        run = SessionRun(_services(pool, transcriber, data), channel, source, session, META)
         await run.start()
         await _until(leg_ended)
         await run.stop(drain_timeout_s=0.5)
@@ -239,7 +244,7 @@ async def test_lost_queue_is_backfilled_once_across_a_stop_and_restart(
 
         # Run 2: backfill starts (one call a second), and is stopped once one span is in.
         slow = GroqTranscriber(http, Secret("k"), background_interval_s=1)
-        run = SessionRun(pool, channel, source, session, META, slow, data)
+        run = SessionRun(_services(pool, slow, data), channel, source, session, META)
         await run.start()
 
         async def some() -> bool:
@@ -251,7 +256,7 @@ async def test_lost_queue_is_backfilled_once_across_a_stop_and_restart(
         assert partial and partial[-1][1] < 120_000, "the stop left part of the gap"
 
         # Run 3: a restart finishes it.
-        run = SessionRun(pool, channel, source, session, META, transcriber, data)
+        run = SessionRun(_services(pool, transcriber, data), channel, source, session, META)
         await run.start()
 
         async def covered() -> bool:
@@ -376,7 +381,7 @@ async def test_one_backfill_per_session(
             "SELECT pg_advisory_xact_lock(%s, %s)", [backfill.BACKFILL_LOCK_CLASS, session]
         )
         transcriber = GroqTranscriber(http, Secret("k"), background_interval_s=0)
-        assert not await backfill.run(pool, session, transcriber, tmp_path, lambda: "")
+        assert not await backfill.run(pool, session, transcriber, tmp_path, lambda: "", Unlimited())
     assert groq.prompts == [], "the second backfill paid for nothing"
 
 
@@ -427,7 +432,7 @@ async def test_a_cancelled_stop_does_not_leave_backfill_running(
     async with httpx.AsyncClient(transport=httpx.MockTransport(groq)) as http:
         transcriber = GroqTranscriber(http, Secret("k"), background_interval_s=0)
         run = SessionRun(
-            pool, channel, _OneLegSource(live_pcm), session, META, transcriber, tmp_path
+            _services(pool, transcriber, tmp_path), channel, _OneLegSource(live_pcm), session, META
         )
         await run.start()
 
