@@ -53,7 +53,7 @@ Each phase ends with something that can be observed working.
 
 ### Phase 1 — Core + League v1
 
-- Twitch watcher, Source, Muse Transcriber (Groq Fallback), audio archive.
+- Twitch watcher, Source, Muse Transcriber (Groq Fallback), audio archive, Backfill of crash gaps from the archive.
 - Speaker map, Windows, Mode, and the Gate with every Rule in one Jev call.
 - Extraction, Novelty check, and Cooldown; Telegram Notifier with 👍/👎.
 - Notes on a schedule using the League Pack: Vocabulary, Notes schemas, and `get_live_match` from the `live-lol-esports` lolesports client.
