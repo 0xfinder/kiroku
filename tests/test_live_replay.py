@@ -25,12 +25,14 @@ import httpx
 import pytest
 from psycopg import AsyncConnection
 
-from kiroku import backfill, sessions, transcript
+from kiroku import alerting, backfill, rules, sessions, transcript
 from kiroku.budget import Budget, Caps
 from kiroku.config import Secret
 from kiroku.db import Pool, open_pool
 from kiroku.gate import Gate
 from kiroku.gate.jev import JevGate
+from kiroku.llm import LLM
+from kiroku.notify import Notifier
 from kiroku.pack import PackSelector
 from kiroku.sessions import claim_channels
 from kiroku.source import StreamlinkSource
@@ -98,6 +100,8 @@ async def watch_until(
     gate: Gate | None = None,
     caps: Caps | None = None,
     select_pack: PackSelector = lambda category: None,
+    llm: LLM | None = None,
+    notifier: Notifier | None = None,
 ) -> None:
     """Run `kiroku watch fake` until `done()` (a coroutine) returns True, then stop it."""
     async with (
@@ -105,13 +109,20 @@ async def watch_until(
         httpx.AsyncClient(transport=httpx.MockTransport(groq)) as http,
     ):
         source = StreamlinkSource("fake", streamlink=(sys.executable, str(FAKE_STREAMLINK)))
+        budget = Budget(pool, caps or Caps())
+        alerts = (
+            alerting.AlertWorker(pool, [channels[0].id], llm, notifier, budget)
+            if llm is not None and notifier is not None
+            else None
+        )
         task = asyncio.create_task(
             watch(
                 pool,
                 [(channels[0], source)],
                 GroqTranscriber(http, Secret("k"), background_interval_s=0),
                 data_dir,
-                budget=Budget(pool, caps or Caps()),
+                budget=budget,
+                alerts=alerts,
                 gate=gate,
                 poll_s=0.5,
                 select_pack=select_pack,
@@ -406,3 +417,74 @@ async def test_killed_watcher_is_backfilled_on_restart(
     assert len(utterances) == 2 * ledger[0][0]
     assert len({text for text, *_ in utterances}) == len(utterances), "nothing stored twice"
     assert all(spoken == expected for _, spoken, expected in utterances)
+
+
+async def test_telegram_hang_doesnt_stall_the_gate(
+    database_url: str,
+    pool: Pool,
+    conn: AsyncConnection,
+    tmp_path: Path,
+    fake_stream: Callable[[str], None],
+) -> None:
+    from kiroku.llm.groq import GroqLLM
+    from kiroku.notify import AlertMessage, Delivery
+    from tests.fakes.alerts import Sink
+    from tests.test_alerts import completion
+    from tests.test_gating import FakeGate
+
+    fake_stream("100")
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    class Hung(Sink):
+        async def send(self, message: AlertMessage, *, give_up_s: float) -> Delivery:
+            entered.set()
+            await release.wait()
+            return await super().send(message, give_up_s=give_up_s)
+
+    await rules.add(pool, "prediction", "predicts a winner", threshold=Decimal(".6"))
+
+    async def done() -> bool:
+        row = await (await conn.execute("SELECT count(*) FROM gate_window")).fetchone()
+        spans = await (
+            await conn.execute("SELECT max(audio_end_ms) FROM transcript_span")
+        ).fetchone()
+        ready = (
+            entered.is_set()
+            and row is not None
+            and row[0] >= 2
+            and spans is not None
+            and spans[0] >= 100_000
+        )
+        if ready:
+            release.set()
+        return ready
+
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(
+            lambda req: httpx.Response(
+                200,
+                json=completion(
+                    {
+                        "claim": "winner",
+                        "summary": "winner",
+                        "quote": None,
+                        "same_as_previous": False,
+                    }
+                ),
+            )
+        )
+    ) as http:
+        await watch_until(
+            database_url,
+            pool,
+            tmp_path / "data",
+            GroqStub(),
+            done,
+            gate=FakeGate(0.9),
+            llm=GroqLLM(http, Secret("k")),
+            notifier=Hung(),
+        )
+    assert entered.is_set()
+    assert await (
+        await conn.execute("SELECT count(*) FROM gate_window WHERE status='answered'")
+    ).fetchone() == (2,)

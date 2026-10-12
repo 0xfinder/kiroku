@@ -15,7 +15,7 @@ from typing import Final, Protocol
 
 from kiroku.budget import BudgetGuard
 from kiroku.errors import KirokuError
-from kiroku.gate.windows import GateState
+from kiroku.gate.windows import JSON, GateState
 from kiroku.ledger import CostEntry, Purpose
 from kiroku.rules import Rule
 
@@ -113,6 +113,10 @@ class GateBadResponse(GateFailed):
 class GateAuthError(KirokuError):
     """401/403: the key is wrong. Stops the Gate for the session; transcription continues."""
 
+    def __init__(self, reason: str, costs: tuple[CostEntry, ...] = ()) -> None:
+        super().__init__(reason)
+        self.costs = costs
+
 
 class Gate(Protocol):
     @property
@@ -122,3 +126,28 @@ class Gate(Protocol):
         """One paid call, plus internal retries. Checks `request.guard` before sending.
         Raises OverBudget (nothing sent), GateFailed (no answer), or GateAuthError."""
         ...
+
+
+def rule_key(rule_id: int) -> str:
+    return f"rule_{rule_id}"
+
+
+def questions_json(request: GateRequest) -> dict[str, JSON]:
+    questions: dict[str, JSON] = {}
+    if request.ask_mode:
+        questions["mode"] = {
+            "type": "choice",
+            "instructions": MODE_INSTRUCTIONS,
+            "criteria": {mode.value: text for mode, text in MODE_CRITERIA.items()},
+        }
+    for q in request.rules:
+        questions[rule_key(q.rule_id)] = {"type": "noul", "instructions": q.question}
+    return questions
+
+
+def probability(value: object) -> float:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise TypeError(f"probability {value!r} is not a number")
+    if not 0 <= value <= 1:  # also rejects NaN and huge JSON integers
+        raise ValueError("probability is outside [0, 1]")
+    return float(value)

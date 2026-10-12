@@ -106,3 +106,51 @@ The control uses Category plus the VOD title. The final Pack prompt uses Data Dr
 **Gate measurement:** `KIROKU_DATABASE_URL=<migrated spike db> uv run python spikes/league_gate.py spikes/results/2026-10-12-league-gate.jsonl` made 12 real Jev calls, three repeats of two recorded passages, with and without the compact live summary. Every call uses the production provider and writes its ledger row. On the passage saying Yunara is broken, the concrete `yunara_broken` Rule scored 0.98 in all three live repeats, versus 0.98–0.99 without live data. On chat about China it scored 0.01 in both layouts. The draft Rule scored 0.10–0.11 without live data and 0.60–0.62 with it on in-game commentary, below threshold 0.70. Chatting with a live match present was Mode `watching_pro` on one of three repeats; the other two were `chatting`. These are measured limitations of the context, not a claim that Mode is perfect. All requests/responses, including that mistake, are committed and replayed byte-for-byte in CI. No wording or model changed, and the existing no-Pack Gate cassette still passes unchanged.
 
 **Observable integration:** synthetic recorded audio through real ffmpeg, the watcher, Groq/HTTP replays and Postgres proves that Category `League of Legends` selects the Pack, Gate state contains both teams and all ten picks, League-scoped Rules run, and `watching_pro` stores `league:117133830114188936:1`. HTTP failures keep transcription and the Gate running with title-only and no live context. Category changes clear live state; stored Segment history preserves scoped Rules during closed-session recovery. A restart backlog receives no current live summary/key. There was no live pro match to verify the feed clock. That acceptance step remains unverified until a match is on.
+
+## 2026-10-12: Groq Gate Fallback (issue #5)
+
+`uv run python spikes/gate_fallback.py spikes/results/2026-10-11-gate-split.jsonl spikes/results/2026-10-12-gate-fallback.jsonl --repeats 3` runs the production LLMGate over eight stored split Windows. Calls are paced at 16 seconds outside the provider retry deadline. All 24 successful calls wrote ledger rows in the isolated `kiroku_spike_5` database, totaling $0.007180 at list price. The dev database was not migrated.
+
+Each cell is Jev / gpt-oss min-max over three repeats, with the original thresholds 0.60 for predicts_winner and 0.70 for the other Rules.
+
+| Chunk | predicts_winner | draft_opinion | talks_item |
+| --- | --- | --- | --- |
+| 0 | 0.68-0.69 / 0.80-0.85 | 0.14-0.19 / 0.10-0.10 | 0.75-0.84 / 0.05-0.05 |
+| 1 | 0.10-0.13 / 0.00-0.05 | 0.95-0.96 / 0.85-1.00 | 0.15-0.20 / 0.00-0.02 |
+| 2 | 0.06-0.06 / 0.00-0.00 | 0.89-0.89 / 0.85-0.90 | 0.43-0.57 / 0.00-0.00 |
+| 3 | 0.11-0.12 / 0.00-0.00 | 0.05-0.05 / 0.00-0.00 | 0.78-0.83 / 0.60-0.80 |
+| 4 | 0.24-0.27 / 0.05-0.10 | 0.95-0.96 / 0.85-0.90 | 0.80-0.84 / 0.10-0.20 |
+| 5 | 0.11-0.12 / 0.00-0.00 | 0.90-0.90 / 0.90-1.00 | 0.36-0.40 / 0.00-0.00 |
+| 6 | 0.08-0.09 / 0.00-0.00 | 0.82-0.86 / 0.00-0.00 | 0.98-0.98 / 0.90-1.00 |
+| 7 | 0.66-0.68 / 0.00-0.10 | 0.40-0.44 / 0.00-0.20 | 0.91-0.93 / 0.85-0.85 |
+
+Mode was `watching_pro` in all 24 calls, matching Jev. The chunk-0 winner prediction passed in 3/3 repeats, and chunk 1 stayed below threshold in 3/3. The implicit chunk-7 prediction scored 0.00-0.10 and failed in 3/3, while Jev scored 0.66-0.68. Several item decisions also differ. Fallback probabilities are not interchangeable with Jev probabilities, and the existing thresholds are not calibrated for gpt-oss. This records a degraded outage path rather than equivalent classifier quality.
+
+The canonical request bodies and real responses are in [2026-10-12-gate-fallback.jsonl](results/2026-10-12-gate-fallback.jsonl). Offline tests force Jev connect failure, prove one primary attempt per bypass, compare all passed values to the recording, and verify Groq gate ledger rows.
+
+## 2026-10-12: Extraction, Novelty and Telegram (issue #5)
+
+`uv run python spikes/alert_extraction.py spikes/results/2026-10-11-gate-split.jsonl spikes/results/2026-10-12-alert-extraction.jsonl --repeats 3` runs the production AlertWorker, Extraction parser and Groq adapter over repeat 0 of Jev's split decisions. Each repeat has default Cooldown 600 seconds and Cooldown 0. The saved fixture has **12** passing decisions, not the design's stated 13: two winner predictions, five draft opinions and five item decisions. The measurement follows the actual recorded decisions.
+
+All 45 calls succeeded and wrote ledger rows in the isolated migrated `kiroku_spike_5_extraction_v3` database, totaling **$0.012539** at list price. Requests are paced at 16 seconds. A separate synthetic speech day per arm keeps Cooldown histories independent, and the worker's clock is fixed to that replay day. Telegram delivery is a local sink; this measures Extraction and suppression, not real said-to-sent latency. The dev `kiroku` database was not migrated.
+
+| Arm | Repeat | LLM calls | Sent | Duplicate | Cooldown | Winner chunk 7 |
+| --- | --- | --- | --- | --- | --- | --- |
+| default | 0 | 3 | 3 | 0 | 9 | cooldown |
+| novelty_only | 0 | 12 | 10 | 2 | 0 | duplicate |
+| default | 1 | 3 | 3 | 0 | 9 | cooldown |
+| novelty_only | 1 | 12 | 10 | 2 | 0 | duplicate |
+| default | 2 | 3 | 3 | 0 | 9 | cooldown |
+| novelty_only | 2 | 12 | 9 | 3 | 0 | duplicate |
+
+The final prompt judges the chunk-7 prediction to be the same as chunk 0 in **3/3 Novelty-only repeats**, so each arm sends exactly one winner Alert. The first prototype reclassified the implicit prediction as absent; its first complete Novelty arm sent chunk 7. Revision 2 improved that to **2/3**. The final prompt distinguishes the classifier's quoted instructions from Extraction's instructions and gives a generic Red-vs-Blue example of the same predicted winner expressed as its opponent's inability to fight. It contains no Spirit/PARIVISION-specific shortcut. Three successful repeats on one fixture do not establish general reliability. Other suppression decisions vary between repeats.
+
+The interrupted first prototype is in [alert-extraction-prototype.jsonl](results/2026-10-12-alert-extraction-prototype.jsonl), revision 2's complete 45-call run is in [alert-extraction-revision-2.jsonl](results/2026-10-12-alert-extraction-revision-2.jsonl), and the final requests/responses and every alert outcome are in [alert-extraction.jsonl](results/2026-10-12-alert-extraction.jsonl). The initial simultaneous smoke/Extraction setup contaminated Cooldown history and was stopped; the measured runs use separate databases. Exploratory ledger totals are retained in `2026-10-12-alert-ledger-summary.json`; they are not included in the final 45-call cost.
+
+`uv run python spikes/telegram_smoke.py tests/fixtures/telegram` sent **one real** production-rendered message with 👍/👎 buttons. The test marker was originally in its body and was subsequently moved to the first line with `editMessageText`, preserving the same message and buttons. The sanitized real send, prefix correction and 20 minutes of empty callback polls are in [the Telegram fixture](../tests/fixtures/telegram/smoke.json). **No human tap arrived within 20 minutes.**
+
+`uv run python spikes/telegram_smoke.py tests/fixtures/telegram --complete-timeout` then replayed Bot-API-documented callback, acknowledgement and markup shapes through the production parser, `labels.record`, and `TelegramNotifier.confirm`. It verified `(decision_id=1, applies=true, source=telegram, alert_id=1)` in the scratch database. [synthesized.json](../tests/fixtures/telegram/synthesized.json) and its [README](../tests/fixtures/telegram/README.md) explicitly mark those shapes and that Label as synthesized. Neither a real human Label nor live `answerCallbackQuery`/`editMessageReplyMarkup` success is claimed.
+
+Offline acceptance replays all three Extraction repeats by canonical request body, uses the recorded Bot API Message shape, verifies duplicate linkage and Cost ledger rows, and labels the stored Gate decision through the documented callback shape. Failure tests cover uncertain sends, restart recovery, Label redelivery and changed verdicts, staleness, per-channel Cooldown, Pack keys, Budget refusal, provider failures, quota expiry and concurrent admission, poller ownership handoff, lost database acknowledgements and worker bugs. Synthetic audio through real ffmpeg proves a blocked Telegram send does not stall transcription or the Gate.
+
+Still unmeasured: said-to-sent latency and human Labels from a live pro match after merge. The ten-minute freshness cutoff and twenty-minute coarse-key gap remain initial values to tune from that measurement.

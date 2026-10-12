@@ -28,7 +28,7 @@ The names kiroku's code, docs, and design discussions use. If a discussion needs
 - **Mode** — what the streamer is doing within a Pack: `playing`, `watching_pro`, `chatting`, or `other`. The Gate infers it for each Window.
 - **Vocabulary** — the list of terms a Pack supplies for the Transcriber's keyword biasing: champions or heroes, items, players, and slang. League loads Data Dragon and current rosters, then selects match terms or title-relevant names to fit Whisper's prompt.
 - **Live context tool** — a Pack function that returns the live game state, such as `get_live_match()` (teams, picks, game number). It is optional. League writes its compact summary to `context.live`; bans are `null` when the source does not expose them. A new snapshot does not apply to Windows starting before its Game boundary.
-- **Game key** — an identifier for "the game currently being discussed", used to scope deduplication. Examples: `league:<lolesports event id>:<game number>`, or a Dota match id. The League Gate stores it on `gate_window` only for Mode `watching_pro` with live context. Missing context means a `null` key.
+- **Game key** — an identifier for "the game currently being discussed", used to scope deduplication. Examples: `league:<lolesports event id>:<game number>`, or a Dota match id. The League Gate stores it on `gate_window` only for Mode `watching_pro` with live context. Missing context means a `null` Gate key. Alerts then use `seg:<session>:<segment start ms>:<anchor window start ms>`. A Segment change or a gap of more than 20 minutes on the Rule starts a new coarse key.
 
 ## Notes
 
@@ -41,10 +41,10 @@ The names kiroku's code, docs, and design discussions use. If a discussion needs
 - **Gate** — stage 1 of alerting. One Jev request per Window evaluates every active Rule as a yes/no question and returns a probability for each.
 - **Rule test** — a dry run of one Rule, or a candidate rewording, against stored Windows: the same Gate request without Mode, scored but not stored as Gate decisions. It is billed to the month, not to a session.
 - **Gate decision** — one (Window, Rule) result: the probability, the threshold, and whether it passed. Every Gate decision is logged. When the Rule wasn't asked (no speech, Budget cap, Gate failure), the probability is empty and the Window's status says why.
-- **Extraction** — stage 2. Runs only when a Gate decision passes. Haiku writes the alert content and checks whether the content is new.
-- **Novelty check** — Extraction's comparison with the last Alert sent for the same Rule and Game key. Content that is not new is dropped.
-- **Cooldown** — the minimum time between Alerts for a Rule.
-- **Alert** — a message sent through a Notifier.
+- **Extraction** — stage 2. Runs only when a Gate decision passes. The Groq JSON LLM writes the alert content and checks whether the content is new, using the saved Gate question and state.
+- **Novelty check** — Extraction's comparison with the last delivered or possibly delivered claim for the same Rule, Channel and Game key. Content that is not new is dropped.
+- **Cooldown** — the minimum speech-time gap between delivered or possibly delivered Alerts for a Rule on a Channel. Suppressed Alerts do not restart it.
+- **Alert** — the durable outcome of a passing Gate decision: `stale`, `cooldown`, `duplicate`, `sending`, `sent`, `unconfirmed` or `failed`. Deliverable Alerts send one message through a Notifier.
 - **Notifier** — an output channel for Alerts. Telegram first; Discord later.
 - **Label** — a human judgment on a Gate decision. Labels come from Telegram 👍/👎 buttons or from the Review queue.
 - **Review queue** — borderline Gate decisions (probability 0.3–0.7) shown in the web app for labelling, so recall can be measured and not just precision.
@@ -53,4 +53,4 @@ The names kiroku's code, docs, and design discussions use. If a discussion needs
 
 - **Cost ledger** — one row per paid call (transcription, Jev, LLM) with its cost. It is the source of truth for Budget caps.
 - **Budget cap** — hard per-session and per-month spending limits. Paid calls stop when a cap is reached.
-- **Fallback** — the replacement used when a vendor is unavailable. The Transcriber falls back to Groq Whisper in chunks, with no speaker labels. The Gate falls back to Haiku answering yes/no with a probability.
+- **Fallback** — the replacement used when a vendor is unavailable. The Transcriber falls back to Groq Whisper in chunks, with no speaker labels. The Gate falls back to Groq `openai/gpt-oss-120b` answering the same Rule and Mode questions.

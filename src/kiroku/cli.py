@@ -21,14 +21,18 @@ from typing import Annotated
 import httpx
 import typer
 
-from kiroku import backfill, dry_run, rules, sessions
+from kiroku import alerting, backfill, dry_run, rules, sessions
 from kiroku.budget import Budget
-from kiroku.config import SecretName, Settings
+from kiroku.config import ConfigError, SecretName, Settings
 from kiroku.db import Pool, connect, open_pool
 from kiroku.db.migrate import migrate, new_migration
 from kiroku.errors import KirokuError
 from kiroku.gate import rule_question
+from kiroku.gate.fallback import FallbackGate
 from kiroku.gate.jev import JevGate
+from kiroku.gate.llm import LLMGate
+from kiroku.llm.groq import GroqLLM
+from kiroku.notify.telegram import TelegramNotifier
 from kiroku.pack import Pack, pack_selector
 from kiroku.packs.league import LeaguePack
 from kiroku.packs.league.data import PUBLIC_WEBSITE_KEY
@@ -43,6 +47,8 @@ db_app = typer.Typer(no_args_is_help=True, help="Database schema.")
 app.add_typer(db_app, name="db")
 rule_app = typer.Typer(no_args_is_help=True, help="Alert Rules: what the Gate asks about.")
 app.add_typer(rule_app, name="rule")
+alert_app = typer.Typer(no_args_is_help=True, help="Recent Alerts and suppression reasons.")
+app.add_typer(alert_app, name="alert")
 
 PACK_FACTORIES: dict[str, Callable[[httpx.AsyncClient, Settings], Pack]] = {
     LeaguePack.name: lambda http, settings: LeaguePack(
@@ -99,6 +105,9 @@ def watch_command(
     no_gate: Annotated[
         bool, typer.Option("--no-gate", help="Transcribe only; needs no JEV_API_KEY.")
     ] = False,
+    no_alerts: Annotated[
+        bool, typer.Option("--no-alerts", help="Gate without Telegram Alerts or Labels.")
+    ] = False,
 ) -> None:
     """Watch channels, store a live transcript while they stream, and gate it against the
     active Rules. Runs until stopped."""
@@ -118,6 +127,15 @@ def watch_command(
         asyncio.get_running_loop().add_signal_handler(signal.SIGTERM, main.cancel)
         groq_key = settings.secrets.require(SecretName.GROQ)
         jev_key = None if no_gate else settings.secrets.require(SecretName.JEV)
+        telegram_key = (
+            None if no_alerts or no_gate else settings.secrets.require(SecretName.TELEGRAM)
+        )
+        chat_id = None
+        if telegram_key is not None:
+            try:
+                chat_id = int(settings.secrets.require(SecretName.TELEGRAM_CHAT).reveal())
+            except ValueError:
+                raise ConfigError("TELEGRAM_CHAT_ID must be an integer") from None
         async with (
             open_pool(settings.database_url) as pool,  # refuses a stale schema first
             claim_channels(settings.database_url, "twitch", channels) as claimed,
@@ -125,13 +143,30 @@ def watch_command(
         ):
             sources = [(c, StreamlinkSource(c.login)) for c in claimed]
             packs = [factory(http, settings) for factory in PACK_FACTORIES.values()]
+            budget = Budget(pool, settings.caps)
+            llm = GroqLLM(http, groq_key)
+            notifier = (
+                TelegramNotifier(http, telegram_key, chat_id)
+                if telegram_key is not None and chat_id is not None
+                else None
+            )
+            alerts = (
+                alerting.AlertWorker(pool, [c.id for c in claimed], llm, notifier, budget)
+                if notifier is not None
+                else None
+            )
             await watch(
                 pool,
                 sources,
                 GroqTranscriber(http, groq_key),
                 settings.data_dir,
-                budget=Budget(pool, settings.caps),
-                gate=JevGate(http, jev_key) if jev_key else None,
+                budget=budget,
+                gate=FallbackGate(JevGate(http, jev_key, give_up_s=20), LLMGate(llm))
+                if jev_key
+                else None,
+                alerts=alerts,
+                notifier=notifier,
+                database_url=settings.database_url,
                 poll_s=poll_s,
                 select_pack=pack_selector(packs),
             )
@@ -353,3 +388,18 @@ def rule_test(
 
 def main() -> None:
     app()
+
+
+@alert_app.command("list")
+def alert_list(
+    last: Annotated[int, typer.Option(min=1, help="Number of recent Alerts.")] = 20,
+) -> None:
+    """Show delivery and suppression outcomes, newest first."""
+
+    async def run(settings: Settings) -> None:
+        async with open_pool(settings.database_url) as pool:
+            for said_at, channel, rule, outcome, reason, claim in await alerting.recent(pool, last):
+                typer.echo(f"{said_at or '-'} {channel} {rule} {outcome} {reason or claim or ''}")
+
+    with _user_errors():
+        asyncio.run(run(Settings.load()))

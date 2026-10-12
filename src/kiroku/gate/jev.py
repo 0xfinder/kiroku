@@ -21,14 +21,19 @@ import httpx
 
 from kiroku.config import Secret
 from kiroku.gate import (
-    MODE_CRITERIA,
-    MODE_INSTRUCTIONS,
     GateAnswer,
     GateAuthError,
     GateBadResponse,
     GateRequest,
     GateUnavailable,
     Mode,
+    questions_json,
+)
+from kiroku.gate import (
+    probability as _probability,
+)
+from kiroku.gate import (
+    rule_key as rule_key,
 )
 from kiroku.gate.windows import JSON
 from kiroku.ledger import CostEntry, Purpose, Tokens
@@ -111,7 +116,10 @@ class JevGate:
             latency_ms = int((self._clock() - started) * 1000)
             status = response.status_code
             if status in (401, 403):
-                raise GateAuthError(f"Jev rejected the API key (HTTP {status})")
+                raise GateAuthError(
+                    f"Jev rejected the API key (HTTP {status})",
+                    self._lost_costs(request.purpose, estimate, maybe_billed),
+                )
             if status == 429:
                 wait = _retry_after(response.headers) or _backoff(attempt)
                 self._not_before = max(self._not_before, self._clock() + wait)
@@ -141,22 +149,9 @@ class JevGate:
         return (CostEntry(PROVIDER, self._model, purpose, Tokens(tokens), usd(tokens), 0),)
 
 
-def rule_key(rule_id: int) -> str:
-    return f"rule_{rule_id}"
-
-
 def request_body(model: str, request: GateRequest) -> dict[str, JSON]:
-    """The exact POST body. Pure, so the live evaluation and the replay test share it."""
-    questions: dict[str, JSON] = {}
-    if request.ask_mode:
-        questions[MODE_KEY] = {
-            "type": "choice",
-            "instructions": MODE_INSTRUCTIONS,
-            "criteria": {mode.value: text for mode, text in MODE_CRITERIA.items()},
-        }
-    for q in request.rules:
-        questions[rule_key(q.rule_id)] = {"type": "noul", "instructions": q.question}
-    return {"model": model, "state": request.state.as_json(), "questions": questions}
+    """The exact POST body, shared by the adapter and its live replay."""
+    return {"model": model, "state": request.state.as_json(), "questions": questions_json(request)}
 
 
 def estimate_tokens(body: Mapping[str, JSON]) -> int:
@@ -201,15 +196,6 @@ def parse_answer(
         latency_ms,
     )
     return GateAnswer(f"{PROVIDER}:{model}", probabilities, mode, mode_probability, (cost,))
-
-
-def _probability(value: object) -> float:
-    if isinstance(value, bool) or not isinstance(value, int | float):
-        raise TypeError(f"probability {value!r} is not a number")
-    p = float(value)
-    if not 0.0 <= p <= 1.0:  # also rejects NaN
-        raise ValueError(f"probability {p} is outside [0, 1]")
-    return p
 
 
 def _backoff(attempt: int) -> float:

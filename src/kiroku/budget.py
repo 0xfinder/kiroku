@@ -44,9 +44,10 @@ class Refusal:
 class OverBudget(Exception):
     """A paid call was refused. Expected and handled per call, so not a KirokuError."""
 
-    def __init__(self, refusal: Refusal) -> None:
+    def __init__(self, refusal: Refusal, costs: tuple[ledger.CostEntry, ...] = ()) -> None:
         super().__init__(str(refusal))
         self.refusal = refusal
+        self.costs = costs
 
 
 def refusal(

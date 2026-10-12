@@ -231,7 +231,9 @@ class GateLoop:
         blocked_from: Callable[[], int | None] = lambda: None,
         policy: WindowPolicy | None = None,
         poll_s: float = POLL_S,
+        on_commit: Callable[[], None] = lambda: None,
     ) -> None:
+        self._on_commit = on_commit
         self._pool = pool
         self._session_id = session_id
         self._transcriber = transcriber
@@ -317,7 +319,14 @@ class GateLoop:
             if live is not None:
                 state = GateState({**state.context, "live": dict(live.summary)}, state.new)
             questions = [rule_question(r) for r in await rules.active(self._pool, pack)]
-            outcome = await self._ask(state, questions)
+            try:
+                outcome = await self._ask(state, questions)
+            except GateAuthError as e:
+                if e.costs:
+                    await self._commit(
+                        bounds, state, questions, NotAsked(Status.FAILED, str(e), e.costs)
+                    )
+                raise
             game_key = (
                 live.game_key
                 if live is not None
@@ -335,7 +344,7 @@ class GateLoop:
         try:
             return Answered(await self._gate.evaluate(request))
         except OverBudget as e:
-            return NotAsked(Status.OVER_BUDGET, str(e.refusal))
+            return NotAsked(Status.OVER_BUDGET, str(e.refusal), e.costs)
         except GateFailed as e:
             log.error("session %d: Gate failed: %s", self._session_id, e.reason)
             return NotAsked(Status.FAILED, e.reason, e.costs)
@@ -362,6 +371,7 @@ class GateLoop:
                     outcome,
                     game_key,
                 )
+                self._on_commit()
                 return
             except psycopg.OperationalError as e:
                 log.warning("session %d: Gate commit failed (%s); retrying", self._session_id, e)
