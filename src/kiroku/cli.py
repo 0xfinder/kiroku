@@ -14,7 +14,7 @@ import signal
 from collections.abc import Awaitable, Callable, Generator
 from contextlib import contextmanager
 from dataclasses import replace
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Annotated
 
 import httpx
@@ -124,10 +124,23 @@ def watch_command(
 
 # ---- rules ---------------------------------------------------------------------------------
 
+
+def _threshold(value: str) -> Decimal:
+    try:
+        return Decimal(value)
+    except InvalidOperation:
+        raise typer.BadParameter(f"{value!r} is not a number, e.g. 0.7") from None
+
+
 Threshold = Annotated[
     Decimal | None,
-    typer.Option(parser=Decimal, help="Pass at this probability or above, e.g. 0.7."),
+    typer.Option(parser=_threshold, help="Pass at this probability or above, e.g. 0.7."),
 ]
+
+PACK_NOT_LIVE = (
+    "note: Packs aren't wired into the live Gate yet (#6); a Pack-scoped Rule is not asked "
+    "until they are"
+)
 
 
 def _run_with_pool[T](body: Callable[[Pool], Awaitable[T]]) -> T:
@@ -158,6 +171,8 @@ def rule_add(
 ) -> None:
     """Add a Rule. Try it with `kiroku rule test` before relying on it."""
     assert threshold is not None
+    if pack is not None:
+        typer.echo(PACK_NOT_LIVE, err=True)
     _show(
         _run_with_pool(
             lambda pool: rules.add(
@@ -177,6 +192,8 @@ def rule_edit(
     any_pack: Annotated[bool, typer.Option("--any-pack", help="Apply with any Pack.")] = False,
 ) -> None:
     """Change a Rule. Past decisions keep the wording they were asked with."""
+    if pack is not None:
+        typer.echo(PACK_NOT_LIVE, err=True)
     _show(
         _run_with_pool(
             lambda pool: rules.edit(
@@ -218,7 +235,7 @@ def rule_list() -> None:
 def rule_test(
     name: str,
     session: Annotated[int | None, typer.Option(help="Every Window of this session.")] = None,
-    last: Annotated[int, typer.Option(help="Otherwise, the latest N Windows.")] = 40,
+    last: Annotated[int, typer.Option(min=1, help="Otherwise, the latest N Windows.")] = 40,
     instructions: Annotated[
         str | None, typer.Option(help="Try this wording instead, without saving it.")
     ] = None,
@@ -233,14 +250,24 @@ def rule_test(
     async def body(pool: Pool) -> str:
         settings = Settings.load()
         key = settings.secrets.require(SecretName.JEV)
+        try:
+            saved: Rule | None = await rules.get(pool, name)
+        except rules.RuleError:
+            if instructions is None:
+                raise
+            saved = None
         if instructions is None:
-            rule = await rules.get(pool, name)
-            if threshold is not None:
-                rule = replace(rule, threshold=threshold)
+            assert saved is not None
+            rule = saved
         else:
-            t = threshold if threshold is not None else Decimal("0.7")
-            rules.check(name, instructions, t)
-            rule = Rule(0, name, instructions.strip(), t, None, 0)
+            # An unsaved rewording, compared at the saved Rule's threshold unless told
+            # otherwise, so the two runs differ only in wording.
+            rule = Rule(
+                0, name, instructions.strip(), saved.threshold if saved else Decimal("0.7"), None, 0
+            )
+        if threshold is not None:
+            rule = replace(rule, threshold=threshold)
+        rules.check(rule.name, rule.instructions, rule.threshold)
         windows = await dry_run.stored_windows(pool, session_id=session, last=last)
         if not windows:
             raise KirokuError("no stored Windows with speech yet; run `kiroku watch` first")

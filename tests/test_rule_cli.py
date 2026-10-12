@@ -185,3 +185,31 @@ def test_rule_test_without_windows_says_so(kiroku: Callable[..., Any]) -> None:
     assert kiroku("add", "draft_opinion", OLD).exit_code == 0
     empty = kiroku("test", "draft_opinion")
     assert empty.exit_code == 2 and "no stored Windows" in empty.stderr
+
+
+def test_bad_input_is_a_one_line_error(kiroku: Callable[..., Any]) -> None:
+    for args, message in [
+        (("add", "x", "Q?", "--threshold", "abc"), "is not a number"),
+        (("add", "x", "Q?", "--threshold", "nan"), "must be above 0"),
+        (("add", "x", "Q?", "--threshold", "0.705"), "at most two decimals"),
+        (("add", "x", "Q?", "--cooldown-s", "-5"), "can't be negative"),
+        (("add", "x", "Q?", "--pack", "lol"), "use one of league, dota"),
+        (("test", "x", "--last", "0"), "--last"),
+    ]:
+        result = kiroku(*args)
+        assert result.exit_code == 2, (args, result.output)
+        assert message in result.stderr, (args, result.stderr)
+        assert "Traceback" not in result.output
+    scoped = kiroku("add", "x", "Q?", "--pack", "league")
+    assert scoped.exit_code == 0 and "aren't wired into the live Gate yet" in scoped.stderr
+
+
+def test_a_rewording_is_tested_at_the_saved_threshold(
+    kiroku: Callable[..., Any], spike_windows: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    replay_jev(monkeypatch)
+    assert kiroku("add", "draft_opinion", OLD, "--threshold", "0.9").exit_code == 0
+    reworded = kiroku(
+        "test", "draft_opinion", "--session", str(spike_windows), "--instructions", NEW
+    )
+    assert "draft_opinion: 2 of 8 Windows pass at 0.90" in reworded.output

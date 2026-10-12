@@ -72,7 +72,8 @@ async def main(out: Path) -> None:
         for label, rule in WORDINGS.items():
             question = rule_question(rule)
             trials = await dry_run.run(pool, JevGate(http, key), guard, question, windows)
-            print(f"{label}: " + " ".join(f"{t.probability:.2f}" for t in trials))
+            print(f"{label}: " + " ".join(
+                f"{t.probability:.2f}" if t.probability is not None else "-" for t in trials))
             print(dry_run.report(rule.name, question, trials), "\n", file=sys.stderr)
     for request, response in recorder.calls:
         lines.append({"request": request, "response": response})

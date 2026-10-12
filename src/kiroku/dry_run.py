@@ -16,7 +16,7 @@ from typing import Any, cast
 from kiroku import ledger
 from kiroku.budget import BudgetGuard, OverBudget
 from kiroku.db import Pool
-from kiroku.gate import Gate, GateFailed, GateRequest, RuleQuestion
+from kiroku.gate import Gate, GateFailed, GateRequest, RuleQuestion, passes
 from kiroku.gate.windows import GateState
 from kiroku.ledger import Purpose
 
@@ -85,7 +85,13 @@ async def run(
         await _record(pool, answer.costs)
         return Trial(window, answer.probabilities[question.rule_id])
 
-    return list(await asyncio.gather(*(one(w) for w in windows)))
+    # Let every call finish and record its cost before an error (a wrong key, a database
+    # blip) propagates: a paid call must never miss the ledger.
+    results = await asyncio.gather(*(one(w) for w in windows), return_exceptions=True)
+    for result in results:
+        if isinstance(result, BaseException):
+            raise result
+    return [r for r in results if isinstance(r, Trial)]
 
 
 async def _record(pool: Pool, costs: Sequence[ledger.CostEntry]) -> None:
@@ -102,7 +108,7 @@ def report(name: str, question: RuleQuestion, trials: Sequence[Trial], *, exampl
         reverse=True,
     )
     failed = [t for t in trials if t.probability is None]
-    passed = [t for t in scored if (t.probability or 0.0) >= question.threshold]
+    passed = [t for t in scored if passes(t.probability or 0.0, question.threshold)]
     lines = [
         f"{name}: {len(passed)} of {len(scored)} Windows pass at {question.threshold}"
         + (f" ({len(failed)} not scored)" if failed else ""),

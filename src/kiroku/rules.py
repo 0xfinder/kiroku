@@ -18,6 +18,7 @@ from kiroku.db import Pool
 from kiroku.errors import KirokuError
 
 NAME_PATTERN: Final = re.compile(r"[a-z][a-z0-9_]{0,62}")
+PACKS: Final = ("league", "dota")  # D11/D12; Category selects one
 
 
 class RuleError(KirokuError):
@@ -38,7 +39,14 @@ class Rule:
 _COLUMNS: Final = "id, name, instructions, threshold, pack, cooldown_s, enabled"
 
 
-def check(name: str, instructions: str, threshold: Decimal) -> None:
+def check(
+    name: str,
+    instructions: str,
+    threshold: Decimal,
+    *,
+    cooldown_s: int = 0,
+    pack: str | None = None,
+) -> None:
     """The constraints the table enforces, as messages a user can act on."""
     if not NAME_PATTERN.fullmatch(name):
         raise RuleError(f"rule name {name!r}: use lowercase letters, digits and _, e.g. draft_take")
@@ -46,8 +54,14 @@ def check(name: str, instructions: str, threshold: Decimal) -> None:
         raise RuleError("instructions must be 1 to 2000 characters")
     if "`" in instructions:
         raise RuleError("instructions can't contain backticks; the Gate names the state fields")
-    if not Decimal(0) < threshold <= Decimal(1):
+    if not (threshold.is_finite() and Decimal(0) < threshold <= Decimal(1)):
         raise RuleError(f"threshold {threshold} must be above 0 and at most 1")
+    if threshold != threshold.quantize(Decimal("0.01")):
+        raise RuleError(f"threshold {threshold}: use at most two decimals, e.g. 0.65")
+    if cooldown_s < 0:
+        raise RuleError("cooldown can't be negative")
+    if pack is not None and pack not in PACKS:
+        raise RuleError(f"pack {pack!r}: use one of {', '.join(PACKS)}")
 
 
 async def add(
@@ -60,7 +74,7 @@ async def add(
     pack: str | None = None,
     owner: str = "me",
 ) -> Rule:
-    check(name, instructions, threshold)
+    check(name, instructions, threshold, cooldown_s=cooldown_s, pack=pack)
     async with pool.connection() as conn:
         try:
             cur = await conn.execute(
@@ -104,7 +118,9 @@ async def edit(
     old = await get(pool, name, owner=owner)
     new_instructions = instructions.strip() if instructions is not None else old.instructions
     new_threshold = threshold if threshold is not None else old.threshold
-    check(name, new_instructions, new_threshold)
+    new_cooldown = cooldown_s if cooldown_s is not None else old.cooldown_s
+    new_pack = None if clear_pack else (pack if pack is not None else old.pack)
+    check(name, new_instructions, new_threshold, cooldown_s=new_cooldown, pack=new_pack)
     async with pool.connection() as conn:
         cur = await conn.execute(
             f"""
@@ -116,8 +132,8 @@ async def edit(
             [
                 new_instructions,
                 new_threshold,
-                cooldown_s if cooldown_s is not None else old.cooldown_s,
-                None if clear_pack else (pack if pack is not None else old.pack),
+                new_cooldown,
+                new_pack,
                 old.id,
             ],
         )

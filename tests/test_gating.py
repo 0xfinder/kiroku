@@ -430,3 +430,21 @@ async def test_sessions_that_closed_ungated_get_their_last_windows(
         (45_000, 70_000),
     ]
     assert await rows(conn, "SELECT count(*) FROM stream_session WHERE ended_at IS NULL") == [(0,)]
+
+
+async def test_a_failing_rule_test_still_records_every_paid_call(
+    pool: Pool, session: int, conn: AsyncConnection
+) -> None:
+    from kiroku import dry_run
+    from kiroku.gate import rule_question
+    from kiroku.gate.windows import GateState
+
+    winner, _ = await two_rules(pool)
+    windows = [
+        dry_run.StoredWindow(i, session, i * 45_000, GateState({}, f"window {i}")) for i in range(4)
+    ]
+    gate = FakeGate(0.5, 0.5, GateAuthError("Jev rejected the API key (HTTP 401)"), 0.5)
+    with pytest.raises(GateAuthError):
+        await dry_run.run(pool, gate, Unlimited(), rule_question(winner), windows)
+    assert len(gate.requests) == 4
+    assert await rows(conn, "SELECT count(*) FROM cost_ledger") == [(3,)]
