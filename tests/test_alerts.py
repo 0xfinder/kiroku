@@ -19,7 +19,7 @@ from kiroku.gate.windows import GateState
 from kiroku.ledger import CostEntry, Purpose, Tokens
 from kiroku.llm import LLMBadResponse, LLMRequest, LLMUnavailable
 from kiroku.llm.groq import GroqLLM
-from kiroku.notify import AlertMessage, NotifierRejected, NotifierUnavailable, NotifierUnsure
+from kiroku.notify import AlertMessage, NotifierRejected, NotifierStale, NotifierUnsure
 from kiroku.notify.telegram import TelegramNotifier, keyboard, parse_tap, render_html
 
 
@@ -220,10 +220,10 @@ async def test_connect_failure_has_a_definite_delivery_deadline() -> None:
         raise httpx.ConnectError("TOKEN", request=req)
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as http:
-        with pytest.raises(NotifierUnavailable):
+        with pytest.raises(NotifierStale):
             await TelegramNotifier(
                 http, Secret("TOKEN"), 42, sleep=clock.sleep, clock=clock.now
-            ).send(message(), give_up_s=3)
+            ).send(message(), give_up_s=7)
     assert clock.waits == [1]
 
 
@@ -454,3 +454,121 @@ async def test_connect_failure_does_not_spend_reserved_daily_requests() -> None:
             LLMRequest("s", "{}", Purpose.GATE, Unlimited(), 512, 20, 150), parse
         )
     assert result.value == "yes" and calls == 3
+
+
+async def test_fallback_auth_disables_only_fallback_and_primary_can_recover(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    from kiroku.gate import GateAnswer, GateAuthError, GateFailed
+
+    cost = CostEntry("jev", "1", Purpose.GATE, Tokens(10), Decimal(".000005"), 0)
+
+    class Primary:
+        name = "jev"
+        calls = 0
+
+        async def evaluate(self, request: GateRequest) -> GateAnswer:
+            self.calls += 1
+            if self.calls < 3:
+                raise GateUnavailable("jev unavailable", (cost,))
+            return GateAnswer("jev:1", {}, Mode.CHATTING, 1, ())
+
+    class Fallback:
+        name = "groq"
+        calls = 0
+
+        async def evaluate(self, request: GateRequest) -> GateAnswer:
+            self.calls += 1
+            raise GateAuthError("wrong fallback key", (cost,))
+
+    primary, fallback = Primary(), Fallback()
+    gate = FallbackGate(primary, fallback)
+    req = GateRequest(GateState({}, "new"), (), Unlimited())
+    with pytest.raises(GateFailed, match="authentication") as first:
+        await gate.evaluate(req)
+    assert first.value.costs == (cost, cost)
+    with pytest.raises(GateFailed, match="disabled") as second:
+        await gate.evaluate(req)
+    assert second.value.costs == (cost,)
+    assert (await gate.evaluate(req)).model == "jev:1"
+    assert primary.calls == 3 and fallback.calls == 1
+    assert sum(r.levelname == "ERROR" for r in caplog.records) == 1
+
+
+@pytest.mark.parametrize("deadline", [0.001, 4.99, 5.99])
+async def test_near_deadline_does_not_start_a_paced_send(deadline: float) -> None:
+    clock = Clock()
+    calls = 0
+
+    def respond(req: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        assert req.extensions["timeout"]["read"] == 15.0
+        return httpx.Response(
+            200, json={"ok": True, "result": {"message_id": calls, "chat": {"id": 42}}}
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as http:
+        bot = TelegramNotifier(http, Secret("TOKEN"), 42, clock=clock.now, sleep=clock.sleep)
+        await bot.send(message(), give_up_s=5)
+        with pytest.raises(NotifierStale):
+            await bot.send(message(), give_up_s=deadline)
+    assert calls == 1 and clock.waits == []
+
+
+async def test_started_send_can_finish_after_stale_deadline() -> None:
+    clock = Clock()
+
+    def respond(req: httpx.Request) -> httpx.Response:
+        assert req.extensions["timeout"]["read"] == 15.0
+        clock.value += 10
+        return httpx.Response(
+            200, json={"ok": True, "result": {"message_id": 7, "chat": {"id": 42}}}
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as http:
+        result = await TelegramNotifier(http, Secret("TOKEN"), 42, clock=clock.now).send(
+            message(), give_up_s=5
+        )
+    assert result.external_id == "42:7"
+
+
+@pytest.mark.parametrize("date", [None, 0, 1])
+def test_callback_unknown_date_uses_receipt_time(date: int | None) -> None:
+    now = datetime(2026, 10, 12, tzinfo=UTC)
+    message: dict[str, Any] = {"chat": {"id": 42}, "message_id": 7}
+    if date is not None:
+        message["date"] = date
+    tap = parse_tap(
+        {"callback_query": {"id": "q", "message": message, "data": "l:1:y"}},
+        42,
+        now=lambda: now,
+    )
+    assert tap is not None
+    assert tap.sent_at == (now if not date else datetime.fromtimestamp(date, UTC))
+
+
+async def test_llm_token_limit_waits_for_minute_reset_not_daily_requests() -> None:
+    clock = Clock()
+    calls = 0
+
+    def respond(req: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return httpx.Response(
+                429,
+                headers={
+                    "x-ratelimit-remaining-tokens": "0",
+                    "x-ratelimit-reset-tokens": "2s",
+                    "x-ratelimit-remaining-requests": "999",
+                    "x-ratelimit-reset-requests": "1h20m",
+                },
+            )
+        return httpx.Response(200, json=completion({"claim": "yes"}))
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as http:
+        llm = GroqLLM(http, Secret("k"), clock=clock.now, sleep=clock.sleep)
+        assert (await llm.complete_json(request(), parse)).value == "yes"
+        assert (await llm.complete_json(request(), parse)).value == "yes"
+    assert calls == 3 and clock.waits == [2]

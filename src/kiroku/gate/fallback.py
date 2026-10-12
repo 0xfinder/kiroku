@@ -33,6 +33,7 @@ class FallbackGate:
         self._bypass_s, self._clock = bypass_s, clock
         self._until = 0.0
         self._why = ""
+        self._fallback_disabled = False
 
     @property
     def name(self) -> str:
@@ -41,25 +42,34 @@ class FallbackGate:
     async def evaluate(self, request: GateRequest) -> GateAnswer:
         costs: tuple[CostEntry, ...] = ()
         why = self._why
-        if self._clock() >= self._until:
+        if self._fallback_disabled or self._clock() >= self._until:
             try:
                 answer = await self._primary.evaluate(request)
             except (GateUnavailable, GateBadResponse) as e:
                 why, costs = e.reason, e.costs
                 if isinstance(e, GateUnavailable):
                     self._until, self._why = self._clock() + self._bypass_s, why
-                log.warning("Gate: %s; falling back to %s", why, self._fallback.name)
+                if not self._fallback_disabled:
+                    log.warning("Gate: %s; falling back to %s", why, self._fallback.name)
             else:
                 if self._why:
                     log.info("%s answered again", self._primary.name)
                     self._why = ""
                 return answer
+        if self._fallback_disabled:
+            raise GateFailed(
+                f"{why}; fallback disabled after authentication failure", costs, reported=True
+            )
         try:
             answer = await self._fallback.evaluate(request)
         except OverBudget as e:
             raise OverBudget(e.refusal, costs + e.costs) from e
         except GateAuthError as e:
-            raise GateAuthError(f"{why}; fallback: {e}", costs + e.costs) from e
+            self._fallback_disabled = True
+            log.error("%s: %s; fallback is off for this process", self._fallback.name, e)
+            raise GateFailed(
+                f"{why}; fallback authentication failed: {e}", costs + e.costs, reported=True
+            ) from e
         except GateFailed as e:
             raise GateFailed(f"{why}; fallback: {e.reason}", costs + e.costs) from e
         return replace(answer, note=f"fallback: {why}", costs=costs + answer.costs)

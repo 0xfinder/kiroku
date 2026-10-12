@@ -691,8 +691,8 @@ async def test_llm_estimate_covers_recorded_usage() -> None:
     assert checked >= 69
 
 
-async def test_fallback_auth_error_writes_all_lost_costs_before_gate_stops(
-    pool: Pool, database_url: str, conn: AsyncConnection
+async def test_fallback_auth_error_writes_costs_and_keeps_gating(
+    pool: Pool, database_url: str, conn: AsyncConnection, caplog: pytest.LogCaptureFixture
 ) -> None:
     from kiroku.gate import GateAnswer, GateRequest, GateUnavailable
 
@@ -721,10 +721,12 @@ async def test_fallback_auth_error_writes_all_lost_costs_before_gate_stops(
         await conn.execute(
             "SELECT provider,count(*) FROM cost_ledger GROUP BY provider ORDER BY provider"
         )
-    ).fetchall() == [("groq", 1), ("jev", 1)]
+    ).fetchall() == [("groq", 1), ("jev", 8)]
     assert await (
         await conn.execute("SELECT count(*) FROM gate_window WHERE status='failed'")
-    ).fetchone() == (1,)
+    ).fetchone() == (8,)
+    assert attempts == 2
+    assert sum(r.levelno == logging.ERROR for r in caplog.records) == 1
 
 
 async def test_worker_bug_before_send_marks_failed_and_moves_on(
@@ -792,7 +794,6 @@ async def test_auth_cost_commit_lost_ack_is_idempotent(
 ) -> None:
     import psycopg
 
-    from kiroku import gating
     from kiroku.gate import GateAnswer, GateAuthError, GateRequest
 
     cost = CostEntry("jev", "jev-1.13.0", Purpose.GATE, Tokens(100), Decimal(".000005"), 0)
@@ -803,22 +804,49 @@ async def test_auth_cost_commit_lost_ack_is_idempotent(
         async def evaluate(self, request: GateRequest) -> GateAnswer:
             raise GateAuthError("wrong key after lost response", (cost,))
 
-    original = gating.commit
+    from kiroku import ledger
+
+    original = ledger.retrying
     commits = 0
 
-    async def lost_ack(*args: Any, **kwargs: Any) -> bool:
-        nonlocal commits
-        commits += 1
-        result = await original(*args, **kwargs)
-        if commits == 1:
-            raise psycopg.OperationalError("commit acknowledgement lost")
-        return result
+    async def lose_ack(what: str, fn: Any) -> Any:
+        async def write() -> Any:
+            nonlocal commits
+            commits += 1
+            result = await fn()
+            if commits == 1:
+                raise psycopg.OperationalError("commit acknowledgement lost")
+            return result
 
-    monkeypatch.setattr(gating, "commit", lost_ack)
-    await seed(pool, database_url, gate=Auth())
+        return await original(what, write)
+
+    monkeypatch.setattr(ledger, "retrying", lose_ack)
+    channel, session, _ = await seed(pool, database_url, gate=Auth())
     assert commits == 2
     assert await (await conn.execute("SELECT count(*) FROM cost_ledger")).fetchone() == (1,)
-    assert await (await conn.execute("SELECT count(*) FROM gate_window")).fetchone() == (1,)
+    assert await (await conn.execute("SELECT count(*) FROM gate_window")).fetchone() == (0,)
+    assert await (await conn.execute("SELECT DISTINCT session_id FROM cost_ledger")).fetchone() == (
+        session,
+    )
+    # A new process with a corrected primary key must see and gate the original backlog.
+    from kiroku.budget import Unlimited
+    from kiroku.gate.windows import WindowPolicy
+    from kiroku.gating import GateLoop
+    from tests.test_gating import FakeGate
+
+    restarted = GateLoop(
+        pool,
+        session,
+        "recorded",
+        FakeGate(0.8),
+        Unlimited(),
+        lambda: {},
+        policy=WindowPolicy(length_ms=30_000),
+    )
+    restarted.finish(session_ended=True)
+    await restarted.run()
+    assert len(await alerting.pending(pool, [channel])) == 20
+    assert await (await conn.execute("SELECT count(*) FROM gate_window")).fetchone() == (8,)
 
 
 async def test_two_rules_in_one_window_send_separate_buttons(pool: Pool, database_url: str) -> None:
@@ -887,3 +915,153 @@ async def test_pack_key_is_persisted_by_the_worker(
     assert await (
         await conn.execute("SELECT game_key, outcome FROM alert WHERE game_key IS NOT NULL")
     ).fetchall() == [("league:event:1", "sent")]
+
+
+@pytest.mark.parametrize("left", [0.001, 5.5])
+async def test_near_deadline_commits_stale_without_cooldown(
+    pool: Pool,
+    database_url: str,
+    conn: AsyncConnection,
+    left: float,
+) -> None:
+    channel, _, now = await seed(pool, database_url)
+    first = (await alerting.pending(pool, [channel]))[0]
+    assert first.said_until is not None
+    await conn.execute("DELETE FROM gate_decision WHERE id <> %s", [first.decision_id])
+    clock = Clock()
+    api = BotAPI()
+    receipt = first.said_until + timedelta(minutes=10) - timedelta(seconds=left)
+    async with (
+        httpx.AsyncClient(transport=replay_transport(EXTRACTION, arm="default")) as llm_http,
+        httpx.AsyncClient(transport=httpx.MockTransport(api)) as bot_http,
+    ):
+        bot = TelegramNotifier(bot_http, Secret("TOKEN"), 42, clock=clock.now, sleep=clock.sleep)
+        if left > 5:
+            from tests.test_alerts import message
+
+            await bot.send(message(), give_up_s=20)
+            api.sent.clear()
+        worker = alerting.AlertWorker(
+            pool,
+            [channel],
+            GroqLLM(llm_http, Secret("k")),
+            bot,
+            Budget(pool, Caps()),
+            now=lambda: receipt,
+        )
+        await worker.drain()
+    assert not api.sent
+    assert await (await conn.execute("SELECT outcome FROM alert")).fetchall() == [("stale",)]
+    assert await (
+        await conn.execute("SELECT count(*) FROM cost_ledger WHERE purpose = 'extraction'")
+    ).fetchone() == (1,)
+    assert await alerting.in_cooldown(pool, replace(first, said_at=now)) is None
+
+
+@pytest.mark.parametrize("date", [0, None])
+async def test_inaccessible_callback_confirms_with_receipt_time(
+    pool: Pool,
+    database_url: str,
+    conn: AsyncConnection,
+    date: int | None,
+) -> None:
+    from kiroku.notify.telegram import parse_tap
+
+    channel, _, now = await seed(pool, database_url)
+    first = (await alerting.pending(pool, [channel]))[0]
+    alert_id = await alerting.commit(
+        pool,
+        first,
+        alerting.Sending(
+            "game",
+            {"summary": "prediction"},
+            None,
+            None,
+            "telegram",
+            (),
+        ),
+    )
+    assert alert_id is not None
+    await alerting.mark_unconfirmed(pool, alert_id, "timeout")
+    message: dict[str, Any] = {"chat": {"id": 42}, "message_id": 7}
+    if date is not None:
+        message["date"] = date
+    tap = parse_tap(
+        {"callback_query": {"id": "q", "data": f"l:{alert_id}:y", "message": message}},
+        42,
+        now=lambda: now,
+    )
+    assert tap is not None and await labels.record(pool, tap)
+    assert await (await conn.execute("SELECT outcome, sent_at FROM alert")).fetchone() == (
+        "sent",
+        now,
+    )
+    assert await (await conn.execute("SELECT applies FROM label")).fetchone() == (True,)
+
+
+async def test_pending_reads_whole_batch_in_one_checkout(
+    pool: Pool,
+    database_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    channel, _, _ = await seed(pool, database_url)
+    checkouts = 0
+    original = pool.connection
+
+    def counted(*args: Any, **kwargs: Any) -> Any:
+        nonlocal checkouts
+        checkouts += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(pool, "connection", counted)
+    candidates = await alerting.pending(pool, [channel])
+    assert len(candidates) == 12 and all(c.said_until is not None for c in candidates)
+    assert checkouts == 1
+
+
+async def test_bug_outcome_never_enters_sending(
+    pool: Pool,
+    database_url: str,
+    conn: AsyncConnection,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    channel, _, now = await seed(pool, database_url)
+    first = (await alerting.pending(pool, [channel]))[0]
+    from kiroku import extraction
+
+    await conn.execute("DELETE FROM gate_decision WHERE id <> %s", [first.decision_id])
+
+    async def broken(*args: Any, **kwargs: Any) -> Any:
+        raise ValueError("provider bug")
+
+    monkeypatch.setattr(extraction, "extract", broken)
+    # An INSERT of sending would fail before _bug could perform its second write.
+    await conn.execute("""
+        CREATE FUNCTION reject_sending() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            IF NEW.outcome = 'sending' THEN RAISE EXCEPTION 'unexpected sending'; END IF;
+            RETURN NEW;
+        END $$;
+        CREATE TRIGGER reject_sending BEFORE INSERT ON alert
+        FOR EACH ROW EXECUTE FUNCTION reject_sending();
+    """)
+    sink = Sink()
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda req: httpx.Response(500))
+    ) as http:
+        worker = alerting.AlertWorker(
+            pool,
+            [channel],
+            GroqLLM(http, Secret("k")),
+            sink,
+            Budget(pool, Caps()),
+            now=lambda: now,
+        )
+        await worker.drain()
+    assert await (await conn.execute("SELECT outcome, reason FROM alert")).fetchone() == (
+        "failed",
+        "bug: ValueError",
+    )
+    assert await alerting.in_cooldown(pool, first) is None
+    assert await alerting.recover(pool, [channel]) == 0
+    assert sink.messages == []

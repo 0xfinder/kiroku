@@ -17,28 +17,36 @@ def go_seconds(text: str) -> float | None:
     return h * 3600 + m * 60 + s + milli / 1000
 
 
-def retry_delay(status: int | None, headers: Mapping[str, str], attempt: int) -> float:
+def retry_delay(
+    status: int | None, headers: Mapping[str, str], attempt: int, *, audio: bool = False
+) -> float:
     """Seconds to wait before retrying the same chunk.
 
-    429: `retry-after` if present, else the larger of the audio-seconds and request reset
-    headers. Otherwise (5xx, network): 1, 2, 4 ... seconds, capped at 60.
+    429: the exhausted limit's reset, then retry-after, then the shortest reset.
+    Otherwise (5xx, network): 1, 2, 4 ... seconds, capped at 60.
     """
     backoff = float(min(2 ** (attempt - 1), 60))
     if status != 429:
         return backoff
+    resets = {
+        limit: reset
+        for limit in (("audio-seconds", "requests") if audio else ("tokens", "requests"))
+        if (reset := go_seconds(headers.get(f"x-ratelimit-reset-{limit}", ""))) is not None
+    }
+    exhausted = [
+        reset
+        for limit, reset in resets.items()
+        if headers.get(f"x-ratelimit-remaining-{limit}") == "0"
+    ]
+    if exhausted:
+        return max(exhausted)
     if (value := headers.get("retry-after")) is not None:
         try:
             return max(float(value), 1.0)
         except ValueError:
             pass
-    resets = [
-        go_seconds(headers[h])
-        for h in (
-            "x-ratelimit-reset-audio-seconds",
-            "x-ratelimit-reset-tokens",
-            "x-ratelimit-reset-requests",
-        )
-        if h in headers
-    ]
-    waits = [r for r in resets if r is not None]
-    return max(waits) if waits else backoff
+    if not resets:
+        return backoff
+    # Whisper historically waits for both audio and request resets when exhaustion
+    # headers are absent. JSON calls must not wait for the unrelated daily reset.
+    return max(resets.values()) if audio else min(resets.values())

@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import PurePosixPath
 
+from psycopg import sql
+
 from kiroku.db import Pool, connect
 from kiroku.errors import KirokuError
 from kiroku.source import StreamMeta
@@ -268,16 +270,21 @@ async def find_session(pool: Pool, channel: Channel, session_id: int | None) -> 
     return SessionInfo(row[0], row[1]) if row else None
 
 
+def said_until_sql(session_id: sql.SQL, end_ms: sql.SQL) -> sql.Composed:
+    """SELECT for the capture leg holding the final sample; also usable in a LATERAL join."""
+    return sql.SQL("""
+        SELECT started_at + ({end} - audio_start_ms) * interval '1 ms' AS said_until
+        FROM capture_leg WHERE session_id = {session} AND audio_start_ms <= {end} - 1
+        ORDER BY audio_start_ms DESC, seq DESC LIMIT 1
+    """).format(session=session_id, end=end_ms)
+
+
 async def said_until(pool: Pool, session_id: int, end_ms: int) -> datetime | None:
     """Speech end on the capture leg holding the Window's last audio sample."""
     async with pool.connection() as conn:
         cur = await conn.execute(
-            """
-            SELECT started_at + (%s - audio_start_ms) * interval '1 ms'
-            FROM capture_leg WHERE session_id = %s AND audio_start_ms <= %s
-            ORDER BY audio_start_ms DESC, seq DESC LIMIT 1
-            """,
-            [end_ms, session_id, end_ms - 1],
+            said_until_sql(sql.SQL("%(session)s"), sql.SQL("%(end)s")),
+            {"session": session_id, "end": end_ms},
         )
         row = await cur.fetchone()
     return row[0] if row else None

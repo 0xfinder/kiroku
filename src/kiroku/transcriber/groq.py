@@ -28,11 +28,11 @@ from typing import Any, cast
 import httpx
 import psycopg
 
+from kiroku import groq_http
 from kiroku.audio import BYTES_PER_SAMPLE, SAMPLE_RATE, AudioBlock, AudioEvent, ms
 from kiroku.budget import BudgetGuard, OverBudget
 from kiroku.config import Secret
 from kiroku.errors import KirokuError
-from kiroku.groq_http import retry_delay as retry_delay
 from kiroku.ledger import AudioSeconds, CostEntry, Purpose
 from kiroku.transcriber import Context, Result, Utterance
 from kiroku.transcriber.chunker import Chunk, ChunkPolicy, SilenceChunker
@@ -288,6 +288,10 @@ def billed(duration_ms: int) -> tuple[Decimal, Decimal]:
     """Groq bills max(duration, 10 s) at $0.04 per audio hour. Returns (seconds, usd)."""
     seconds = max(Decimal(duration_ms) / 1000, MIN_BILLED_SECONDS)
     return seconds, (seconds * USD_PER_AUDIO_HOUR / 3600).quantize(Decimal("0.000001"))
+
+
+def retry_delay(status: int | None, headers: Mapping[str, str], attempt: int) -> float:
+    return groq_http.retry_delay(status, headers, attempt, audio=True)
 
 
 def to_utterances(
