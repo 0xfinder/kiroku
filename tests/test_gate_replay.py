@@ -37,6 +37,10 @@ RECORDED = [
     json.loads(line)
     for line in Path("spikes/results/2026-10-11-gate-split.jsonl").read_text().splitlines()
 ]
+LEAGUE_RECORDED = [
+    json.loads(line)
+    for line in Path("spikes/results/2026-10-12-league-gate.jsonl").read_text().splitlines()
+]
 
 
 def _canonical(body: Any) -> str:
@@ -111,3 +115,81 @@ async def test_the_split_passes_real_predictions_but_not_the_one_in_context(
     assert await cur.fetchall() == [("watching_pro", "jev:jev-1.13.0")]
     cur = await conn.execute("SELECT count(*) FROM cost_ledger WHERE purpose = 'gate'")
     assert await cur.fetchone() == (8,)
+
+
+@pytest.mark.parametrize("repeat", [0, 1, 2])
+async def test_league_live_context_replays_real_jev_answers(
+    pool: Pool,
+    database_url: str,
+    conn: AsyncConnection,
+    repeat: int,
+) -> None:
+    from kiroku import segments
+    from kiroku.pack import LiveContext
+
+    recording = LEAGUE_RECORDED
+    header = recording[0]["header"]
+    calls = [r for r in recording[1:] if r["arm"] == "live" and r["repeat"] == repeat]
+    cassette = {_canonical(r["request"]): r["response"] for r in calls}
+    for r in header["rules"]:
+        await rules.add(
+            pool, r["name"], r["instructions"], threshold=Decimal(r["threshold"]), pack="league"
+        )
+    async with claim_channels(database_url, "twitch", ["caedrel"]) as (channel,):
+        session = await sessions.open_session(
+            pool,
+            channel,
+            StreamMeta("recorded", header["stream"]["title"], "League of Legends"),
+            datetime.now(UTC),
+        )
+    leg = await sessions.next_leg(pool, channel, session)
+    await segments.record(
+        pool,
+        session,
+        0,
+        StreamMeta("recorded", header["stream"]["title"], "League of Legends"),
+        "league",
+    )
+    await sessions.record_leg(pool, leg, datetime.now(UTC))
+    for i, text in enumerate(header["texts"]):
+        await transcript.commit(
+            pool,
+            session,
+            NAME,
+            Result(
+                i * 45000, (i + 1) * 45000, (Utterance(i * 45000, (i + 1) * 45000, text),), None
+            ),
+        )
+
+    def jev(request: httpx.Request) -> httpx.Response:
+        body = cassette.get(_canonical(json.loads(request.content)))
+        if body is None:
+            pytest.fail("League Gate request changed; re-run spikes/league_gate.py")
+        return httpx.Response(200, json=body)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(jev)) as http:
+        loop = GateLoop(
+            pool,
+            session,
+            NAME,
+            JevGate(http, Secret("k")),
+            Unlimited(),
+            lambda: header["stream"],
+            use_segments=True,
+            live=lambda bounds: LiveContext(header["live"], header["game_key"]),
+        )
+        loop.finish(session_ended=True)
+        await loop.run()
+    cur = await conn.execute("""
+        SELECT w.start_ms, r.name, d.passed FROM gate_decision d
+        JOIN gate_window w ON w.id=d.window_id JOIN rule r ON r.id=d.rule_id
+        ORDER BY w.start_ms,r.name
+    """)
+    assert await cur.fetchall() == [
+        (0, "draft", False),
+        (0, "yunara_broken", False),
+        (45000, "draft", False),
+        (45000, "yunara_broken", True),
+    ]
+    cur = await conn.execute("SELECT mode FROM gate_window ORDER BY start_ms")
+    assert [row[0] for row in await cur.fetchall()] == [r["mode"] for r in calls]

@@ -201,7 +201,29 @@ def test_bad_input_is_a_one_line_error(kiroku: Callable[..., Any]) -> None:
         assert message in result.stderr, (args, result.stderr)
         assert "Traceback" not in result.output
     scoped = kiroku("add", "x", "Q?", "--pack", "league")
-    assert scoped.exit_code == 0 and "aren't wired into the live Gate yet" in scoped.stderr
+    assert scoped.exit_code == 0 and scoped.stderr == ""
+
+
+def test_unavailable_pack_warns_when_adding_editing_or_enabling_a_rule(
+    kiroku: Callable[..., Any],
+) -> None:
+    added = kiroku("add", "x", "Q?", "--pack", "dota")
+    assert added.exit_code == 0 and "PACK_NOT_LIVE: dota is unavailable" in added.stderr
+    assert "PACK_NOT_LIVE" in kiroku("enable", "x").stderr
+    assert kiroku("edit", "x", "--pack", "league").stderr == ""
+    assert "PACK_NOT_LIVE" in kiroku("edit", "x", "--pack", "dota").stderr
+    assert kiroku("edit", "x", "--any-pack").stderr == ""
+
+
+def test_pack_warning_uses_the_same_registry_as_watch(
+    kiroku: Callable[..., Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from kiroku.cli import PACK_FACTORIES
+
+    monkeypatch.delitem(PACK_FACTORIES, "league")
+    added = kiroku("add", "x", "Q?", "--pack", "league")
+    assert added.exit_code == 0 and "PACK_NOT_LIVE: league is unavailable" in added.stderr
 
 
 def test_a_rewording_is_tested_at_the_saved_threshold(

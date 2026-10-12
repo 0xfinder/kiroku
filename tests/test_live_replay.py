@@ -31,6 +31,7 @@ from kiroku.config import Secret
 from kiroku.db import Pool, open_pool
 from kiroku.gate import Gate
 from kiroku.gate.jev import JevGate
+from kiroku.pack import PackSelector
 from kiroku.sessions import claim_channels
 from kiroku.source import StreamlinkSource
 from kiroku.transcriber.groq import GroqTranscriber
@@ -86,7 +87,7 @@ class GroqStub:
         )
 
 
-async def _watch_until(
+async def watch_until(
     database_url: str,
     pool: Pool,
     data_dir: Path,
@@ -96,6 +97,7 @@ async def _watch_until(
     *,
     gate: Gate | None = None,
     caps: Caps | None = None,
+    select_pack: PackSelector = lambda category: None,
 ) -> None:
     """Run `kiroku watch fake` until `done()` (a coroutine) returns True, then stop it."""
     async with (
@@ -112,6 +114,7 @@ async def _watch_until(
                 budget=Budget(pool, caps or Caps()),
                 gate=gate,
                 poll_s=0.5,
+                select_pack=select_pack,
             )
         )
         try:
@@ -126,14 +129,14 @@ async def _watch_until(
                 await task
 
 
-async def _rows(conn: AsyncConnection, query: str) -> list[tuple[Any, ...]]:
+async def query_rows(conn: AsyncConnection, query: str) -> list[tuple[Any, ...]]:
     cur = await conn.execute(cast(LiteralString, query))
     return list(await cur.fetchall())
 
 
-def _spans_cover(conn: AsyncConnection, end_ms: int) -> Callable[[], Any]:
+def spans_cover(conn: AsyncConnection, end_ms: int) -> Callable[[], Any]:
     async def check() -> bool:
-        rows = await _rows(conn, "SELECT coalesce(max(audio_end_ms), 0) FROM transcript_span")
+        rows = await query_rows(conn, "SELECT coalesce(max(audio_end_ms), 0) FROM transcript_span")
         return rows[0][0] >= end_ms
 
     return check
@@ -157,13 +160,13 @@ async def test_stream_drop_reconnects_to_the_same_session(
 ) -> None:
     fake_stream("40,30")
     groq = GroqStub()
-    await _watch_until(database_url, pool, tmp_path / "data", groq, _spans_cover(conn, 70_000))
+    await watch_until(database_url, pool, tmp_path / "data", groq, spans_cover(conn, 70_000))
 
-    sessions = await _rows(conn, "SELECT id, platform_stream_id, ended_at FROM stream_session")
+    sessions = await query_rows(conn, "SELECT id, platform_stream_id, ended_at FROM stream_session")
     assert len(sessions) == 1 and sessions[0][1] == "broadcast-1"
     session_id = sessions[0][0]
 
-    legs = await _rows(
+    legs = await query_rows(
         conn, "SELECT seq, audio_start_ms, audio_end_ms, archive_path FROM capture_leg ORDER BY seq"
     )
     assert [(s, a, b) for s, a, b, _ in legs] == [(1, 0, 40_000), (2, 40_000, 70_000)]
@@ -171,7 +174,7 @@ async def test_stream_drop_reconnects_to_the_same_session(
         decoded = _decoded_seconds(tmp_path / "data" / path)
         assert decoded == pytest.approx((end - start) / 1000, abs=0.05)
 
-    spans = await _rows(
+    spans = await query_rows(
         conn, "SELECT audio_start_ms, audio_end_ms FROM transcript_span ORDER BY audio_start_ms"
     )
     assert spans[0][0] == 0 and spans[-1][1] == 70_000
@@ -179,13 +182,13 @@ async def test_stream_drop_reconnects_to_the_same_session(
         assert b_start == a_end, "spans must tile the audio with no gap or overlap"
     assert 40_000 in {end for _, end in spans}, "no span crosses the reconnect"
 
-    utterances = await _rows(
+    utterances = await query_rows(
         conn, "SELECT audio_start_ms, spoken_at, text FROM utterance ORDER BY audio_start_ms"
     )
     assert len(utterances) == 2 * groq.calls
     assert len({text for *_, text in utterances}) == len(utterances), "nothing stored twice"
 
-    ledger = await _rows(
+    ledger = await query_rows(
         conn,
         f"SELECT count(*), sum(audio_seconds) FROM cost_ledger WHERE session_id = {session_id}",
     )
@@ -202,14 +205,14 @@ async def test_restarting_watch_resumes_the_session(
 ) -> None:
     fake_stream("40,30")
     data = tmp_path / "data"
-    await _watch_until(database_url, pool, data, GroqStub(), _spans_cover(conn, 40_000))
+    await watch_until(database_url, pool, data, GroqStub(), spans_cover(conn, 40_000))
     # A second process start: same broadcast, so the same session, continuing the clock.
-    await _watch_until(database_url, pool, data, GroqStub(), _spans_cover(conn, 70_000))
+    await watch_until(database_url, pool, data, GroqStub(), spans_cover(conn, 70_000))
 
-    assert len(await _rows(conn, "SELECT id FROM stream_session")) == 1
-    legs = await _rows(conn, "SELECT audio_start_ms FROM capture_leg ORDER BY seq")
+    assert len(await query_rows(conn, "SELECT id FROM stream_session")) == 1
+    legs = await query_rows(conn, "SELECT audio_start_ms FROM capture_leg ORDER BY seq")
     assert [start for (start,) in legs] == sorted({start for (start,) in legs})
-    spans = await _rows(
+    spans = await query_rows(
         conn, "SELECT audio_start_ms, audio_end_ms FROM transcript_span ORDER BY audio_start_ms"
     )
     for (_, a_end), (b_start, _) in itertools.pairwise(spans):
@@ -226,14 +229,12 @@ async def test_stopping_mid_leg_transcribes_everything_captured(
 ) -> None:
     fake_stream("37")
     monkeypatch.setenv("FAKE_HOLD", "1")  # the leg is still live when watch stops
-    await _watch_until(
-        database_url, pool, tmp_path / "data", GroqStub(), _spans_cover(conn, 15_000)
-    )
+    await watch_until(database_url, pool, tmp_path / "data", GroqStub(), spans_cover(conn, 15_000))
 
     # Stopping cuts the input; whatever ffmpeg already received is archived, recorded as
     # the leg's end, and transcribed before the run returns.
-    legs = await _rows(conn, "SELECT audio_end_ms, archive_path FROM capture_leg")
-    spans = await _rows(conn, "SELECT max(audio_end_ms) FROM transcript_span")
+    legs = await query_rows(conn, "SELECT audio_end_ms, archive_path FROM capture_leg")
+    spans = await query_rows(conn, "SELECT max(audio_end_ms) FROM transcript_span")
     assert len(legs) == 1
     leg_end, path = legs[0]
     assert leg_end is not None and leg_end > 15_000
@@ -274,19 +275,19 @@ async def test_the_gate_closes_windows_as_the_transcript_lands_and_at_session_en
 
     fake_stream("40,30")
     await rules.add(pool, "says_words", "Does he say words?", threshold=Decimal("0.5"))
-    covered = _spans_cover(conn, 70_000)
+    covered = spans_cover(conn, 70_000)
 
     async def ended() -> bool:
         if await covered():
             monkeypatch.delenv("FAKE_STREAM_ID", raising=False)  # the broadcast ends
-        rows = await _rows(conn, "SELECT ended_at FROM stream_session")
+        rows = await query_rows(conn, "SELECT ended_at FROM stream_session")
         return bool(rows) and rows[0][0] is not None
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(jev_stub)) as jev:
         gate = JevGate(jev, Secret("k"))
-        await _watch_until(database_url, pool, tmp_path / "data", GroqStub(), ended, gate=gate)
+        await watch_until(database_url, pool, tmp_path / "data", GroqStub(), ended, gate=gate)
 
-    windows = await _rows(
+    windows = await query_rows(
         conn, "SELECT start_ms, end_ms, status, mode FROM gate_window ORDER BY start_ms"
     )
     # A full Window while live, then the partial one when the session ended.
@@ -294,9 +295,9 @@ async def test_the_gate_closes_windows_as_the_transcript_lands_and_at_session_en
         (0, 45_000, "answered", "chatting"),
         (45_000, 70_000, "answered", "chatting"),
     ]
-    decisions = await _rows(conn, "SELECT probability, passed FROM gate_decision")
+    decisions = await query_rows(conn, "SELECT probability, passed FROM gate_decision")
     assert decisions == [(Decimal("0.8000"), True)] * 2
-    ledger = await _rows(conn, "SELECT count(*) FROM cost_ledger WHERE purpose = 'gate'")
+    ledger = await query_rows(conn, "SELECT count(*) FROM cost_ledger WHERE purpose = 'gate'")
     assert ledger == [(2,)]
 
 
@@ -333,7 +334,7 @@ async def test_killed_watcher_is_backfilled_on_restart(
     )
     try:
         async with asyncio.timeout(30):
-            while not await _rows(conn, "SELECT 1 FROM transcript_span"):
+            while not await query_rows(conn, "SELECT 1 FROM transcript_span"):
                 assert proc.returncode is None, "the watcher died on its own"
                 await asyncio.sleep(0.1)
     finally:
@@ -346,8 +347,8 @@ async def test_killed_watcher_is_backfilled_on_restart(
                 break
             await asyncio.sleep(0.1)
 
-    (session_id,) = (await _rows(conn, "SELECT id FROM stream_session"))[0]
-    assert await _rows(conn, "SELECT seq, audio_end_ms FROM capture_leg") == [(1, None)]
+    (session_id,) = (await query_rows(conn, "SELECT id FROM stream_session"))[0]
+    assert await query_rows(conn, "SELECT seq, audio_end_ms FROM capture_leg") == [(1, None)]
     killed_spans = await transcript.spans(pool, session_id, name)
     assert killed_spans[-1][1] < 25_000, "the kill left queued audio untranscribed"
 
@@ -366,7 +367,7 @@ async def test_killed_watcher_is_backfilled_on_restart(
             and not backfill.find_gaps(legs, spans)
         )
 
-    await _watch_until(database_url, pool, data, groq, covered)
+    await watch_until(database_url, pool, data, groq, covered)
 
     legs = await sessions.legs(pool, session_id)
     first, second = legs
@@ -386,15 +387,17 @@ async def test_killed_watcher_is_backfilled_on_restart(
 
     # Each chunk committed exactly once: one ledger row (under the session) per voiced span,
     # its two utterances stored once, each anchored to its own leg's wall clock.
-    voiced = await _rows(
+    voiced = await query_rows(
         conn,
         f"SELECT count(DISTINCT s.audio_start_ms) FROM transcript_span s JOIN utterance u "
         f"ON u.session_id = s.session_id AND u.audio_start_ms >= s.audio_start_ms "
         f"AND u.audio_start_ms < s.audio_end_ms WHERE s.session_id = {session_id}",
     )
-    ledger = await _rows(conn, f"SELECT count(*) FROM cost_ledger WHERE session_id = {session_id}")
+    ledger = await query_rows(
+        conn, f"SELECT count(*) FROM cost_ledger WHERE session_id = {session_id}"
+    )
     assert ledger[0][0] == voiced[0][0] == len(killed_spans) + groq.calls
-    utterances = await _rows(
+    utterances = await query_rows(
         conn,
         "SELECT u.text, u.spoken_at, l.started_at + (u.audio_start_ms - l.audio_start_ms) "
         "* interval '1 ms' FROM utterance u JOIN capture_leg l ON l.session_id = u.session_id "

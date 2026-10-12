@@ -276,8 +276,11 @@ def wav_bytes(pcm: bytes) -> bytes:
 
 def build_prompt(vocabulary: str, tail: str) -> str:
     """Vocabulary first, then the end of the previous text, cut at a word boundary."""
-    if len(tail) > PROMPT_TAIL_CHARS:
-        tail = tail[-PROMPT_TAIL_CHARS:].split(" ", 1)[-1]
+    # Long Vocabulary needs room in Whisper's 224-token prompt. This also protects
+    # long title-only prompts; short titles keep the established continuity budget.
+    tail_chars = 200 if len(vocabulary) > 100 else PROMPT_TAIL_CHARS
+    if len(tail) > tail_chars:
+        tail = tail[-tail_chars:].split(" ", 1)[-1]
     return f"{vocabulary} {tail}".strip()
 
 

@@ -1,0 +1,155 @@
+{
+  "data": {
+    "event": {
+      "id": "117133830114188936",
+      "type": "match",
+      "tournament": {
+        "id": "117133773242499009"
+      },
+      "league": {
+        "id": "117126995932274206",
+        "slug": "demacia_cup",
+        "image": "http://static.lolesports.com/leagues/1788253732774_94x-81.png",
+        "name": "DCGI"
+      },
+      "match": {
+        "strategy": {
+          "count": 3
+        },
+        "teams": [
+          {
+            "id": "99566408221961358",
+            "name": "RED Kalunga",
+            "code": "RED",
+            "image": "http://static.lolesports.com/teams/1631820575924_red-2021-worlds.png",
+            "result": {
+              "gameWins": 0
+            }
+          },
+          {
+            "id": "98926509892121852",
+            "name": "FlyQuest",
+            "code": "FLY",
+            "image": "http://static.lolesports.com/teams/flyquest-new-on-dark.png",
+            "result": {
+              "gameWins": 2
+            }
+          }
+        ],
+        "games": [
+          {
+            "number": 1,
+            "id": "117133830114188937",
+            "state": "completed",
+            "teams": [
+              {
+                "id": "99566408221961358",
+                "side": "blue"
+              },
+              {
+                "id": "98926509892121852",
+                "side": "red"
+              }
+            ],
+            "vods": [
+              {
+                "id": "117407931510828168",
+                "parameter": "cPCxeEvvm2c",
+                "locale": "fr-FR",
+                "mediaLocale": {
+                  "locale": "fr-FR",
+                  "englishName": "French (France)",
+                  "translatedName": "Fran\u00e7ais"
+                },
+                "provider": "youtube",
+                "offset": 0,
+                "firstFrameTime": null,
+                "startMillis": 324000,
+                "endMillis": 3344000
+              },
+              {
+                "id": "117405676748531177",
+                "parameter": "209259915",
+                "locale": "ko-KR",
+                "mediaLocale": {
+                  "locale": "ko-KR",
+                  "englishName": "Korean (Korea)",
+                  "translatedName": "\ud55c\uad6d\uc5b4"
+                },
+                "provider": "afreecatv",
+                "offset": 0,
+                "firstFrameTime": null,
+                "startMillis": 2100000,
+                "endMillis": 5340000
+              }
+            ]
+          },
+          {
+            "number": 2,
+            "id": "117133830114188938",
+            "state": "completed",
+            "teams": [
+              {
+                "id": "98926509892121852",
+                "side": "blue"
+              },
+              {
+                "id": "99566408221961358",
+                "side": "red"
+              }
+            ],
+            "vods": [
+              {
+                "id": "117407931513129966",
+                "parameter": "cPCxeEvvm2c",
+                "locale": "fr-FR",
+                "mediaLocale": {
+                  "locale": "fr-FR",
+                  "englishName": "French (France)",
+                  "translatedName": "Fran\u00e7ais"
+                },
+                "provider": "youtube",
+                "offset": 0,
+                "firstFrameTime": null,
+                "startMillis": 3710000,
+                "endMillis": 5718000
+              },
+              {
+                "id": "117405676764407855",
+                "parameter": "209259915",
+                "locale": "ko-KR",
+                "mediaLocale": {
+                  "locale": "ko-KR",
+                  "englishName": "Korean (Korea)",
+                  "translatedName": "\ud55c\uad6d\uc5b4"
+                },
+                "provider": "afreecatv",
+                "offset": 0,
+                "firstFrameTime": null,
+                "startMillis": 6120000,
+                "endMillis": 8160000
+              }
+            ]
+          },
+          {
+            "number": 3,
+            "id": "117133830114188939",
+            "state": "unneeded",
+            "teams": [
+              {
+                "id": "98926509892121852",
+                "side": "blue"
+              },
+              {
+                "id": "99566408221961358",
+                "side": "red"
+              }
+            ],
+            "vods": []
+          }
+        ]
+      },
+      "streams": []
+    }
+  }
+}

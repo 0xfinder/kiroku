@@ -1,0 +1,223 @@
+{
+  "esportsGameId": "117133830114188937",
+  "esportsMatchId": "117133830114188936",
+  "gameMetadata": {
+    "patchVersion": "16.18.819.1060",
+    "blueTeamMetadata": {
+      "esportsTeamId": "99566408221961358",
+      "participantMetadata": [
+        {
+          "participantId": 1,
+          "esportsPlayerId": "111734845200890741",
+          "summonerName": "RED zynts",
+          "championId": "Rumble",
+          "role": "top"
+        },
+        {
+          "participantId": 2,
+          "esportsPlayerId": "103743617977630492",
+          "summonerName": "RED Aegis",
+          "championId": "MonkeyKing",
+          "role": "jungle"
+        },
+        {
+          "participantId": 3,
+          "esportsPlayerId": "107559338252333149",
+          "summonerName": "RED Fuuu",
+          "championId": "Orianna",
+          "role": "mid"
+        },
+        {
+          "participantId": 4,
+          "esportsPlayerId": "108395451349202875",
+          "summonerName": "RED Morttheus",
+          "championId": "Xayah",
+          "role": "bottom"
+        },
+        {
+          "participantId": 5,
+          "esportsPlayerId": "109518716685978765",
+          "summonerName": "RED Manel",
+          "championId": "Rakan",
+          "role": "support"
+        }
+      ]
+    },
+    "redTeamMetadata": {
+      "esportsTeamId": "98926509892121852",
+      "participantMetadata": [
+        {
+          "participantId": 6,
+          "esportsPlayerId": "111686531260879329",
+          "summonerName": "FLY Gakgos",
+          "championId": "Ornn",
+          "role": "top"
+        },
+        {
+          "participantId": 7,
+          "esportsPlayerId": "107577675767857598",
+          "summonerName": "FLY Gryffinn",
+          "championId": "Nocturne",
+          "role": "jungle"
+        },
+        {
+          "participantId": 8,
+          "esportsPlayerId": "110219103969081067",
+          "summonerName": "FLY Quad",
+          "championId": "Syndra",
+          "role": "mid"
+        },
+        {
+          "participantId": 9,
+          "esportsPlayerId": "108369186353082038",
+          "summonerName": "FLY Massu",
+          "championId": "Yunara",
+          "role": "bottom"
+        },
+        {
+          "participantId": 10,
+          "esportsPlayerId": "110535834235603720",
+          "summonerName": "FLY Cryogen",
+          "championId": "Lulu",
+          "role": "support"
+        }
+      ]
+    }
+  },
+  "frames": [
+    {
+      "rfc460Timestamp": "2026-10-08T09:02:47.283Z",
+      "gameState": "in_game",
+      "blueTeam": {
+        "totalGold": 0,
+        "inhibitors": 0,
+        "towers": 0,
+        "barons": 0,
+        "totalKills": 0,
+        "dragons": [],
+        "participants": [
+          {
+            "participantId": 1,
+            "totalGold": 0,
+            "level": 1,
+            "kills": 0,
+            "deaths": 0,
+            "assists": 0,
+            "creepScore": 0,
+            "currentHealth": 0,
+            "maxHealth": 0
+          },
+          {
+            "participantId": 2,
+            "totalGold": 0,
+            "level": 1,
+            "kills": 0,
+            "deaths": 0,
+            "assists": 0,
+            "creepScore": 0,
+            "currentHealth": 0,
+            "maxHealth": 0
+          },
+          {
+            "participantId": 3,
+            "totalGold": 0,
+            "level": 1,
+            "kills": 0,
+            "deaths": 0,
+            "assists": 0,
+            "creepScore": 0,
+            "currentHealth": 0,
+            "maxHealth": 0
+          },
+          {
+            "participantId": 4,
+            "totalGold": 0,
+            "level": 1,
+            "kills": 0,
+            "deaths": 0,
+            "assists": 0,
+            "creepScore": 0,
+            "currentHealth": 0,
+            "maxHealth": 0
+          },
+          {
+            "participantId": 5,
+            "totalGold": 0,
+            "level": 1,
+            "kills": 0,
+            "deaths": 0,
+            "assists": 0,
+            "creepScore": 0,
+            "currentHealth": 0,
+            "maxHealth": 0
+          }
+        ]
+      },
+      "redTeam": {
+        "totalGold": 0,
+        "inhibitors": 0,
+        "towers": 0,
+        "barons": 0,
+        "totalKills": 0,
+        "dragons": [],
+        "participants": [
+          {
+            "participantId": 6,
+            "totalGold": 0,
+            "level": 1,
+            "kills": 0,
+            "deaths": 0,
+            "assists": 0,
+            "creepScore": 0,
+            "currentHealth": 0,
+            "maxHealth": 0
+          },
+          {
+            "participantId": 7,
+            "totalGold": 0,
+            "level": 1,
+            "kills": 0,
+            "deaths": 0,
+            "assists": 0,
+            "creepScore": 0,
+            "currentHealth": 0,
+            "maxHealth": 0
+          },
+          {
+            "participantId": 8,
+            "totalGold": 0,
+            "level": 1,
+            "kills": 0,
+            "deaths": 0,
+            "assists": 0,
+            "creepScore": 0,
+            "currentHealth": 0,
+            "maxHealth": 0
+          },
+          {
+            "participantId": 9,
+            "totalGold": 0,
+            "level": 1,
+            "kills": 0,
+            "deaths": 0,
+            "assists": 0,
+            "creepScore": 0,
+            "currentHealth": 0,
+            "maxHealth": 0
+          },
+          {
+            "participantId": 10,
+            "totalGold": 0,
+            "level": 1,
+            "kills": 0,
+            "deaths": 0,
+            "assists": 0,
+            "creepScore": 0,
+            "currentHealth": 0,
+            "maxHealth": 0
+          }
+        ]
+      }
+    }
+  ]
+}

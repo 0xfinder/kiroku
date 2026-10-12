@@ -42,7 +42,7 @@ class Turn:
 
 @dataclass(frozen=True, slots=True)
 class GateState:
-    context: Mapping[str, JSON]  # {"stream": {...}, "earlier": "..."}; #6 adds "live"
+    context: Mapping[str, JSON]  # {"stream": {...}, "earlier": "...", optional "live": {...}}
     new: str
 
     def as_json(self) -> dict[str, JSON]:

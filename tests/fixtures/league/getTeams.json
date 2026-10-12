@@ -1,0 +1,166 @@
+{
+  "data": {
+    "teams": [
+      {
+        "id": "98926509892121852",
+        "slug": "flyquest",
+        "name": "FlyQuest",
+        "code": "FLY",
+        "image": "http://static.lolesports.com/teams/flyquest-new-on-dark.png",
+        "alternativeImage": "http://static.lolesports.com/teams/flyquest-new-on-dark.png",
+        "backgroundImage": null,
+        "status": "active",
+        "homeLeague": {
+          "name": "LCS",
+          "region": "NORTH AMERICA"
+        },
+        "players": [
+          {
+            "id": "111686531260879329",
+            "summonerName": "Gakgos",
+            "firstName": "Bulut",
+            "lastName": "Ibrahim Samet",
+            "image": "http://static.lolesports.com/players/1769149952615_AME_LCS26S1_FLY_GAKGOS.png",
+            "role": "top"
+          },
+          {
+            "id": "107577675767857598",
+            "summonerName": "Gryffinn",
+            "firstName": "Johnson",
+            "lastName": "Le",
+            "image": "http://static.lolesports.com/players/1769149987501_AME_LCS26S1_FLY_GRYFFINN.png",
+            "role": "jungle"
+          },
+          {
+            "id": "110535834235603720",
+            "summonerName": "Cryogen",
+            "firstName": "Michael",
+            "lastName": "Luu",
+            "image": "http://static.lolesports.com/players/1769149918320_AME_LCS26S1_FLY_CRYOGEN.png",
+            "role": "support"
+          },
+          {
+            "id": "108369186353082038",
+            "summonerName": "Massu",
+            "firstName": "Abdulmalek",
+            "lastName": "Fahad",
+            "image": "http://static.lolesports.com/players/1769150023296_AME_LCS26S1_FLY_MASSU.png",
+            "role": "bottom"
+          },
+          {
+            "id": "110219103969081067",
+            "summonerName": "Quad",
+            "firstName": "Suhyeong",
+            "lastName": "Song",
+            "image": "http://static.lolesports.com/players/1769150064862_AME_LCS26S1_FLY_QUAD.png",
+            "role": "mid"
+          }
+        ]
+      },
+      {
+        "id": "99566408221961358",
+        "slug": "red-kalunga",
+        "name": "RED Kalunga",
+        "code": "RED",
+        "image": "http://static.lolesports.com/teams/1631820575924_red-2021-worlds.png",
+        "alternativeImage": null,
+        "backgroundImage": "http://static.lolesports.com/teams/REDCanidsRED.png",
+        "status": "active",
+        "homeLeague": {
+          "name": "CBLOL",
+          "region": "BRAZIL"
+        },
+        "players": [
+          {
+            "id": "103743617977630492",
+            "summonerName": "Aegis",
+            "firstName": "Gabriel",
+            "lastName": "Lemos",
+            "image": "http://static.lolesports.com/players/1737725725326_image634.png",
+            "role": "jungle"
+          },
+          {
+            "id": "108395451349202875",
+            "summonerName": "Morttheus",
+            "firstName": "Matheus",
+            "lastName": "Motta",
+            "image": "http://static.lolesports.com/players/1785142373432_RED_Morttheus-1copy.png",
+            "role": "bottom"
+          },
+          {
+            "id": "111734785118050063",
+            "summonerName": "jmz",
+            "firstName": "Jo\u00e3o",
+            "lastName": "Loureiro",
+            "image": "http://static.lolesports.com/players/1717435024791_Jmz.png",
+            "role": "top"
+          },
+          {
+            "id": "107559338252333149",
+            "summonerName": "Fuuu",
+            "firstName": "Gabriel",
+            "lastName": "Furuya",
+            "image": "http://static.lolesports.com/players/1785142378404_RED_Fuuu-1copy.png",
+            "role": "mid"
+          },
+          {
+            "id": "111734845200890741",
+            "summonerName": "zynts",
+            "firstName": "Matheus",
+            "lastName": "Silva",
+            "image": "http://static.lolesports.com/players/1785142349477_RED_Zynts-1copy.png",
+            "role": "top"
+          },
+          {
+            "id": "107559668094235248",
+            "summonerName": "STEPZ",
+            "firstName": "Eloy",
+            "lastName": "Rodriguez",
+            "image": "http://static.lolesports.com/players/1785142383650_RED_Stepz-1copy.png",
+            "role": "jungle"
+          },
+          {
+            "id": "116915008919095996",
+            "summonerName": "smooth",
+            "firstName": "Anthony",
+            "lastName": "Bonatto",
+            "image": "http://static.lolesports.com/players/default-headshot.png",
+            "role": "jungle"
+          },
+          {
+            "id": "116915009014636741",
+            "summonerName": "Nukenin",
+            "firstName": "Davi",
+            "lastName": "Loureiro",
+            "image": "http://static.lolesports.com/players/default-headshot.png",
+            "role": "mid"
+          },
+          {
+            "id": "116915009116614247",
+            "summonerName": "Nanashi",
+            "firstName": "Giuliano",
+            "lastName": "de Lorenzo",
+            "image": "http://static.lolesports.com/players/default-headshot.png",
+            "role": "bottom"
+          },
+          {
+            "id": "109518716685978765",
+            "summonerName": "Manel",
+            "firstName": "Emanuel",
+            "lastName": "Lopes",
+            "image": "http://static.lolesports.com/players/1717430231339_Manel.png",
+            "role": "support"
+          },
+          {
+            "id": "108395422235497387",
+            "summonerName": "frosty",
+            "firstName": "Jos\u00e9",
+            "lastName": "Leal",
+            "image": "http://static.lolesports.com/players/1785142368737_RED_Frosty-1copy.png",
+            "role": "support"
+          }
+        ]
+      }
+    ]
+  }
+}

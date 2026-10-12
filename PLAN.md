@@ -24,12 +24,12 @@ Twitch watcher (streamlink metadata poll ~60 s: live? category?)
 | --- | --- |
 | `channel` | Watch list: platform, login, enabled |
 | `stream_session` | One live broadcast: start/end times, audio path |
-| `segment` | Category spans within a session, plus the Pack |
+| `segment` | Category/title boundaries on the session audio clock, plus the Pack; end derived from the next boundary |
 | `capture_leg` | One streamlink→ffmpeg run: position on the session audio clock, wall-clock start, archive file |
 | `utterance` | Transcript text, session-relative and wall-clock times, Speaker label, Transcriber used |
 | `transcript_span` | Audio ranges a Transcriber has finalized; the exactly-once key and the completeness watermark |
 | `speaker_map` | Speaker label → role, probability, who decided it and when |
-| `gate_window` | Window bounds, the state the Gate saw, status, inferred Mode and its probability |
+| `gate_window` | Window bounds, the state the Gate saw, status, inferred Mode and its probability, Game key |
 | `note` | JSONB body, Pack, Mode, `schema_version`, model, time span, Game key |
 | `rule` | Owner, instructions, Pack scope, threshold, Cooldown, enabled |
 | `gate_decision` | Window × Rule: the question asked, probability, threshold, passed |
@@ -56,7 +56,8 @@ Each phase ends with something that can be observed working.
 - Twitch watcher, Source, Muse Transcriber (Groq Fallback), audio archive, Backfill of crash gaps from the archive.
 - Speaker map, Windows, Mode, and the Gate with every Rule in one Jev call.
 - Extraction, Novelty check, and Cooldown; Telegram Notifier with 👍/👎.
-- Notes on a schedule using the League Pack: Vocabulary, Notes schemas, and `get_live_match` from the `live-lol-esports` lolesports client.
+- League Vocabulary and `get_live_match` from the `live-lol-esports` lolesports client are implemented (issue #6). Recorded Caedrel name audit: 15 errors with title-only, 9 with match Vocabulary. Teams and picks reach the Gate in replay; the live feed still needs verification during a pro match. The public endpoints do not expose bans.
+- Notes on a schedule using the League Pack's Notes schemas.
 - Cost ledger and Budget caps.
 - Minimal web app: live transcript, Notes timeline, Rule editor, Review queue.
 - **Done when:** during a live Caedrel co-stream, a "predicts the winner" Rule alerts within about 60 s with his reasoning, sends no duplicate for the same game, and the session's cost is visible.

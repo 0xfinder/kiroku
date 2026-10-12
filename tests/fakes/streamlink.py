@@ -29,8 +29,8 @@ if "--json" in args:
                     "metadata": {
                         "id": stream_id,
                         "author": "Fake",
-                        "category": "Dota 2",
-                        "title": "fake stream",
+                        "category": os.environ.get("FAKE_CATEGORY", "Dota 2"),
+                        "title": os.environ.get("FAKE_TITLE", "fake stream"),
                     },
                     "streams": {"audio_only": {}},
                 }

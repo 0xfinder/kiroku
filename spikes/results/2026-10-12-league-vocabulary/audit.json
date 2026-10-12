@@ -1,0 +1,291 @@
+{
+  "vod": "https://www.twitch.tv/videos/2895001169",
+  "offset_seconds": 4200,
+  "duration_seconds": 611.072,
+  "method": "Reading-only audit of grammatical English clauses with match champion/player mentions. One name occurrence is one reference item. Case does not matter; canonical spelling does. No listening reference. Misses are visible clause omissions in the aligned second transcript.",
+  "excluded": "Background caster garble and ungrammatical repetitions cannot establish a reading-only reference. Excludes all of chunk0; the garbled prefix of chunk23; chunk25 Xion ult (uncertain referent); chunk28 repetitive DRAKE, Rumble and Mastu; chunk29 initial DRAKE, Rumble; chunk30 caster suffix. Baus/Baos and Basil are outside the ten-player match roster. Full transcripts retained, including regressions.",
+  "champions": [
+    "Rumble",
+    "Wukong",
+    "Orianna",
+    "Xayah",
+    "Rakan",
+    "Ornn",
+    "Nocturne",
+    "Syndra",
+    "Yunara",
+    "Lulu"
+  ],
+  "players": [
+    "zynts",
+    "Aegis",
+    "Fuuu",
+    "Morttheus",
+    "Manel",
+    "Gakgos",
+    "Gryffinn",
+    "Quad",
+    "Massu",
+    "Cryogen"
+  ],
+  "chunks": [
+    {
+      "chunk": 1,
+      "reference": [
+        "Xayah",
+        "Wukong",
+        "Rumble"
+      ],
+      "title": [],
+      "pack": []
+    },
+    {
+      "chunk": 2,
+      "reference": [
+        "Wukong",
+        "Aegis",
+        "Gryffinn"
+      ],
+      "title": [
+        {
+          "name": "Gryffinn",
+          "observed": "Griffin",
+          "kind": "spelling"
+        }
+      ],
+      "pack": []
+    },
+    {
+      "chunk": 3,
+      "reference": [
+        "Syndra",
+        "Aegis",
+        "Gakgos",
+        "Wukong"
+      ],
+      "title": [
+        {
+          "name": "Syndra",
+          "observed": "Xindra",
+          "kind": "spelling"
+        },
+        {
+          "name": "Gakgos",
+          "observed": "Gatgos",
+          "kind": "spelling"
+        }
+      ],
+      "pack": [
+        {
+          "name": "Syndra",
+          "observed": "Xindra",
+          "kind": "spelling"
+        }
+      ]
+    },
+    {
+      "chunk": 4,
+      "reference": [
+        "Gakgos",
+        "Rumble"
+      ],
+      "title": [
+        {
+          "name": "Gakgos",
+          "observed": "Gatgos",
+          "kind": "spelling"
+        }
+      ],
+      "pack": []
+    },
+    {
+      "chunk": 5,
+      "reference": [
+        "Rumble",
+        "Rumble"
+      ],
+      "title": [],
+      "pack": []
+    },
+    {
+      "chunk": 7,
+      "reference": [
+        "Wukong"
+      ],
+      "title": [],
+      "pack": []
+    },
+    {
+      "chunk": 8,
+      "reference": [
+        "Rumble",
+        "Ornn"
+      ],
+      "title": [],
+      "pack": [
+        {
+          "name": "Ornn",
+          "observed": "Oren",
+          "kind": "spelling"
+        }
+      ]
+    },
+    {
+      "chunk": 23,
+      "reference": [
+        "Ornn",
+        "Yunara"
+      ],
+      "title": [
+        {
+          "name": "Ornn",
+          "observed": "Orn",
+          "kind": "spelling"
+        },
+        {
+          "name": "Yunara",
+          "observed": "Eunara",
+          "kind": "spelling"
+        }
+      ],
+      "pack": [
+        {
+          "name": "Ornn",
+          "observed": "orn",
+          "kind": "spelling"
+        }
+      ]
+    },
+    {
+      "chunk": 24,
+      "reference": [
+        "Yunara",
+        "Lulu",
+        "Syndra",
+        "Ornn",
+        "Yunara",
+        "Lulu",
+        "Wukong"
+      ],
+      "title": [
+        {
+          "name": "Yunara",
+          "observed": "Yuen Arna",
+          "kind": "spelling"
+        },
+        {
+          "name": "Lulu",
+          "observed": "Lulul",
+          "kind": "spelling"
+        },
+        {
+          "name": "Syndra",
+          "observed": "Xindela",
+          "kind": "spelling"
+        },
+        {
+          "name": "Ornn",
+          "observed": "Oren",
+          "kind": "spelling"
+        },
+        {
+          "name": "Yunara",
+          "observed": "Eunara",
+          "kind": "spelling"
+        },
+        {
+          "name": "Lulu",
+          "observed": "Lulul",
+          "kind": "spelling"
+        },
+        {
+          "name": "Wukong",
+          "observed": "Mookong",
+          "kind": "spelling"
+        }
+      ],
+      "pack": [
+        {
+          "name": "Syndra",
+          "observed": "Xindra",
+          "kind": "spelling"
+        },
+        {
+          "name": "Ornn",
+          "observed": "Oren",
+          "kind": "spelling"
+        },
+        {
+          "name": "Wukong",
+          "observed": "Mukong",
+          "kind": "spelling"
+        }
+      ]
+    },
+    {
+      "chunk": 26,
+      "reference": [
+        "Rumble",
+        "Aegis",
+        "Rumble"
+      ],
+      "title": [],
+      "pack": []
+    },
+    {
+      "chunk": 27,
+      "reference": [
+        "Rumble",
+        "Orianna",
+        "Syndra",
+        "Syndra",
+        "Yunara"
+      ],
+      "title": [
+        {
+          "name": "Syndra",
+          "observed": "Zindra",
+          "kind": "spelling"
+        },
+        {
+          "name": "Syndra",
+          "observed": "Zindra",
+          "kind": "spelling"
+        }
+      ],
+      "pack": [
+        {
+          "name": "Rumble",
+          "observed": null,
+          "kind": "miss"
+        },
+        {
+          "name": "Syndra",
+          "observed": "Zindra",
+          "kind": "spelling"
+        },
+        {
+          "name": "Syndra",
+          "observed": "Zindra",
+          "kind": "spelling"
+        }
+      ]
+    },
+    {
+      "chunk": 29,
+      "reference": [
+        "Yunara"
+      ],
+      "title": [],
+      "pack": []
+    },
+    {
+      "chunk": 31,
+      "reference": [
+        "Yunara"
+      ],
+      "title": [],
+      "pack": []
+    }
+  ]
+}

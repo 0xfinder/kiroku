@@ -211,3 +211,29 @@ D23 accepted that a crash loses queued audio from the transcript but not from th
 - **Revisit if:**
   - The Transcriber changes mid-session. Gaps are counted per Transcriber, so the new one would backfill every leg.
   - More channels share a key than the background lane's headroom allows.
+
+## D26. League Pack context and Vocabulary (issue #6)
+
+2026-10-12. The CLI maps Category `League of Legends` to `league` and injects the selector. Core depends on a Protocol with a name, Vocabulary, and an optional live-context call. The first interface contains only what the live transcript uses; Notes schemas wait for Notes. The CLI is the composition root exception to the Pack import ban.
+
+- Free Data Dragon champion/item catalogues and current lolesports rosters use a 24-hour disk cache under the data dir. Parsing precedes cache writes, and invalid cache shapes trigger refetch. lolesports uses its public browser key, overridable with `KIROKU_LOLESPORTS_API_KEY`; it is not a secret or a billed provider call.
+- A session refreshes Pack data beside capture every 60 s. A failed refresh clears both outputs, falls back to title-only Vocabulary and no live context, and retries next time. Category/title changes wake the refresh; results from an earlier metadata revision cannot overwrite the current one.
+- Whisper cannot hold the catalogue in its 224-token prompt. The live game's actual teams, players and champions take priority; substitutes and unrelated catalogue names stay out. Without a live match, use the title's teams' rosters and catalogue names explicitly mentioned in the title. Vocabulary is at most 350 characters and long Vocabulary leaves a 200-character continuity tail. Final prompts measured 82–152 Whisper tokens on the Caedrel clip. Character limits are a heuristic, not a token guarantee for arbitrary text.
+- A live event must match a team name/code in the title and be unambiguous. A game between games has no live summary. The public window feed provides picks and players; the recorded endpoints expose no bans. `bans: null` states that limitation. No champion statistics or item stats enter the Gate.
+- The Gate gets `context.live` only when a validated live match exists. Its Mode answer remains authoritative. A Window gets a Game key only when Mode is `watching_pro`. The key is `league:<event id>:<game number>`.
+- Category, title and Pack changes are stored on the captured audio clock in `segment`. This small table was added after review found that closed-session recovery otherwise omitted Pack-scoped Rules. A Window uses the Segment at its start. End bounds derive from the next row or the session's end. Title updates also record a metadata boundary; a restart with identical metadata adds no row. A restart removes boundaries beyond the durable resumed clock, because uncommitted capture can have reached further before a crash. A failed metadata write retains its first observed boundary; the watcher retries it before reading another probe, and the Gate waits before processing Windows starting past that pending boundary.
+- New live context is bounded by its observed position on the captured audio clock. A restart backlog or a Window starting before a changed game has no live summary/key, rather than receiving the current game's key. Historical live snapshots are not reconstructed; recorded Windows retain the context they actually saw. Pre-feature sessions with no Segment retain their previous unscoped recovery behavior.
+
+Measured results and the reading-only audit are in [spikes/README.md](../spikes/README.md). The compact live summary still affects Jev: a draft Rule rose from 0.10–0.11 without live data to 0.60–0.62 with it, below its 0.70 threshold, on in-game commentary. One of three chatting repeats was classified `watching_pro` with live metadata. This is recorded, not treated as proof of calibrated live accuracy. Test Rule wording against real live-context Windows before relying on it.
+
+Rejected: dumping every champion/item/player into Whisper; choosing an arbitrary concurrent match; fabricating bans; making a Pack outage stop capture. Revisit after an actual pro match verifies the feed clock and Mode/Rule quality, and when Dota exposes which interface choices need to change.
+
+## D27. Independent Pack refresh and declared Categories (issue #6 review)
+
+2026-10-12. Supersedes D26's selection, refresh-failure, and cache details. The Pack Protocol declares `categories`. The CLI builds a generic Category selector from one Pack factory registry and derives `PACK_NOT_LIVE` warnings from that registry. Adding a Pack requires one registry entry. The Gate's Pack scope comes only from the Window's stored Segment; the current-Pack callback is removed.
+
+Live context and Vocabulary refresh independently with separate timeouts. A live-feed failure clears the previous Game key while catalogue and roster Vocabulary remain available. A Vocabulary failure leaves validated live context available to the Gate. Category revisions still discard obsolete refresh results.
+
+The 24-hour disk cache validates expired copies too. A failed fetch or invalid response serves a usable stale copy with a warning and leaves its timestamp unchanged, so the next refresh retries. Without a usable copy the error propagates to the optional Pack refresh. Catalogue parsing is memoized by parser and file mtime, so changed files invalidate the memo. Roster parsing skips players with missing or empty names. Team and catalogue title matching share whole-word matching.
+
+The Secrets policy explicitly permits the public lolesports website key as a commented, named constant with an environment override. User API keys remain outside the repository. The measured effect of live picks on the draft Rule remains a limit to monitor through Labels in #5; the Gate wording and recordings are unchanged.

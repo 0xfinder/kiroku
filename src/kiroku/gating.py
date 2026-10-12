@@ -27,7 +27,7 @@ from typing import Literal
 import psycopg
 from psycopg.types.json import Jsonb
 
-from kiroku import ledger, rules
+from kiroku import ledger, rules, segments
 from kiroku.budget import BudgetGuard, OverBudget
 from kiroku.db import Pool
 from kiroku.gate import (
@@ -36,6 +36,7 @@ from kiroku.gate import (
     GateAuthError,
     GateFailed,
     GateRequest,
+    Mode,
     RuleQuestion,
     passes,
     rule_question,
@@ -51,6 +52,7 @@ from kiroku.gate.windows import (
     due_windows,
 )
 from kiroku.ledger import CostEntry
+from kiroku.pack import LiveContext
 
 log = logging.getLogger(__name__)
 
@@ -142,6 +144,7 @@ async def commit(
     state: GateState,
     questions: Sequence[RuleQuestion],
     outcome: Outcome,
+    game_key: str | None = None,
 ) -> bool:
     """Store one gated Window. Returns False when it was already stored (nothing written)."""
     match outcome:
@@ -158,7 +161,7 @@ async def commit(
             """
             INSERT INTO gate_window (session_id, start_ms, end_ms, transcriber, started_at,
                                      covered_ms, state, status, reason, model, mode,
-                                     mode_probability)
+                                     mode_probability, game_key)
             VALUES (%(s)s, %(start)s, %(end)s, %(t)s,
                     (SELECT l.started_at + (%(start)s - l.audio_start_ms) * interval '1 ms'
                      FROM capture_leg l
@@ -172,7 +175,8 @@ async def commit(
                      FROM transcript_span
                      WHERE session_id = %(s)s AND transcriber = %(t)s
                        AND audio_start_ms < %(end)s AND audio_end_ms > %(start)s),
-                    %(state)s, %(status)s, %(reason)s, %(model)s, %(mode)s, %(mode_p)s)
+                    %(state)s, %(status)s, %(reason)s, %(model)s, %(mode)s, %(mode_p)s,
+                    %(game_key)s)
             ON CONFLICT (session_id, start_ms) DO NOTHING
             RETURNING id
             """,
@@ -187,6 +191,7 @@ async def commit(
                 "model": model,
                 "mode": mode.value if mode else None,
                 "mode_p": mode_p,
+                "game_key": game_key,
             },
         )
         if (row := await cur.fetchone()) is None:
@@ -221,7 +226,9 @@ class GateLoop:
         guard: BudgetGuard,
         stream: Callable[[], Mapping[str, JSON]],
         *,
-        pack: Callable[[], str | None] = lambda: None,
+        live: Callable[[Bounds], LiveContext | None] = lambda bounds: None,
+        use_segments: bool = False,
+        blocked_from: Callable[[], int | None] = lambda: None,
         policy: WindowPolicy | None = None,
         poll_s: float = POLL_S,
     ) -> None:
@@ -231,7 +238,9 @@ class GateLoop:
         self._gate = gate
         self._guard = guard
         self._stream = stream
-        self._pack = pack
+        self._live = live
+        self._use_segments = use_segments
+        self._blocked_from = blocked_from
         self._policy = policy or WindowPolicy()
         self._poll_s = poll_s
         self._wake = asyncio.Event()
@@ -278,6 +287,9 @@ class GateLoop:
     async def _pass(self, *, final: bool) -> None:
         next_start, watermark = await progress(self._pool, self._session_id, self._transcriber)
         for bounds in due_windows(next_start, watermark, self._policy, final=final):
+            pending = self._blocked_from()
+            if pending is not None and bounds.start_ms >= pending:
+                return  # the original metadata boundary is being retried in the watcher
             window_turns = await turns(
                 self._pool,
                 self._session_id,
@@ -285,10 +297,35 @@ class GateLoop:
                 bounds.start_ms - self._policy.context_lookback_ms,
                 bounds.end_ms,
             )
-            state = build_state(bounds, window_turns, self._stream(), self._policy)
-            questions = [rule_question(r) for r in await rules.active(self._pool, self._pack())]
+            segment = (
+                await segments.at(self._pool, self._session_id, bounds.start_ms)
+                if self._use_segments
+                else None
+            )
+            stream = self._stream()
+            pack = None
+            if segment is not None:
+                stream = {"title": segment.title}
+                if segment.category:
+                    stream["category"] = segment.category
+                pack = segment.pack
+            elif self._use_segments:
+                stream = {"title": stream.get("title", "")}
+                pack = None  # no historical Category evidence in pre-feature sessions
+            state = build_state(bounds, window_turns, stream, self._policy)
+            live = self._live(bounds)
+            if live is not None:
+                state = GateState({**state.context, "live": dict(live.summary)}, state.new)
+            questions = [rule_question(r) for r in await rules.active(self._pool, pack)]
             outcome = await self._ask(state, questions)
-            await self._commit(bounds, state, questions, outcome)
+            game_key = (
+                live.game_key
+                if live is not None
+                and isinstance(outcome, Answered)
+                and outcome.answer.mode == Mode.WATCHING_PRO
+                else None
+            )
+            await self._commit(bounds, state, questions, outcome, game_key)
             _log_window(self._session_id, bounds, questions, outcome)
 
     async def _ask(self, state: GateState, questions: Sequence[RuleQuestion]) -> Outcome:
@@ -309,6 +346,7 @@ class GateLoop:
         state: GateState,
         questions: Sequence[RuleQuestion],
         outcome: Outcome,
+        game_key: str | None = None,
     ) -> None:
         """Retry the commit, never the paid call that produced the outcome."""
         delay = 1.0
@@ -322,6 +360,7 @@ class GateLoop:
                     state,
                     questions,
                     outcome,
+                    game_key,
                 )
                 return
             except psycopg.OperationalError as e:
