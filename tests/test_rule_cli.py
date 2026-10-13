@@ -37,7 +37,16 @@ NEW = (
 @pytest.fixture
 def kiroku(database_url: str) -> Callable[..., Any]:
     runner = CliRunner()
-    env = {"KIROKU_DATABASE_URL": database_url, "KIROKU_SECRETS_FILE": "/x", "JEV_API_KEY": "k"}
+    env = {
+        "KIROKU_DATABASE_URL": database_url,
+        "KIROKU_SECRETS_FILE": "/x",
+        "JEV_API_KEY": "k",
+        # Typer's error panel is coloured on CI (GITHUB_ACTIONS), and colour codes split the
+        # option names the assertions look for.
+        "NO_COLOR": "1",
+        "FORCE_COLOR": "",
+        "GITHUB_ACTIONS": "",
+    }
 
     def run(*args: str, extra: dict[str, str] | None = None) -> Any:
         return runner.invoke(app, ["rule", *args], env=env | (extra or {}))
