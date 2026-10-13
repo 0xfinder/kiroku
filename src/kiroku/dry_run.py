@@ -9,7 +9,7 @@ Cost ledger row (purpose rule_test, no session) and counts against the monthly B
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, cast
 
@@ -70,11 +70,13 @@ async def run(
     guard: BudgetGuard,
     question: RuleQuestion,
     windows: Sequence[StoredWindow],
+    *,
+    progress: Callable[[Trial], None] | None = None,
 ) -> list[Trial]:
     """One paid call per Window, a few at a time. Decisions are not stored; costs are."""
     slots = asyncio.Semaphore(CONCURRENCY)
 
-    async def one(window: StoredWindow) -> Trial:
+    async def evaluate(window: StoredWindow) -> Trial:
         request = GateRequest(window.state, (question,), guard, Purpose.RULE_TEST, ask_mode=False)
         async with slots:
             try:
@@ -89,6 +91,12 @@ async def run(
                 return Trial(window, None, e.reason)
         await _record(pool, answer.costs)
         return Trial(window, answer.probabilities[question.rule_id])
+
+    async def one(window: StoredWindow) -> Trial:
+        trial = await evaluate(window)
+        if progress is not None:
+            progress(trial)
+        return trial
 
     # Let every call finish and record its cost before an error (a wrong key, a database
     # blip) propagates: a paid call must never miss the ledger.

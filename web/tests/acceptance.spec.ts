@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import { z } from 'zod';
-import { sessionSchema } from '../src/lib/api';
+import { sessionSchema, ruleSchema } from '../src/lib/api';
 
 declare global {
   interface Window {
@@ -41,11 +41,20 @@ test('phone live updates, Notes links, Rules, Review persistence and undo', asyn
   const session = sessions[0];
   if (!session) throw new Error('fixture has no session');
   await page.setViewportSize({ width: 390, height: 844 });
+  const transcriptOffsets: number[] = [];
+  page.on('request', (req) => {
+    if (req.url().includes('/transcript?'))
+      transcriptOffsets.push(
+        Number(new URL(req.url()).searchParams.get('after_ms')),
+      );
+  });
   await page.goto(`/session/${session.id}`);
   await expect(page.getByTestId('transcript')).toContainText(
     'Draft discussion 35',
   );
   await expect(page.getByText('Connected', { exact: true })).toBeVisible();
+  await expect.poll(() => transcriptOffsets.length).toBe(2);
+  expect(transcriptOffsets).toEqual([-1, 175000]);
   let navigations = 0;
   page.on('framenavigated', (frame) => {
     if (frame === page.mainFrame()) navigations++;
@@ -94,12 +103,28 @@ test('phone live updates, Notes links, Rules, Review persistence and undo', asyn
     'Historical Backfill appeared',
   );
   expect(navigations).toBe(0);
+  expect(transcriptOffsets.filter((at) => at === -1)).toHaveLength(1);
+  expect(transcriptOffsets).toContain(999);
+  expect(transcriptOffsets).toContain(1999);
   expect(
     await page
       .getByTestId('transcript')
       .getByText('Live speech arrived without a reload')
       .count(),
   ).toBe(1);
+  // A dropped connection must recover historical speech missed while offline.
+  await page.context().setOffline(true);
+  action('disconnect');
+  await expect(page.getByText('Reconnecting', { exact: true })).toBeVisible();
+  action('backfill-third');
+  await page.context().setOffline(false);
+  await expect(page.getByTestId('transcript')).toContainText(
+    'Offline Backfill appeared',
+  );
+  await expect(page.getByText('Connected', { exact: true })).toBeVisible();
+  await expect
+    .poll(() => transcriptOffsets.filter((at) => at === -1).length)
+    .toBe(2);
   // Reading older speech pauses following; the explicit control returns to live.
   await page.getByTestId('transcript').evaluate((element) => {
     element.scrollTop = 0;
@@ -124,13 +149,74 @@ test('phone live updates, Notes links, Rules, Review persistence and undo', asyn
   await page
     .getByLabel('Instructions', { exact: true })
     .fill('Does the streamer name a favorite?');
+  // A CLI disable after the form loaded must survive a wording-only save.
+  const disable = await request.post('/api/rules/predicts_winner/disable');
+  expect(disable.ok()).toBe(true);
   await page.getByRole('button', { name: 'Save Rule' }).click();
   await expect(page.getByRole('status')).toContainText('Rule saved');
+  expect(
+    z
+      .array(ruleSchema)
+      .parse(await (await request.get('/api/rules')).json())
+      .find((rule) => rule.name === 'predicts_winner')?.enabled,
+  ).toBe(false);
   await page
     .getByRole('button', { name: 'Test against recent windows' })
     .click();
   await expect(page.getByRole('alertdialog')).toContainText('Estimated cost');
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await page.route('**/api/rules/predicts_winner/test', (route) =>
+    route.fulfill({
+      status: 202,
+      json: { id: 'browser-job', status: 'running', completed: 0, total: 2 },
+    }),
+  );
+  let polls = 0;
+  await page.route('**/api/rule-tests/browser-job', (route) => {
+    polls++;
+    if (polls === 2)
+      return route.fulfill({
+        status: 503,
+        json: { detail: 'Results temporarily unavailable' },
+      });
+    return route.fulfill({
+      json:
+        polls === 1
+          ? { id: 'browser-job', status: 'running', completed: 1, total: 2 }
+          : {
+              id: 'browser-job',
+              status: 'completed',
+              completed: 2,
+              total: 2,
+              report: {
+                question: 'Favorite?',
+                threshold: 0.7,
+                trials: [],
+                scored: 2,
+                passed: 1,
+                failed: 0,
+                pass_rate: 0.5,
+                histogram: [1, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+                highest: [],
+                lowest: [],
+                report: '1 of 2',
+              },
+            },
+    });
+  });
+  await page
+    .getByRole('button', { name: 'Test against recent windows' })
+    .click();
+  await page.getByRole('button', { name: 'Confirm paid test' }).click();
+  await expect(page.getByRole('status')).toContainText('1 of 2 Windows tested');
+  await expect(page.getByRole('alert')).toContainText(
+    'Results temporarily unavailable',
+  );
+  await page.getByRole('button', { name: 'Resume test results' }).click();
+  await expect(
+    page.getByRole('heading', { name: '1 of 2 Windows pass' }),
+  ).toBeVisible();
+  expect(polls).toBeGreaterThanOrEqual(2);
   const shots = resolve('../docs/web/screenshots');
   mkdirSync(shots, { recursive: true });
   for (const [label, width, height] of [

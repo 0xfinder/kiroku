@@ -14,6 +14,7 @@ from typing import Any, Literal, cast
 from uuid import UUID, uuid4
 
 import psycopg
+from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from kiroku import gating, ledger, segments, transcript
@@ -646,23 +647,10 @@ def timeline(row: Mapping[str, Any]) -> str:
 
 async def timeline_rows(pool: Pool, session_id: int) -> list[dict[str, Any]]:
     """Timeline including pending statuses; never expose prompts or raw model attempts."""
-    async with pool.connection() as conn:
-        cur = await conn.execute(
+    async with pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+        await cur.execute(
             "SELECT id,start_ms,end_ms,pack,mode,status,body,schema_name,schema_version "
             "FROM note WHERE session_id=%s ORDER BY start_ms",
             [session_id],
         )
-        names = [col.name for col in cur.description or ()]
-        return [dict(zip(names, row, strict=True)) for row in await cur.fetchall()]
-
-
-async def count_for_session(pool: Pool, session_id: int) -> int:
-    async with pool.connection() as conn:
-        row = await (
-            await conn.execute(
-                "SELECT count(*) FROM note WHERE session_id=%s",
-                [session_id],
-            )
-        ).fetchone()
-    assert row is not None
-    return row[0]
+        return list(await cur.fetchall())

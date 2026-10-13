@@ -39,6 +39,11 @@ async def commit(pool: Pool, session_id: int, transcriber: str, result: Result) 
 
 async def _commit_once(pool: Pool, session_id: int, transcriber: str, result: Result) -> bool:
     async with pool.connection() as conn, conn.transaction():
+        # IDs must become visible in allocation order within a session. Otherwise a
+        # later commit with a lower ID could disappear behind an SSE commit cursor.
+        await conn.execute(
+            "SELECT id FROM stream_session WHERE id=%s FOR NO KEY UPDATE", [session_id]
+        )
         cur = await conn.execute(
             """
             INSERT INTO transcript_span (session_id, transcriber, audio_start_ms, audio_end_ms)
@@ -132,29 +137,48 @@ class Row:
     transcriber: str
 
 
-async def page(pool: Pool, session_id: int, *, after_ms: int, limit: int) -> list[Row]:
+async def page(
+    pool: Pool, session_id: int, *, after_ms: int, limit: int, through_id: int | None = None
+) -> list[Row]:
     """Oldest first; never split utterances sharing one SSE audio-clock ID."""
     async with pool.connection() as conn:
         cur = await conn.execute(
             "WITH offsets AS (SELECT DISTINCT audio_start_ms FROM utterance "
             "WHERE session_id=%(s)s AND audio_start_ms>%(after)s "
+            "AND (%(id)s::bigint IS NULL OR id<=%(id)s) "
             "ORDER BY audio_start_ms LIMIT %(limit)s) "
             "SELECT id,u.audio_start_ms,audio_end_ms,spoken_at,text,transcriber "
             "FROM utterance u JOIN offsets o USING(audio_start_ms) WHERE session_id=%(s)s "
+            "AND (%(id)s::bigint IS NULL OR id<=%(id)s) "
             "ORDER BY u.audio_start_ms,id",
-            {"s": session_id, "after": after_ms, "limit": limit},
+            {"s": session_id, "after": after_ms, "limit": limit, "id": through_id},
         )
         return [Row(*row) for row in await cur.fetchall()]
 
 
-async def count_through(pool: Pool, session_id: int, through_ms: int) -> int:
-    """Rows at or behind a stream cursor. A rise beyond rows sent is late Backfill."""
+async def latest_id(pool: Pool, session_id: int) -> int:
     async with pool.connection() as conn:
         row = await (
             await conn.execute(
-                "SELECT count(*) FROM utterance WHERE session_id=%s AND audio_start_ms<=%s",
-                [session_id, through_ms],
+                "SELECT coalesce(max(id),0) FROM utterance WHERE session_id=%s", [session_id]
             )
         ).fetchone()
     assert row is not None
     return row[0]
+
+
+async def changes(
+    pool: Pool, session_id: int, after_id: int, through_ms: int
+) -> tuple[int, int | None]:
+    """Read only newly committed rows; return their ID cursor and earliest late offset."""
+    async with pool.connection() as conn:
+        row = await (
+            await conn.execute(
+                "SELECT coalesce(max(id),%(id)s),"
+                "min(audio_start_ms) FILTER (WHERE audio_start_ms<=%(ms)s) "
+                "FROM utterance WHERE session_id=%(s)s AND id>%(id)s",
+                {"s": session_id, "id": after_id, "ms": through_ms},
+            )
+        ).fetchone()
+    assert row is not None
+    return row[0], row[1]

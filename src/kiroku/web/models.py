@@ -34,6 +34,10 @@ class Utterance(Model):
     transcriber: str
 
 
+class TranscriptCursor(Model):
+    id: int
+
+
 class Note(Model):
     id: int
     start_ms: int
@@ -117,6 +121,29 @@ class TestReport(Model):
     highest: list[Trial]
     lowest: list[Trial]
     report: str
+
+
+class TestProgress(Model):
+    id: str
+    completed: int
+    total: int
+
+
+class RunningTest(TestProgress):
+    status: Literal["running"] = "running"
+
+
+class CompletedTest(TestProgress):
+    status: Literal["completed"] = "completed"
+    report: TestReport
+
+
+class FailedTest(TestProgress):
+    status: Literal["failed"] = "failed"
+    error: str
+
+
+type TestJob = Annotated[RunningTest | CompletedTest | FailedTest, Field(discriminator="status")]
 
 
 class Review(Model):

@@ -6,11 +6,11 @@
     request,
     message,
     ruleSchema,
-    reportSchema,
+    testJobSchema,
     type Rule,
     type Report,
   } from '#lib/api.ts';
-  import { clock } from '#lib/helpers.ts';
+  import { clock, ruleEditBody } from '#lib/helpers.ts';
   let rules = $state<Rule[]>([]);
   let selected = $state<string | null>(null);
   let name = $state('');
@@ -19,6 +19,10 @@
   let cooldown = $state(600);
   let pack = $state('');
   let enabled = $state(true);
+  let loadedEnabled: boolean | null = null;
+  let testId = $state<string | null>(null);
+  let progress = $state('');
+  let destroyed = false;
   let error = $state('');
   let notice = $state('');
   let loading = $state(true);
@@ -36,6 +40,7 @@
     cooldown = rule?.cooldown_s ?? 600;
     pack = rule?.pack ?? '';
     enabled = rule?.enabled ?? true;
+    loadedEnabled = rule?.enabled ?? null;
     report = null;
     error = '';
     notice = '';
@@ -57,13 +62,16 @@
     busy = true;
     error = '';
     try {
-      const body = {
-        instructions,
-        threshold,
-        cooldown_s: cooldown,
-        pack: pack || null,
-        enabled,
-      };
+      const body = ruleEditBody(
+        {
+          instructions,
+          threshold,
+          cooldown_s: cooldown,
+          pack: pack || null,
+          enabled,
+        },
+        loadedEnabled,
+      );
       const saved = ruleSchema.parse(
         await request(selected ? `/rules/${selected}` : '/rules', {
           method: selected ? 'PATCH' : 'POST',
@@ -83,22 +91,53 @@
     confirm = false;
     testing = true;
     error = '';
+    notice = '';
+    progress = '';
     report = null;
     try {
-      report = reportSchema.parse(
+      const job = testJobSchema.parse(
         await request(`/rules/${selected}/test`, {
           method: 'POST',
           body: JSON.stringify({ instructions, threshold, last }),
         }),
       );
+      testId = job.id;
+      await pollTest();
     } catch (e) {
       error = message(e);
     } finally {
       testing = false;
     }
   }
+  async function pollTest() {
+    testing = true;
+    error = '';
+    try {
+      while (!destroyed && testId) {
+        const job = await read(`/rule-tests/${testId}`, testJobSchema);
+        progress = `${job.completed} of ${job.total} Windows tested`;
+        if (job.status === 'completed') {
+          report = job.report;
+          testId = null;
+          break;
+        }
+        if (job.status === 'failed') {
+          testId = null;
+          throw new Error(job.error);
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    } catch (e) {
+      if (!destroyed) error = message(e);
+    } finally {
+      testing = false;
+    }
+  }
   onMount(() => {
     void refresh();
+    return () => {
+      destroyed = true;
+    };
   });
 </script>
 
@@ -120,6 +159,11 @@
   >
     {notice}
   </p>{/if}
+{#if testing}<p role="status" class="notice">
+    {progress || 'Starting test…'}
+  </p>{/if}
+{#if testId && !testing}<button onclick={pollTest}>Resume test results</button
+  >{/if}
 <div class="rule-layout">
   <section class="stack" aria-label="Rules">
     {#if loading}<div class="empty">

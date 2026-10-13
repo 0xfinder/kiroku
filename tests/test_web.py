@@ -19,7 +19,7 @@ import uvicorn
 from psycopg import AsyncConnection
 from typer.testing import CliRunner
 
-from kiroku import labels, rules, sessions, transcript
+from kiroku import dry_run, labels, rules, sessions, transcript
 from kiroku.budget import Caps
 from kiroku.cli import app as cli
 from kiroku.config import Secret, Secrets, Settings
@@ -57,6 +57,21 @@ async def client(database_url: str) -> AsyncGenerator[httpx.AsyncClient]:
         ) as client,
     ):
         yield client
+
+
+async def completed_test(client: httpx.AsyncClient, response: httpx.Response) -> dict[str, Any]:
+    assert response.status_code == 202, response.text
+    job_id = response.json()["id"]
+    async with asyncio.timeout(5):
+        while True:
+            status = await client.get(f"/api/rule-tests/{job_id}")
+            assert status.status_code == 200
+            job = status.json()
+            if job["status"] != "running":
+                assert job["status"] == "completed", job
+                assert job["completed"] == job["total"]
+                return job["report"]
+            await asyncio.sleep(0.01)
 
 
 async def test_session_views(
@@ -303,16 +318,15 @@ async def test_rule_test_recorded_jev_and_month_costs(
         response = await client.post(
             "/api/rules/draft_opinion/test", json={"session": session, "instructions": NEW}
         )
-        assert response.status_code == 200, response.text
-        report = response.json()
+        report = await completed_test(client, response)
         assert (report["passed"], report["scored"], sum(report["histogram"])) == (3, 8, 8)
         assert report["pass_rate"] == 3 / 8 and len(report["highest"]) == 3
         assert "3 of 8" in report["report"] and len(sent) == 8
-        assert (
-            await client.post(
-                "/api/rules/draft_opinion/test", json={"last": 2, "instructions": NEW}
-            )
-        ).json()["scored"] == 2
+        second = await client.post(
+            "/api/rules/draft_opinion/test", json={"last": 2, "instructions": NEW}
+        )
+        assert (await completed_test(client, second))["scored"] == 2
+        assert (await client.get(f"/api/rule-tests/{response.json()['id']}")).status_code == 404
     assert await (
         await conn.execute(
             "SELECT count(*),count(session_id) FROM cost_ledger WHERE purpose='rule_test'"
@@ -404,6 +418,9 @@ async def test_real_sse_commit_reconnect_backfill_and_keepalive(
             async with asyncio.timeout(5):
                 async for line in lines:
                     if line == "event: reconcile":
+                        assert json.loads((await anext(lines)).removeprefix("data: ")) == {
+                            "after_ms": -1
+                        }
                         break
             async with asyncio.timeout(5):
                 async for line in lines:
@@ -533,8 +550,7 @@ async def test_rule_test_month_cap_reports_refusal_without_dispatch(
         monkeypatch.setattr(httpx.AsyncClient, "post", forbidden)
         # Use request() so only the provider's post() is prohibited.
         response = await client.request("POST", "/api/rules/predicts_winner/test", json={"last": 1})
-        assert response.status_code == 200
-        report = response.json()
+        report = await completed_test(client, response)
         assert report["scored"] == 0 and report["failed"] == 1
         assert "month" in report["trials"][0]["error"]
 
@@ -557,3 +573,175 @@ async def test_session_specific_rule_test_is_bounded(pool: Pool, notebook: tuple
         )
     assert len(await dry_run.stored_windows(pool, session_id=session, last=100)) == 100
     assert len(await dry_run.stored_windows(pool, session_id=session, last=None)) == 110
+
+
+@pytest.mark.parametrize(
+    "origin,forwarded,accepted",
+    [
+        ("https://kiroku.example", "kiroku.example", True),
+        ("https://kiroku.example:443", "kiroku.example:443", True),
+        ("http://testserver", "kiroku.example", True),
+        ("https://evil.example", "kiroku.example", False),
+        ("https://kiroku.example.evil", "kiroku.example", False),
+        ("https://kiroku.example", "kiroku.example:443", False),
+        ("https://kiroku.example", "", False),
+        ("null", "", False),
+    ],
+)
+async def test_proxy_write_origin(
+    client: httpx.AsyncClient, origin: str, forwarded: str, accepted: bool
+) -> None:
+    response = await client.post(
+        "/api/rules",
+        headers={"Origin": origin, "X-Forwarded-Host": forwarded},
+        json={"name": "proxy", "instructions": "Does he predict a winner?"},
+    )
+    assert response.status_code == (201 if accepted else 403)
+    assert "access-control-allow-origin" not in response.headers
+    preflight = await client.options(
+        "/api/rules",
+        headers={
+            "Origin": "https://evil.example",
+            "Access-Control-Request-Headers": "x-forwarded-host",
+        },
+    )
+    assert "access-control-allow-origin" not in preflight.headers
+
+
+@pytest.mark.parametrize(
+    "method",
+    ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "TRACE", "CONNECT", "CUSTOM"],
+)
+async def test_unknown_api_methods_are_json(client: httpx.AsyncClient, method: str) -> None:
+    response = await client.request(method, "/api/nonexistent")
+    assert response.status_code == 404
+    assert response.headers["content-type"] == "application/json"
+    if method == "HEAD":
+        assert response.content == b""
+    else:
+        assert response.json() == {"detail": "API route not found"}
+    unsupported = await client.request(
+        method if method not in {"GET", "HEAD"} else "PUT", "/api/sessions"
+    )
+    assert unsupported.status_code in {404, 405}
+    assert unsupported.headers["content-type"] == "application/json"
+
+
+async def test_head_on_get_routes(client: httpx.AsyncClient, notebook: tuple[int, int]) -> None:
+    session, _ = notebook
+    for path in [
+        "/api/sessions",
+        f"/api/sessions/{session}",
+        f"/api/sessions/{session}/transcript",
+        "/api/rules",
+        "/api/review",
+    ]:
+        get = await client.get(path)
+        head = await client.head(path)
+        assert head.status_code == get.status_code == 200
+        assert head.headers["content-type"] == get.headers["content-type"]
+        assert head.headers["content-length"] == get.headers["content-length"]
+        assert head.content == b""
+    async with asyncio.timeout(1):
+        head = await client.head(f"/api/sessions/{session}/transcript/stream")
+    assert head.status_code == 200 and head.content == b""
+    assert head.headers["content-type"].startswith("text/event-stream")
+
+
+async def test_rule_job_progress_disconnect_errors_and_shutdown(
+    database_url: str, notebook: tuple[int, int], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cfg = replace(
+        settings(database_url), secrets=Secrets({"JEV_API_KEY": "fixture"}, Path("/tmp/absent"))
+    )
+    application = create_app(cfg)
+    started = asyncio.Event()
+    release = asyncio.Event()
+    cancelled = asyncio.Event()
+    runs = 0
+
+    async def run(*args: Any, **kwargs: Any) -> list[dry_run.Trial]:
+        nonlocal runs
+        runs += 1
+        windows = args[4]
+        first = dry_run.Trial(windows[0], 0.8)
+        kwargs["progress"](first)
+        started.set()
+        try:
+            await release.wait()
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+        if runs == 2:
+            raise rules.RuleError("test provider unavailable")
+        return [first]
+
+    monkeypatch.setattr(dry_run, "run", run)
+    transport = httpx.ASGITransport(app=application)
+    async with application.router.lifespan_context(application):
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            async with asyncio.timeout(1):
+                response = await client.post("/api/rules/predicts_winner/test", json={"last": 1})
+            assert response.status_code == 202
+            job_id = response.json()["id"]
+            await started.wait()
+            progress = (await client.get(f"/api/rule-tests/{job_id}")).json()
+            assert progress == {"id": job_id, "status": "running", "completed": 1, "total": 1}
+            assert (
+                await client.post("/api/rules/predicts_winner/test", json={})
+            ).status_code == 409
+        # Losing the requesting client leaves the paid job and its retrievable report intact.
+        release.set()
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            report = await completed_test(client, response)
+            assert report["scored"] == 1
+            assert (await client.get(f"/api/rule-tests/{job_id}")).json()["report"] == report
+            error_job = await client.post("/api/rules/predicts_winner/test", json={"last": 1})
+            assert error_job.status_code == 202
+            error_id = error_job.json()["id"]
+            async with asyncio.timeout(1):
+                while True:
+                    job = (await client.get(f"/api/rule-tests/{error_id}")).json()
+                    if job["status"] != "running":
+                        break
+                    await asyncio.sleep(0.01)
+            assert job["status"] == "failed" and job["error"] == "test provider unavailable"
+            assert (await client.get(f"/api/rule-tests/{job_id}")).status_code == 404
+            release.clear()
+            started.clear()
+            assert (
+                await client.post("/api/rules/predicts_winner/test", json={"last": 1})
+            ).status_code == 202
+            await started.wait()
+    assert cancelled.is_set(), "server shutdown left a paid job running"
+
+
+async def test_sse_catches_backfill_between_snapshot_and_subscription(
+    server: str, pool: Pool, notebook: tuple[int, int]
+) -> None:
+    session, _ = notebook
+    async with httpx.AsyncClient(base_url=server) as client:
+        cursor = (await client.get(f"/api/sessions/{session}/transcript/cursor")).json()["id"]
+        await transcript.commit(
+            pool,
+            session,
+            "fixture:gap",
+            Result(7000, 8000, (Utterance(7000, 7500, "Between scan and stream"),), None),
+        )
+        snapshot = (
+            await client.get(f"/api/sessions/{session}/transcript?through_id={cursor}&limit=1000")
+        ).json()
+        assert all(row["text"] != "Between scan and stream" for row in snapshot)
+        async with client.stream(
+            "GET", f"/api/sessions/{session}/transcript/stream?after_ms=175000&after_id={cursor}"
+        ) as response:
+            lines = response.aiter_lines()
+            async with asyncio.timeout(5):
+                async for line in lines:
+                    if line == "event: reconcile":
+                        assert json.loads((await anext(lines)).removeprefix("data: ")) == {
+                            "after_ms": 6999
+                        }
+                        break
+                else:
+                    pytest.fail("Backfill between snapshot and subscription was missed")

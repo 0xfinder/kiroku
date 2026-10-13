@@ -6,6 +6,8 @@ import {
   removeCard,
   restoreCard,
   noteItems,
+  ruleEditBody,
+  transcriptCursor,
 } from './helpers';
 import type { Review, Utterance } from './api';
 
@@ -72,4 +74,36 @@ describe('timeline behavior', () => {
       }),
     ).toEqual([{ at_ms: 1000, kind: 'takes', text: 'Draft · Blue has range' }]);
   });
+});
+
+describe('Rule edits', () => {
+  const form = {
+    instructions: 'Winner?',
+    threshold: 0.7,
+    cooldown_s: 600,
+    pack: null,
+    enabled: true,
+  };
+  it('omits unchanged enablement so a wording save preserves a concurrent disable', () => {
+    expect(ruleEditBody(form, true)).toEqual({
+      instructions: 'Winner?',
+      threshold: 0.7,
+      cooldown_s: 600,
+      pack: null,
+    });
+  });
+  it('sends an explicit checkbox change and enablement for a new Rule', () => {
+    expect(ruleEditBody({ ...form, enabled: false }, true)).toEqual({
+      ...form,
+      enabled: false,
+    });
+    expect(ruleEditBody(form, false)).toEqual(form);
+    expect(ruleEditBody(form, null)).toEqual(form);
+  });
+});
+
+it('reads the cursor of a long sorted transcript without spreading arguments', () => {
+  const rows = Array.from({ length: 150000 }, (_, i) => speech(i, i));
+  expect(transcriptCursor(rows)).toBe(149999);
+  expect(transcriptCursor([])).toBe(-1);
 });

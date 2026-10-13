@@ -375,3 +375,27 @@ existing watcher/CLI semantics.
 
 Rejected: an SSR Node server, one LISTEN connection per tab, and polling-only live transcript.
 The static build and shared listener keep the production process and connection count small.
+
+
+## D34. Background web Rule tests and transcript commit cursors (issue #8)
+
+This supersedes D33's synchronous Rule-test response and reconciliation scans on every
+connection open. A paid test can exceed the Cloudflare Access proxy's HTTP timeout under
+D18. The POST now validates and returns a job ID with HTTP 202. The UI polls progress
+and then reads the report or error. One job runs at a time, its terminal result remains
+in memory until the next test starts, and server shutdown cancels it within the existing
+five-second bound. A database job table is unnecessary for the single-worker process;
+results disappear on restart. A disconnect leaves an accepted test running.
+
+SSE reads new Utterances through an indexed per-session ID cursor instead of counting
+all speech behind its audio cursor. Transcript commits take a session row lock before
+allocating Utterance IDs, ensuring a late commit cannot appear below a consumed ID.
+The initial browser scan uses a fixed ID snapshot, then subscribes from that commit ID.
+Backfill hints carry the earliest affected offset; reconnects still scan the full
+history. This removes duplicate initial downloads and confines hint-driven reads to the
+changed range without missing commits between the snapshot and SSE subscription.
+
+Rejected: retaining a paid operation inside an HTTP request through a proxy timeout;
+using maximum IDs without commit ordering; relying on notifications alone to detect
+Backfill during listener outages. Revisit persisted jobs if process restarts must preserve
+reports or multiple serve workers become necessary.

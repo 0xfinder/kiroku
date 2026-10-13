@@ -1,4 +1,4 @@
-import type { Review, Utterance, Note } from './api';
+import type { Review, Utterance, Note, Rule } from './api';
 import { z } from 'zod';
 
 export function clock(ms: number): string {
@@ -61,4 +61,19 @@ export function noteItems(note: Note): NoteItem[] {
     }
   }
   return items.sort((a, b) => a.at_ms - b.at_ms);
+}
+
+export function ruleEditBody(
+  form: Pick<
+    Rule,
+    'instructions' | 'threshold' | 'cooldown_s' | 'pack' | 'enabled'
+  >,
+  loadedEnabled: boolean | null,
+) {
+  const { enabled, ...body } = form;
+  return loadedEnabled === enabled ? body : { ...body, enabled };
+}
+
+export function transcriptCursor(rows: Utterance[]): number {
+  return rows.at(-1)?.audio_start_ms ?? -1;
 }

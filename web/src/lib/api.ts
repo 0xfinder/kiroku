@@ -106,6 +106,32 @@ export const reportSchema = z.object({
   report: z.string(),
 });
 export type Report = z.infer<typeof reportSchema>;
+export const testJobSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('running'),
+    id: z.string(),
+    completed: z.number(),
+    total: z.number(),
+  }),
+  z.object({
+    status: z.literal('completed'),
+    id: z.string(),
+    completed: z.number(),
+    total: z.number(),
+    report: reportSchema,
+  }),
+  z.object({
+    status: z.literal('failed'),
+    id: z.string(),
+    completed: z.number(),
+    total: z.number(),
+    error: z.string(),
+  }),
+]);
+export const transcriptCursorSchema = z.object({
+  id: z.number().int().nonnegative(),
+});
+export const reconcileSchema = z.object({ after_ms: z.number().int().min(-1) });
 
 export async function request(
   path: string,

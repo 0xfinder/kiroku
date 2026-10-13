@@ -25,6 +25,7 @@ from enum import StrEnum
 from typing import Any, Literal
 
 import psycopg
+from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from kiroku import ledger, rules, segments, transcript
@@ -397,21 +398,9 @@ def _log_window(
             log.info("session %d: window %s: %s %s", session_id, span, status, reason or "")
 
 
-async def latest_mode(pool: Pool, session_id: int) -> str | None:
-    async with pool.connection() as conn:
-        row = await (
-            await conn.execute(
-                "SELECT mode FROM gate_window WHERE session_id=%s AND mode IS NOT NULL "
-                "ORDER BY start_ms DESC LIMIT 1",
-                [session_id],
-            )
-        ).fetchone()
-    return row[0] if row else None
-
-
 async def review_queue(pool: Pool, limit: int) -> list[dict[str, Any]]:
-    async with pool.connection() as conn:
-        cur = await conn.execute(
+    async with pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+        await cur.execute(
             "SELECT d.id,d.question,d.probability,d.threshold,d.passed,r.name AS rule,"
             "w.session_id,w.start_ms,w.state->>'new' AS new,"
             "coalesce(w.state->'context'->>'earlier','') AS earlier,c.login AS channel "
@@ -422,18 +411,16 @@ async def review_queue(pool: Pool, limit: int) -> list[dict[str, Any]]:
             "ORDER BY w.closed_at DESC,d.id DESC LIMIT %s",
             [limit],
         )
-        names = [col.name for col in cur.description or ()]
-        return [dict(zip(names, row, strict=True)) for row in await cur.fetchall()]
+        return list(await cur.fetchall())
 
 
 async def session_passes(pool: Pool, session_id: int, limit: int) -> list[dict[str, Any]]:
-    async with pool.connection() as conn:
-        cur = await conn.execute(
+    async with pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+        await cur.execute(
             "SELECT d.id,r.name AS rule,d.question,d.probability,d.threshold,w.start_ms "
             "FROM gate_decision d JOIN gate_window w ON w.id=d.window_id "
             "JOIN rule r ON r.id=d.rule_id WHERE w.session_id=%s AND d.passed "
             "ORDER BY w.start_ms DESC,d.id DESC LIMIT %s",
             [session_id, limit],
         )
-        names = [col.name for col in cur.description or ()]
-        return [dict(zip(names, row, strict=True)) for row in reversed(await cur.fetchall())]
+        return list(reversed(await cur.fetchall()))

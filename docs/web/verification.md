@@ -89,3 +89,58 @@ Notes migrations, and `kiroku serve` refused with `SchemaOutOfDate`. No dev migr
 write was performed. T3 preview also refused browser startup because the host's AppArmor
 policy blocks its sandbox. Local Playwright ran successfully. The eight acceptance
 screenshots show synthetic data, not a live streamer session.
+
+
+## PR #20 review fixes
+
+The API now starts paid tests with HTTP 202 and a job ID; polling retrieves progress,
+the report, or the error. Results remain in memory until the next test starts. See
+[the API contract](design.md#rule-test-api) and D34. The new migration adds indexes for
+Utterance commit IDs and audio paging. All measurements and tests use isolated migrated
+databases; the dev database was not migrated.
+
+Regression coverage by finding:
+
+1. `test_channel_claim_keeps_original_exception_when_unlock_fails` closes the actual
+   lock connection and checks identity of the propagated CancelledError, ChannelBusy
+   and ValueError. The existing lock-handoff regression still checks acknowledged unlock.
+2. Vitest checks the exact Rule PATCH body with unchanged and changed enablement.
+   Chromium disables the Rule through the API after loading its form, saves wording,
+   and verifies it stays disabled.
+3. `test_rule_job_progress_disconnect_errors_and_shutdown` checks immediate acceptance,
+   progress, concurrent 409, survival of request-client closure, retained reports, errors,
+   replacement of old results, and cancellation on lifespan shutdown. Recorded Jev and
+   monthly-budget tests poll the job and verify reports and Cost ledger rows. Chromium
+   checks progress, final results, and resuming a failed poll without a new paid request.
+4. `test_proxy_write_origin` accepts the external forwarded authority or direct Host,
+   refuses unrelated origins, suffix attacks, port mismatches and null Origin, and
+   checks that write and preflight responses expose no CORS headers.
+5. Chromium asserts exactly one initial paged transcript scan, targeted scans from
+   offsets 999 and 1999, overlapping Backfill hints, and a full scan on native EventSource
+   reconnect. The fixture closes real SSE responses with a test signal; setting Playwright
+   offline alone does not close an established SSE socket.
+6. `test_session_views` verifies the latest Segment, Mode and both counts through the
+   owning summary query, shared by list and detail.
+7. `test_real_sse_commit_reconnect_backfill_and_keepalive` checks that appends send no
+   hint and late Backfill carries the affected offset. The snapshot/subscription gap
+   test proves a commit between initial paging and SSE is caught. The commit-visibility
+   test holds a real transaction before commit and proves a second writer cannot expose
+   a higher ID first. Idle reads use the indexed ID range rather than counting history.
+8. `test_unknown_api_methods_are_json` covers GET, HEAD, POST, PUT, PATCH, DELETE,
+   OPTIONS, TRACE, CONNECT and a custom verb; `test_head_on_get_routes` checks status,
+   headers and empty bodies, including HEAD on SSE without opening a stream.
+9. Existing session, Review, Notes and Alerts endpoint tests cover the dict-row reads.
+10. Vitest reads the cursor of 150,000 sorted Utterances and an empty transcript.
+
+Negative checks temporarily restored the defective behaviours and restored the source
+in `finally` blocks. The regressions failed for unguarded unlock, synchronous test runs,
+raw-Host-only comparison, empty Backfill hints, unordered commit IDs, limited API methods,
+stale enabled bodies, spreading the long transcript cursor, and duplicate first-open
+scans. The final source and production build were restored before the full checks.
+
+
+Final review-fix validation on 2026-10-13 ran in the requested sequence, with no concurrent
+checks: Ruff lint passed; Ruff format checked all 90 Python files; strict Pyright had zero
+errors or warnings; pytest passed all 405 tests. Svelte Check had zero errors or warnings,
+all eight Vitest tests passed, the static build passed, and Chromium acceptance passed
+with eight screenshots. CI runs the same sequence against the pushed revision.

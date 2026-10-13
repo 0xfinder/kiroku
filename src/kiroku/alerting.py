@@ -13,6 +13,7 @@ from typing import Any, cast
 
 import psycopg
 from psycopg import AsyncConnection, sql
+from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from kiroku import extraction, ledger, sessions
@@ -576,8 +577,8 @@ class AlertWorker:
 
 
 async def session_rows(pool: Pool, session_id: int, limit: int) -> list[dict[str, Any]]:
-    async with pool.connection() as conn:
-        cur = await conn.execute(
+    async with pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+        await cur.execute(
             "SELECT a.id,a.decision_id,r.name AS rule,a.outcome,a.said_at,w.start_ms,"
             "coalesce(a.content->>'claim',a.content->>'summary',a.content->>'excerpt','') AS text,"
             "(SELECT l.applies FROM label l WHERE l.decision_id=a.decision_id "
@@ -587,17 +588,4 @@ async def session_rows(pool: Pool, session_id: int, limit: int) -> list[dict[str
             "WHERE a.session_id=%s ORDER BY a.id DESC LIMIT %s",
             [session_id, limit],
         )
-        names = [col.name for col in cur.description or ()]
-        return [dict(zip(names, row, strict=True)) for row in reversed(await cur.fetchall())]
-
-
-async def count_for_session(pool: Pool, session_id: int) -> int:
-    async with pool.connection() as conn:
-        row = await (
-            await conn.execute(
-                "SELECT count(*) FROM alert WHERE session_id=%s",
-                [session_id],
-            )
-        ).fetchone()
-    assert row is not None
-    return row[0]
+        return list(reversed(await cur.fetchall()))

@@ -2,10 +2,11 @@
 
 import asyncio
 import contextlib
+import json
 import logging
 import time
 from collections import defaultdict
-from collections.abc import AsyncGenerator, AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from itertools import groupby
 
@@ -56,17 +57,27 @@ class TranscriptHub:
 
 
 async def events(
-    request: Request, pool: Pool, hub: TranscriptHub, session_id: int, after_ms: int
-) -> AsyncIterator[str]:
+    request: Request,
+    pool: Pool,
+    hub: TranscriptHub,
+    session_id: int,
+    after_ms: int,
+    after_id: int | None = None,
+) -> AsyncGenerator[str]:
     async with hub.subscribe(session_id) as wake:
-        covered = await transcript.count_through(pool, session_id, after_ms)
+        committed = (
+            after_id if after_id is not None else await transcript.latest_id(pool, session_id)
+        )
         keepalive = time.monotonic()
         yield ": connected\n\n"
         while not await request.is_disconnected():
             wake.clear()
-            sent = 0
-            while rows := await transcript.page(pool, session_id, after_ms=after_ms, limit=200):
-                sent += len(rows)
+            committed, affected = await transcript.changes(pool, session_id, committed, after_ms)
+            if affected is not None:
+                yield f"event: reconcile\ndata: {json.dumps({'after_ms': affected - 1})}\n\n"
+            while rows := await transcript.page(
+                pool, session_id, after_ms=after_ms, limit=200, through_id=committed
+            ):
                 for start_ms, group in groupby(rows, key=lambda row: row.audio_start_ms):
                     # One atomic group per audio-clock ID keeps comparison transcribers intact.
                     data = (
@@ -78,11 +89,6 @@ async def events(
                     after_ms = start_ms
                 if await request.is_disconnected():
                     return
-            current = await transcript.count_through(pool, session_id, after_ms)
-            if current != covered + sent:
-                # A Backfill can insert behind after_ms; audio cursors cannot describe that.
-                yield "event: reconcile\ndata: {}\n\n"
-            covered = current
             if time.monotonic() - keepalive >= KEEPALIVE_S:
                 yield ": keepalive\n\n"
                 keepalive = time.monotonic()

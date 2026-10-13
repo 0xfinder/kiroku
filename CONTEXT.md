@@ -55,4 +55,4 @@ The names kiroku's code, docs, and design discussions use. If a discussion needs
 - **Budget cap** — hard per-session and per-month spending limits. Paid calls stop when a cap is reached.
 - **Fallback** — the replacement used when a vendor is unavailable. The Transcriber falls back to Groq Whisper in chunks, with no speaker labels. The Gate falls back to Groq `openai/gpt-oss-120b` answering the same Rule and Mode questions.
 
-- **Live transcript stream** — the web app's SSE feed of committed Utterances. Event IDs are session audio offsets and group speech at the same offset. Backfill behind the cursor triggers reconciliation from stored pages.
+- **Live transcript stream** — the web app's SSE feed of committed Utterances. Event IDs are session audio offsets and group speech at the same offset. Backfill behind the cursor triggers reconciliation from the earliest affected audio offset. A separate Utterance-ID cursor follows commit order and bridges the initial snapshot to the stream.

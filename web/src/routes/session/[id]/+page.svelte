@@ -10,13 +10,20 @@
     noteSchema,
     alertSchema,
     passSchema,
+    transcriptCursorSchema,
+    reconcileSchema,
     type Session,
     type Utterance,
     type Note,
     type Alert,
     type GatePass,
   } from '#lib/api.ts';
-  import { clock, atBottom, mergeTranscript } from '#lib/helpers.ts';
+  import {
+    clock,
+    atBottom,
+    mergeTranscript,
+    transcriptCursor,
+  } from '#lib/helpers.ts';
   let session = $state<Session | null>(null);
   let rows = $state<Utterance[]>([]);
   let notes = $state<Note[]>([]);
@@ -49,24 +56,25 @@
     await tick();
     if (box && follow) box.scrollTop = box.scrollHeight;
   }
-  let reconcileAgain = false;
-  async function reconcile() {
-    reconcileAgain = true;
+  let pendingAfter: number | null = null;
+  async function reconcile(afterMs = -1, throughId: number | null = null) {
+    pendingAfter =
+      pendingAfter === null ? afterMs : Math.min(pendingAfter, afterMs);
     if (reconciling) return reconciling;
     reconciling = (async () => {
-      while (reconcileAgain && !destroyed) {
-        reconcileAgain = false;
+      while (pendingAfter !== null && !destroyed) {
+        let after = pendingAfter;
+        pendingAfter = null;
         try {
-          let after = -1;
           let incoming: Utterance[] = [];
           while (!destroyed) {
             const chunk = await read(
-              `/sessions/${id}/transcript?after_ms=${after}&limit=500`,
+              `/sessions/${id}/transcript?after_ms=${after}&limit=500${throughId === null ? '' : `&through_id=${throughId}`}`,
               z.array(utteranceSchema),
             );
             if (chunk.length === 0) break;
             incoming = mergeTranscript(incoming, chunk);
-            after = Math.max(...chunk.map((r) => r.audio_start_ms));
+            after = transcriptCursor(chunk);
           }
           if (!destroyed) {
             rows = mergeTranscript(rows, incoming);
@@ -102,7 +110,11 @@
   }
   async function start() {
     follow = at < 0;
-    await Promise.all([reconcile(), refresh()]);
+    const cursor = await read(
+      `/sessions/${id}/transcript/cursor`,
+      transcriptCursorSchema,
+    );
+    await Promise.all([reconcile(-1, cursor.id), refresh()]);
     if (destroyed) return;
     if (at >= 0) {
       await tick();
@@ -112,13 +124,15 @@
           .getElementById(`u${row.id}`)
           ?.scrollIntoView({ block: 'center' });
     }
-    const after = Math.max(-1, ...rows.map((r) => r.audio_start_ms));
+    const after = transcriptCursor(rows);
     const stream = new EventSource(
-      `/api/sessions/${id}/transcript/stream?after_ms=${after}`,
+      `/api/sessions/${id}/transcript/stream?after_ms=${after}&after_id=${cursor.id}`,
     );
+    let opened = false;
     stream.onopen = () => {
       connection = 'Connected';
-      void reconcile();
+      if (opened) void reconcile();
+      opened = true;
     };
     stream.onerror = () => {
       connection = 'Reconnecting';
@@ -132,17 +146,26 @@
         error = message(e);
       }
     });
-    stream.addEventListener('reconcile', () => {
-      void reconcile();
+    stream.addEventListener('reconcile', (event: MessageEvent<string>) => {
+      try {
+        const hint = reconcileSchema.parse(JSON.parse(event.data));
+        void reconcile(hint.after_ms);
+      } catch (e) {
+        error = message(e);
+      }
     });
     return stream;
   }
   onMount(() => {
     let stream: EventSource | undefined;
-    void start().then((value) => {
-      if (destroyed) value?.close();
-      else stream = value;
-    });
+    void start()
+      .then((value) => {
+        if (destroyed) value?.close();
+        else stream = value;
+      })
+      .catch((e) => {
+        if (!destroyed) error = message(e);
+      });
     const timer = setInterval(refresh, 30000);
     return () => {
       destroyed = true;

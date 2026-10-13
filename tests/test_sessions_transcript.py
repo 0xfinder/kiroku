@@ -134,6 +134,29 @@ async def test_channel_claim_releases_before_socket_disconnect(
         assert not await sessions.end_leg(pool, leg, 9_000, unless_watched=watched)
 
 
+@pytest.mark.parametrize("exception", [asyncio.CancelledError, sessions.ChannelBusy, ValueError])
+async def test_channel_claim_keeps_original_exception_when_unlock_fails(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, exception: type[BaseException]
+) -> None:
+    held: AsyncConnection | None = None
+
+    @asynccontextmanager
+    async def broken_connection(url: str) -> AsyncGenerator[AsyncConnection]:
+        nonlocal held
+        async with connect(url) as conn:
+            held = conn
+            yield conn
+
+    monkeypatch.setattr(sessions, "connect", broken_connection)
+    original = exception("original block failure")
+    with pytest.raises(exception) as caught:
+        async with claim_channels(database_url, "twitch", ["gorgc"]):
+            assert held is not None
+            await held.close()
+            raise original
+    assert caught.value is original
+
+
 class _FlakyPool:
     """Delegates to a real pool, but the first `fail` connections are lost."""
 
@@ -265,3 +288,58 @@ async def test_stop_after_a_capture_failure_still_drains(
 
     cur = await conn.execute("SELECT max(audio_end_ms) FROM transcript_span")
     assert await cur.fetchone() == (20_000,)
+
+
+async def test_transcript_commit_ids_follow_visibility_order(
+    pool: Pool, channel: Channel, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    session = await sessions.open_session(pool, channel, A, T0)
+    leg = await sessions.next_leg(pool, channel, session)
+    await sessions.record_leg(pool, leg, T0)
+    original = AsyncConnection.execute
+    inserted = asyncio.Event()
+    release = asyncio.Event()
+    first = True
+
+    async def paused_notify(
+        self: AsyncConnection, query: Any, params: Any = None, **kwargs: Any
+    ) -> Any:
+        nonlocal first
+        if query == "SELECT pg_notify('kiroku_transcript', %s)" and first:
+            first = False
+            inserted.set()
+            await release.wait()
+        return await original(self, query, params, **kwargs)
+
+    monkeypatch.setattr(AsyncConnection, "execute", paused_notify)
+    old_id = await transcript.latest_id(pool, session)
+    one = asyncio.create_task(
+        transcript.commit(
+            pool,
+            session,
+            "first",
+            Result(1000, 2000, (Utterance(1000, 1900, "First commit"),), None),
+        )
+    )
+    two: asyncio.Task[bool] | None = None
+    try:
+        await asyncio.wait_for(inserted.wait(), 1)
+        two = asyncio.create_task(
+            transcript.commit(
+                pool,
+                session,
+                "second",
+                Result(0, 1000, (Utterance(0, 900, "Second commit"),), None),
+            )
+        )
+        done, _ = await asyncio.wait({two}, timeout=0.1)
+        assert not done, "higher IDs became visible before an earlier session commit"
+        assert await transcript.latest_id(pool, session) == old_id
+        release.set()
+        assert await one and await two
+        cursor, affected = await transcript.changes(pool, session, old_id, 1000)
+        assert cursor > old_id and affected == 0
+        assert await transcript.changes(pool, session, cursor, 1000) == (cursor, None)
+    finally:
+        release.set()
+        await asyncio.gather(one, *([two] if two else []), return_exceptions=True)
