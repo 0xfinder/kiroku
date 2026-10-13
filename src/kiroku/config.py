@@ -109,14 +109,30 @@ class Settings:
             SecretName.GOOGLE_CLIENT_SECRET,
             SecretName.SESSION_SECRET,
         )
-        owner = env.get("KIROKU_OWNER_EMAIL", "").strip()
+        owner = env.get("KIROKU_OWNER_EMAIL", "").strip().lower()
         public_url = env.get("KIROKU_PUBLIC_URL", "").rstrip("/")
         if owner and public_url and all(values.get(n, "").strip() for n in names):
             from urllib.parse import urlsplit
 
             url = urlsplit(public_url)
-            if url.scheme != "https" or not url.netloc or url.path or url.query or url.fragment:
+            try:
+                port = url.port
+            except ValueError:
+                raise ConfigError("KIROKU_PUBLIC_URL must be an HTTPS origin") from None
+            if (
+                url.scheme != "https"
+                or not url.hostname
+                or url.username
+                or url.password
+                or url.path
+                or url.query
+                or url.fragment
+            ):
                 raise ConfigError("KIROKU_PUBLIC_URL must be an HTTPS origin")
+            host = url.hostname.lower()
+            if ":" in host:
+                host = f"[{host}]"
+            public_url = f"https://{host}" + (f":{port}" if port not in {None, 443} else "")
             if len(values[SecretName.SESSION_SECRET]) < 32:
                 raise ConfigError("KIROKU_SESSION_SECRET must contain at least 32 characters")
             oidc = OIDC(

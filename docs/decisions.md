@@ -442,3 +442,35 @@ Rejected: Cloudflare Access, because it cannot distinguish reads from writes on 
 same path and the application needs owner identity anyway; offline transcript storage;
 trusting loopback as owner; a production Node server. Revisit shared rate/flow storage
 if serve needs multiple workers, and session revocation if more owners are introduced.
+
+The review revision below supersedes the original login caps and admission/recovery details.
+
+### D35 review revision: stateless login and recovery
+
+2026-10-13. Supersedes D35's original pending-flow caps, client-table capacity refusal,
+and immediate offline selection on a lone network failure. A global pending-login
+cap allows anonymous visitors to lock out the owner, so state, nonce, PKCE verifier
+and expiry now live in a signed Secure, HttpOnly ten-minute `/auth` cookie. Session
+and flow salts differ. Every callback clears the flow cookie; Google single-use codes
+reject replay. Pending logins survive restart. Google's only accepted issuers are
+`https://accounts.google.com` and `accounts.google.com`. Owner emails are lowercased,
+and the HTTPS origin uses lowercase scheme/host, no default 443 and no trailing slash.
+
+Admission groups IPv6 by /64 and IPv4 by full address. The 4096-client LRU tracks
+last-seen order, expires incrementally and evicts its oldest client on capacity.
+Per-client and total stream counts are separate from request-client eviction.
+Admission expires at most one old client per request and uses a maintained total
+stream count; no full-table scans occur.
+
+Identity remains unknown while either identity read fails, retries with backoff and
+shows an error after repeated failures. A CLOSED EventSource explicitly retries with
+backoff and an unavailable/too-many-streams message. Offline selection requires the
+device to report offline or three consecutive connection failures. A success clears
+it; automatic probes and visibility events recover without manual intervention.
+
+Deployment templates use systemd user units under `~/.config/systemd/user/`, with
+`WantedBy=default.target`, no root/namespace sandboxing and checkout `%h/kiroku`.
+One watch process handles Caedrel and Gorgc, sharing quota and pollers. The cloudflared
+user unit runs `%h/.local/bin/cloudflared` for a remotely managed tunnel with a private
+`%h/.config/kiroku/tunnel-token` file. Lingering keeps the user manager alive. Installing
+or starting services stays with the operator.

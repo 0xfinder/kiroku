@@ -332,43 +332,6 @@ test('public read-only PWA, CSP, network-only data and offline shell', async ({
   await expect(
     page.getByRole('button', { name: /Yes|No|Undo|Check for more/ }),
   ).toHaveCount(0);
-  // A reachable network with an unreachable origin must also hide data views.
-  await page.route('**/api/**', async (route) => {
-    if (/\/(me|auth)$/.test(new URL(route.request().url()).pathname)) {
-      await new Promise((resolve) => setTimeout(resolve, 150));
-      await route.continue();
-    } else await route.abort('connectionfailed');
-  });
-  await page.goto('/notes');
-  await expect(
-    page.getByRole('heading', { name: 'You’re offline' }),
-  ).toBeVisible();
-  expect(await page.evaluate(() => navigator.onLine)).toBe(true);
-  await expect(page.getByRole('link', { name: 'Owner login' })).toHaveCount(0);
-  await page.unrouteAll({ behavior: 'wait' });
-  await expect(
-    page.getByRole('heading', { name: 'You’re offline' }),
-  ).toBeVisible();
-  await page.getByRole('button', { name: 'Retry connection' }).click();
-  await expect(
-    page.getByRole('heading', { name: 'Notes timeline' }),
-  ).toBeVisible();
-  const liveSessions = z
-    .array(sessionSchema)
-    .parse(await (await request.get('/api/sessions')).json());
-  const liveSession = liveSessions[0];
-  if (!liveSession) throw new Error('fixture has no session');
-  await page.goto(`/session/${liveSession.id}`);
-  await expect(page.getByText('Connected', { exact: true })).toBeVisible();
-  await page.route('**/api/me', (route) => route.abort('connectionfailed'));
-  action('disconnect');
-  await expect(
-    page.getByRole('heading', { name: 'You’re offline' }),
-  ).toBeVisible();
-  await expect(page.getByTestId('transcript')).toHaveCount(0);
-  await page.unrouteAll({ behavior: 'wait' });
-  await page.getByRole('button', { name: 'Retry connection' }).click();
-  await expect(page.getByText('Connected', { exact: true })).toBeVisible();
   const manifest = await request.get('/manifest.webmanifest');
   expect(manifest.ok()).toBe(true);
   const parsed = z
@@ -486,4 +449,99 @@ test('public read-only PWA, CSP, network-only data and offline shell', async ({
     owner: false,
   });
   expect(violations).toEqual([]);
+});
+
+test('owner identity retries /me and /auth errors without a public downgrade', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Owner login' }).click();
+  await expect(page.getByRole('button', { name: 'Log out' })).toBeVisible();
+  for (const path of ['me', 'auth']) {
+    let attempts = 0;
+    await page.route(`**/api/${path}`, (route) => {
+      attempts++;
+      return attempts <= 3
+        ? route.fulfill({
+            status: attempts === 1 ? 429 : attempts === 2 ? 503 : 500,
+            json: { detail: 'busy' },
+          })
+        : route.continue();
+    });
+    await page.reload();
+    await expect(
+      page.getByText('Checking owner login…', { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText('Read-only', { exact: true })).toHaveCount(0);
+    await expect(
+      page.getByText('Unable to check owner login; retrying.'),
+    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('button', { name: 'Log out' })).toBeVisible({
+      timeout: 15000,
+    });
+    expect(attempts).toBe(4);
+    await page.unroute(`**/api/${path}`);
+  }
+});
+
+test('429 and 503 permanently closed streams retry and reconnect', async ({
+  page,
+  request,
+}) => {
+  const [session] = z
+    .array(sessionSchema)
+    .parse(await (await request.get('/api/sessions')).json());
+  if (!session) throw new Error('missing fixture session');
+  let attempts = 0;
+  await page.route('**/transcript/stream?*', (route) => {
+    attempts++;
+    return attempts <= 2
+      ? route.fulfill({
+          status: attempts === 1 ? 429 : 503,
+          json: { detail: 'too many streams' },
+        })
+      : route.continue();
+  });
+  await page.goto(`/session/${session.id}`);
+  await expect(
+    page.getByText('Stream unavailable or too many open streams; retrying'),
+  ).toBeVisible();
+  await expect(page.getByText('Connected', { exact: true })).toBeVisible({
+    timeout: 10000,
+  });
+  expect(attempts).toBe(3);
+});
+
+test('repeated failures go offline and recover automatically when visible', async ({
+  page,
+}) => {
+  await page.goto('/notes');
+  await expect(page.getByRole('link', { name: 'Owner login' })).toBeVisible();
+  await page.route('**/api/**', (route) => route.abort('connectionfailed'));
+  await page.evaluate(() =>
+    document.dispatchEvent(new Event('visibilitychange')),
+  );
+  await expect(
+    page.getByRole('heading', { name: 'You’re offline' }),
+  ).toBeVisible({ timeout: 10000 });
+  expect(await page.evaluate(() => navigator.onLine)).toBe(true);
+  await page.unrouteAll({ behavior: 'wait' });
+  // No manual Retry: the scheduled probe recovers without any event.
+  await expect(
+    page.getByRole('heading', { name: 'Notes timeline' }),
+  ).toBeVisible({ timeout: 15000 });
+  await page.route('**/api/**', (route) => route.abort('connectionfailed'));
+  await page.evaluate(() =>
+    document.dispatchEvent(new Event('visibilitychange')),
+  );
+  await expect(
+    page.getByRole('heading', { name: 'You’re offline' }),
+  ).toBeVisible({ timeout: 10000 });
+  await page.unrouteAll({ behavior: 'wait' });
+  await page.evaluate(() =>
+    document.dispatchEvent(new Event('visibilitychange')),
+  );
+  await expect(
+    page.getByRole('heading', { name: 'Notes timeline' }),
+  ).toBeVisible();
 });

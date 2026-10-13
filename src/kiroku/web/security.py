@@ -5,7 +5,7 @@ import hashlib
 import ipaddress
 import re
 import time
-from collections import deque
+from collections import OrderedDict, deque
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -40,6 +40,23 @@ def client_ip(scope: Scope) -> str:
     return host
 
 
+def admission_key(scope: Scope) -> str:
+    host = client_ip(scope)
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return host
+    if isinstance(address, ipaddress.IPv6Address):
+        return str(ipaddress.ip_network(f"{address}/64", strict=False))
+    return str(address)
+
+
+@dataclass
+class Client:
+    requests: deque[float]
+    last_seen: float
+
+
 def csp(static: Path) -> str:
     hashes: set[str] = set()
     for html in static.glob("*.html"):
@@ -62,8 +79,9 @@ class PublicBoundary:
     def __init__(self, app: ASGIApp, *, static: Path, limits: Limits) -> None:
         self.app = app
         self.limits = limits
-        self.requests: dict[str, deque[float]] = {}
+        self.clients: OrderedDict[str, Client] = OrderedDict()
         self.streams: dict[str, int] = {}
+        self.stream_count = 0
         self.headers = {
             "Content-Security-Policy": csp(static),
             "X-Frame-Options": "DENY",
@@ -88,22 +106,21 @@ class PublicBoundary:
                     values["Cache-Control"] = "no-cache"
             await send(message)
 
-        ip = client_ip(scope)
+        ip = admission_key(scope)
         if path == "/api" or path.startswith("/api/"):
             now = time.monotonic()
-            # Bound memory even when an attacker rotates IPs. Expired clients leave on admission.
-            if ip not in self.requests:
-                self.requests = {
-                    key: q
-                    for key, q in self.requests.items()
-                    if q and q[-1] > now - self.limits.window_s
-                }
-                if len(self.requests) >= self.limits.clients:
-                    await JSONResponse({"detail": "API capacity reached"}, status_code=503)(
-                        scope, receive, headers
-                    )
-                    return
-            queue = self.requests.setdefault(ip, deque())
+            cutoff = now - self.limits.window_s
+            # Expire one oldest entry per admission; never scan the client table.
+            if self.clients and next(iter(self.clients.values())).last_seen <= cutoff:
+                self.clients.popitem(last=False)
+            if ip not in self.clients:
+                if len(self.clients) >= self.limits.clients:
+                    self.clients.popitem(last=False)
+                self.clients[ip] = Client(deque(), now)
+            client = self.clients[ip]
+            client.last_seen = now
+            self.clients.move_to_end(ip)
+            queue = client.requests
             while queue and queue[0] <= now - self.limits.window_s:
                 queue.popleft()
             if len(queue) >= self.limits.requests:
@@ -125,16 +142,18 @@ class PublicBoundary:
                     scope, receive, headers
                 )
                 return
-            if sum(self.streams.values()) >= self.limits.streams:
+            if self.stream_count >= self.limits.streams:
                 await JSONResponse({"detail": "stream capacity reached"}, status_code=503)(
                     scope, receive, headers
                 )
                 return
             self.streams[ip] = self.streams.get(ip, 0) + 1
+            self.stream_count += 1
         try:
             await self.app(scope, receive, headers)
         finally:
             if streaming:
                 self.streams[ip] -= 1
+                self.stream_count -= 1
                 if not self.streams[ip]:
                     del self.streams[ip]

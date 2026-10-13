@@ -50,15 +50,24 @@ async def test_rate_reset_bounded_clients_and_invalid_ip(
         assert (await client.get("/api/me")).status_code == 429
         assert (
             await client.get("/api/me", headers={"CF-Connecting-IP": "203.0.113.1"})
-        ).status_code == 503
+        ).status_code == 200
         now += 61
         assert (
             await client.get("/api/me", headers={"CF-Connecting-IP": "203.0.113.1"})
         ).status_code == 200
-        assert len(boundary.requests) == 1
+        assert len(boundary.clients) == 1
 
 
-async def test_stream_caps_release_on_cancel_and_error(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "ips",
+    [
+        ("203.0.113.1", "203.0.113.1", "203.0.113.2", "203.0.113.3"),
+        ("2001:db8:1:2::1", "2001:db8:1:2::ffff", "2001:db8:1:3::1", "2001:db8:1:4::1"),
+    ],
+)
+async def test_stream_caps_release_on_cancel_and_error(
+    tmp_path: Path, ips: tuple[str, str, str, str]
+) -> None:
     entered = asyncio.Queue[None]()
     release = asyncio.Event()
 
@@ -69,7 +78,9 @@ async def test_stream_caps_release_on_cancel_and_error(tmp_path: Path) -> None:
             raise RuntimeError("fixture disconnect")
         await ok(scope, receive, send)
 
-    boundary = PublicBoundary(held, static=tmp_path, limits=Limits(streams=2, streams_per_ip=1))
+    boundary = PublicBoundary(
+        held, static=tmp_path, limits=Limits(streams=2, streams_per_ip=1, clients=2)
+    )
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=boundary, client=("127.0.0.1", 1)),
         base_url="https://testserver",
@@ -77,29 +88,26 @@ async def test_stream_caps_release_on_cancel_and_error(tmp_path: Path) -> None:
         path = "/api/sessions/1/transcript/stream"
         tasks: list[asyncio.Task[httpx.Response]] = []
         try:
-            for ip in ("203.0.113.1", "203.0.113.2"):
+            for ip in (ips[0], ips[2]):
                 tasks.append(
                     asyncio.create_task(client.get(path, headers={"CF-Connecting-IP": ip}))
                 )
                 await asyncio.wait_for(entered.get(), 1)
-            assert (
-                await client.get(path, headers={"CF-Connecting-IP": "203.0.113.1"})
-            ).status_code == 429
-            assert (
-                await client.get(path, headers={"CF-Connecting-IP": "203.0.113.3"})
-            ).status_code == 503
+            assert (await client.get(path, headers={"CF-Connecting-IP": ips[1]})).status_code == 429
+            assert (await client.get(path, headers={"CF-Connecting-IP": ips[3]})).status_code == 503
             assert (await client.head(path)).status_code == 200
             tasks[0].cancel()
             with pytest.raises(asyncio.CancelledError):
                 await tasks[0]
             tasks.append(
-                asyncio.create_task(client.get(path, headers={"CF-Connecting-IP": "203.0.113.3"}))
+                asyncio.create_task(client.get(path, headers={"CF-Connecting-IP": ips[3]}))
             )
             await asyncio.wait_for(entered.get(), 1)
             release.set()
             results = await asyncio.gather(*tasks[1:], return_exceptions=True)
             assert all(isinstance(result, RuntimeError) for result in results)
             assert boundary.streams == {}
+            assert boundary.stream_count == 0
         finally:
             release.set()
             for task in tasks:
@@ -124,3 +132,51 @@ async def test_security_headers_and_script_hash(tmp_path: Path) -> None:
         for path in ("/api/me", "/auth/login"):
             assert (await client.get(path)).headers["cache-control"] == "no-store"
         assert (await client.get("/service-worker.js")).headers["cache-control"] == "no-cache"
+
+
+async def test_ipv6_rotation_shares_rate_limit(tmp_path: Path) -> None:
+    boundary = PublicBoundary(ok, static=tmp_path, limits=Limits(requests=1))
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=boundary, client=("127.0.0.1", 1)),
+        base_url="https://testserver",
+    ) as client:
+        for ip, status in [
+            ("2001:db8:1:2::1", 200),
+            ("2001:db8:1:2::ffff", 429),
+            ("2001:db8:1:3::1", 200),
+        ]:
+            assert (
+                await client.get("/api/me", headers={"CF-Connecting-IP": ip})
+            ).status_code == status
+
+
+async def test_full_client_table_evicts_least_recently_seen(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now = 100.0
+    monkeypatch.setattr("kiroku.web.security.time.monotonic", lambda: now)
+    boundary = PublicBoundary(ok, static=tmp_path, limits=Limits(requests=2, clients=2))
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=boundary, client=("127.0.0.1", 1)),
+        base_url="https://testserver",
+    ) as client:
+
+        async def hit(ip: str) -> int:
+            return (await client.get("/api/me", headers={"CF-Connecting-IP": ip})).status_code
+
+        assert await hit("203.0.113.1") == 200
+        now += 1
+        assert await hit("203.0.113.2") == 200
+        now += 1
+        assert await hit("203.0.113.1") == 200
+        assert await hit("203.0.113.3") == 200
+        assert list(boundary.clients) == ["203.0.113.1", "203.0.113.3"]
+        assert await hit("203.0.113.1") == 429
+        assert await hit("203.0.113.2") == 200
+        assert list(boundary.clients) == ["203.0.113.1", "203.0.113.2"]
+        now += 61
+        assert await hit("203.0.113.4") == 200
+        assert list(boundary.clients) == ["203.0.113.2", "203.0.113.4"]
+        assert await hit("203.0.113.4") == 200
+        assert list(boundary.clients) == ["203.0.113.4"]

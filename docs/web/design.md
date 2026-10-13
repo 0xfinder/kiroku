@@ -58,28 +58,47 @@ returns headers without starting a subscription.
 
 ## Public access and offline shell (D35)
 
-The public navigation shows Live, Notes and Rules. Rules appear as readable cards,
-with their instructions, threshold, Cooldown, Pack and enabled state. Editing, new
-Rule controls, paid tests and Review appear only after `/api/me` returns owner.
-Direct public navigation to Review shows an owner-login message with no voting
-controls. `/api/auth` advertises whether login is configured, keeping the owner-login
-link absent when it cannot work. Server owner dependencies enforce the same boundary.
+The public navigation shows Live, Notes and Rules. Rules appear as readable cards, with
+their instructions, threshold, Cooldown, Pack and enabled state. Editing, new Rule
+controls, paid tests and Review appear only after `/api/me` returns owner. Direct public
+navigation to Review shows an owner-login message with no voting controls. `/api/auth`
+advertises whether login is configured, keeping the owner-login link absent when it
+cannot work. Until both identity reads succeed, owner state remains unknown; failed
+reads retry with bounded exponential backoff and show a small error after repeated
+failures. Server owner dependencies enforce the same boundary.
 
 The header offers Owner login or Log out. Google OIDC returns to `/auth/callback`;
-logout posts with the existing Origin guard and clears the email cookie. Public
-read access needs no credentials. Owner sessions last 12 hours. All API/auth responses
+logout posts with the existing Origin guard and clears the email cookie. Public read
+access needs no credentials. Owner sessions last 12 hours. The ten-minute login flow is
+stateless in its own signed HttpOnly `/auth` cookie, with a salt distinct from the
+session. Callbacks clear it on success and failure; Google codes enforce single use.
+Restarting serve preserves pending logins. Google accepts exactly its two issuer
+spellings, and email matching is case insensitive. The configured HTTPS origin is
+canonicalized before the write Origin check. All API/auth responses
 use `Cache-Control: no-store`, including errors and `/api/me`.
 
 The manifest and generated icons support standalone installation. The service worker
 precaches build assets and `/`, removes obsolete version caches on activation, and
 uses network-first navigation with a cached-shell fallback. It never intercepts API,
 auth or SSE. Offline mode unmounts data views, clears owner UI state and displays
-“You’re offline” with a reconnect instruction. Failed network requests and gateway
-errors also select the offline view when the device still has internet access.
-Retry connection reloads identity before restoring data views. Delayed responses
-from earlier requests cannot clear the offline state.
-Online mode fetches identity again and
-remounts views, which reload current database data rather than showing stale speech.
+“You’re offline” with a reconnect instruction. A device reporting offline selects this
+view immediately; while online, three consecutive network/body or gateway failures
+are required. A successful API response resets failures and clears the offline view.
+The layout probes with bounded backoff while offline, and on online/visibility events;
+manual Retry also remains available. Identity reloads before owner controls return.
+Remounted views reload current database data. Late identity responses cannot restore
+owner controls after an offline event.
+
+A transcript stream rejected with 429 or 503 permanently closes native EventSource.
+The page detects CLOSED and creates a new stream with exponential backoff, showing
+“Stream unavailable or too many open streams; retrying”. Native reconnects retain
+“Reconnecting”. Every reopen reconciles stored speech; unmount cancels retry timers.
+
+Public admission shares quotas by IPv4 address or IPv6 /64. The bounded client LRU
+expires from its head and evicts the least recently seen entry when full, allowing
+new visitors in. Stream counts remain separate so eviction cannot release held slots.
+Deployment uses systemd user units, one watch process for both channels and a remotely
+managed cloudflared tunnel token file; see deploy/README.md.
 
 The CSP allows only same-origin scripts and hashes of installed bootstrap scripts;
 inline styles support dynamic meters and layout properties. Chromium acceptance

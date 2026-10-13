@@ -10,6 +10,7 @@ import pytest
 from fastapi import APIRouter, FastAPI
 from fastapi.dependencies.models import Dependant
 from fastapi.routing import APIRoute, RouteContext, iter_route_contexts
+from itsdangerous import BadSignature
 
 from kiroku.web.app import create_app
 from kiroku.web.auth import COOKIE, FLOW_COOKIE, SESSION_SECONDS, require_owner
@@ -73,6 +74,7 @@ async def test_login_session_logout(auth_client: tuple[httpx.AsyncClient, FastAP
         await client.post("/auth/logout", headers={"Origin": "https://testserver"})
     ).status_code == 303
     assert COOKIE not in client.cookies
+    assert FLOW_COOKIE not in client.cookies
     assert (await client.get("/api/me")).json() == {"owner": False}
     assert (await client.get("/api/review")).status_code == 403
 
@@ -117,8 +119,9 @@ async def test_reject_bad_identity(
         response.text
     )
     assert COOKIE not in client.cookies
+    assert FLOW_COOKIE not in client.cookies
     assert (await client.get("/api/me")).json() == {"owner": False}
-    # Even an unsuccessful exchange consumes the flow before the paid network boundary.
+    # An unsuccessful exchange clears the browser cookie too.
     assert (await client.get(callback)).status_code == 400
     assert oidc.exchanges == 1
 
@@ -129,12 +132,19 @@ async def test_state_browser_binding_expiry_and_single_use(
     client, app = auth_client
     callback = await begin(client)
     state = parse_qs(urlsplit(callback).query)["state"][0]
-    assert (await client.get(callback.replace(state, "wrong-state"))).status_code == 400
     saved = client.cookies[FLOW_COOKIE]
+    assert (await client.get(callback.replace(state, "wrong-state"))).status_code == 400
+    assert FLOW_COOKIE not in client.cookies
     client.cookies.clear()
     assert (await client.get(callback)).status_code == 400
     client.cookies.set(FLOW_COOKIE, saved, domain="testserver.local", path="/auth")
-    app.state.auth.flows[state] = replace(app.state.auth.flows[state], expires=0)
+    flow = app.state.auth.flow_signer.loads(saved)
+    client.cookies.set(
+        FLOW_COOKIE,
+        app.state.auth.flow_signer.dumps(flow | {"expires": 0}),
+        domain="testserver.local",
+        path="/auth",
+    )
     assert (await client.get(callback)).status_code == 400
     assert oidc.exchanges == 0
     callback = await begin(client)
@@ -142,7 +152,7 @@ async def test_state_browser_binding_expiry_and_single_use(
     assert (await client.get(callback)).status_code == 303
     client.cookies.set(FLOW_COOKIE, saved, domain="testserver.local", path="/auth")
     assert (await client.get(callback)).status_code == 400
-    assert oidc.exchanges == 1
+    assert oidc.exchanges == 2
 
 
 @pytest.mark.parametrize("oidc_enabled", [False, True])
@@ -272,35 +282,104 @@ def test_route_enumeration_catches_new_nested_private_read(database_url: str) ->
         assert_owner_boundary(app)
 
 
-async def test_pending_login_capacity_and_expired_cleanup(
+async def test_stateless_login_survives_restart_and_unbounded_visitors(
     auth_client: tuple[httpx.AsyncClient, FastAPI],
+    oidc: FakeOIDC,
 ) -> None:
-    from kiroku.web.auth import Flow
+    from kiroku.web.auth import OwnerAuth
 
     client, app = auth_client
-    app.state.auth.flows = {
-        str(n): Flow("nonce", "verifier", time.monotonic() + 600, str(n)) for n in range(128)
-    }
-    assert (await client.get("/auth/login")).status_code == 429
-    app.state.auth.flows = {str(n): Flow("nonce", "verifier", 0, str(n)) for n in range(128)}
-    assert (await client.get("/auth/login")).status_code == 302
-    assert len(app.state.auth.flows) == 1
-
-
-async def test_login_pending_limit_is_per_ip(
-    auth_client: tuple[httpx.AsyncClient, FastAPI],
-) -> None:
-    client, _ = auth_client
-    for _ in range(4):
+    callback = await begin(client)
+    saved = client.cookies[FLOW_COOKIE]
+    for n in range(130):
         assert (
-            await client.get("/auth/login", headers={"CF-Connecting-IP": "203.0.113.1"})
+            await client.get(
+                "/auth/login",
+                headers={"CF-Connecting-IP": f"2001:db8:{n:x}::1"},
+            )
         ).status_code == 302
-    assert (
-        await client.get("/auth/login", headers={"CF-Connecting-IP": "203.0.113.1"})
-    ).status_code == 429
-    assert (
-        await client.get("/auth/login", headers={"CF-Connecting-IP": "203.0.113.2"})
-    ).status_code == 302
+    # Repeated logins from the owner address cannot exhaust server flow state either.
+    for _ in range(5):
+        assert (await client.get("/auth/login")).status_code == 302
+    restarted = FastAPI()
+    restarted.state.auth = OwnerAuth(
+        replace(settings("unused"), oidc=app.state.auth.config), oidc.provider
+    )
+    restarted.include_router(restarted.state.auth.routes())
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=restarted), base_url="https://testserver"
+    ) as fresh:
+        fresh.cookies.set(FLOW_COOKIE, saved, domain="testserver.local", path="/auth")
+        assert (await fresh.get(callback)).status_code == 303
+        assert (await fresh.get("/api/me")).json()["owner"] is True
+
+
+async def test_tampered_flow_and_distinct_cookie_salts(
+    auth_client: tuple[httpx.AsyncClient, FastAPI],
+    oidc: FakeOIDC,
+) -> None:
+    client, app = auth_client
+    callback = await begin(client)
+    saved = client.cookies[FLOW_COOKIE]
+    with pytest.raises(BadSignature):
+        app.state.auth.signer.loads(saved)
+    client.cookies.set(COOKIE, saved, domain="testserver.local", path="/")
+    assert (await client.get("/api/me")).json() == {"owner": False}
+    client.cookies.set(FLOW_COOKIE, "tampered" + saved, domain="testserver.local", path="/auth")
+    assert (await client.get(callback)).status_code == 400
+    assert FLOW_COOKIE not in client.cookies
+    assert oidc.exchanges == 0
+
+
+@pytest.mark.parametrize(
+    "issuer", ["https://accounts.google.com", "accounts.google.com", "https://evil.test"]
+)
+async def test_google_issuer_variants(
+    auth_client: tuple[httpx.AsyncClient, FastAPI],
+    oidc: FakeOIDC,
+    issuer: str,
+) -> None:
+    client, app = auth_client
+    app.state.auth.provider = replace(oidc.provider, issuer="https://accounts.google.com")
+    oidc.claims = {"iss": issuer}
+    assert (await client.get(await begin(client))).status_code == (
+        400 if issuer == "https://evil.test" else 303
+    )
+
+
+async def test_normalized_owner_and_origin(database_url: str, oidc: FakeOIDC) -> None:
+    from kiroku.config import Settings
+
+    normalized = Settings.load(
+        {
+            "KIROKU_SECRETS_FILE": "/absent",
+            "GOOGLE_CLIENT_ID": "test-client",
+            "GOOGLE_CLIENT_SECRET": "test-secret",
+            "KIROKU_SESSION_SECRET": "s" * 48,
+            "KIROKU_OWNER_EMAIL": "Owner@Example.TEST",
+            "KIROKU_PUBLIC_URL": "HTTPS://Kiroku.orulon.com:443/",
+        }
+    ).oidc
+    assert normalized is not None
+    assert normalized.owner_email == "owner@example.test"
+    assert normalized.public_url == "https://kiroku.orulon.com"
+    oidc.claims = {"email": "OWNER@example.TEST"}
+    app = create_app(replace(settings(database_url), oidc=normalized), provider=oidc.provider)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url=normalized.public_url,
+        ) as client,
+    ):
+        assert (await client.get(await begin(client))).status_code == 303
+        assert (await client.get("/api/me")).json() == {
+            "owner": True,
+            "email": normalized.owner_email,
+        }
+        assert (
+            await client.post("/auth/logout", headers={"Origin": normalized.public_url})
+        ).status_code == 303
 
 
 def test_route_enumeration_catches_new_read_by_default(database_url: str) -> None:
@@ -312,3 +391,23 @@ def test_route_enumeration_catches_new_read_by_default(database_url: str) -> Non
 
     with pytest.raises(AssertionError, match="owner guard missing: /api/owner-stats"):
         assert_owner_boundary(app)
+
+
+async def test_flow_cookie_age_expiry(
+    auth_client: tuple[httpx.AsyncClient, FastAPI],
+    oidc: FakeOIDC,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from kiroku.web.auth import FLOW_SECONDS
+
+    client, _ = auth_client
+    callback = await begin(client)
+    future = int(time.time()) + FLOW_SECONDS + 1
+
+    def future_timestamp(_: object) -> int:
+        return future
+
+    monkeypatch.setattr("itsdangerous.timed.TimestampSigner.get_timestamp", future_timestamp)
+    assert (await client.get(callback)).status_code == 400
+    assert FLOW_COOKIE not in client.cookies
+    assert oidc.exchanges == 0

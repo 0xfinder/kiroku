@@ -1,21 +1,17 @@
 [Unit]
 Description=Kiroku public read-only notebook
-After=network-online.target docker.service
-Wants=network-online.target
 
 [Service]
 Type=simple
-User=finder
-WorkingDirectory=/home/finder/kiroku
+WorkingDirectory=%h/kiroku
 Environment=KIROKU_OWNER_EMAIL=ethanoixe@gmail.com
 Environment=KIROKU_PUBLIC_URL=https://kiroku.orulon.com
-ExecStart=/home/finder/kiroku/.venv/bin/kiroku serve
+ExecStart=%h/kiroku/.venv/bin/kiroku serve
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=15
 NoNewPrivileges=true
-PrivateTmp=true
 UMask=0077
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
+  import { transcriptStream } from '#lib/stream.ts';
   import { page } from '$app/state';
   import { z } from 'zod';
   import {
@@ -126,41 +127,43 @@
           ?.scrollIntoView({ block: 'center' });
     }
     const after = transcriptCursor(rows);
-    const stream = new EventSource(
-      `/api/sessions/${id}/transcript/stream?after_ms=${after}&after_id=${cursor.id}`,
-    );
     let opened = false;
-    stream.onopen = () => {
-      connection = 'Connected';
-      if (opened) void reconcile();
-      opened = true;
-    };
-    stream.onerror = () => {
-      connection = 'Reconnecting';
-      // A stream may reconnect while the API is healthy; probe before hiding data.
-      if (!destroyed) void request('/me').catch(() => {});
-    };
-    stream.addEventListener('transcript', (event: MessageEvent<string>) => {
-      try {
-        const incoming = z.array(utteranceSchema).parse(JSON.parse(event.data));
-        rows = mergeTranscript(rows, incoming);
-        void scrollLive();
-      } catch (e) {
-        error = message(e);
-      }
-    });
-    stream.addEventListener('reconcile', (event: MessageEvent<string>) => {
-      try {
-        const hint = reconcileSchema.parse(JSON.parse(event.data));
-        void reconcile(hint.after_ms);
-      } catch (e) {
-        error = message(e);
-      }
+    const stream = transcriptStream({
+      url: `/api/sessions/${id}/transcript/stream?after_ms=${after}&after_id=${cursor.id}`,
+      status: (value) => {
+        connection = value;
+      },
+      opened: () => {
+        if (opened) void reconcile();
+        opened = true;
+      },
+      failed: () => {
+        if (!destroyed) void request('/me').catch(() => {});
+      },
+      transcript: (event) => {
+        try {
+          const incoming = z
+            .array(utteranceSchema)
+            .parse(JSON.parse(event.data));
+          rows = mergeTranscript(rows, incoming);
+          void scrollLive();
+        } catch (e) {
+          error = message(e);
+        }
+      },
+      reconcile: (event) => {
+        try {
+          const hint = reconcileSchema.parse(JSON.parse(event.data));
+          void reconcile(hint.after_ms);
+        } catch (e) {
+          error = message(e);
+        }
+      },
     });
     return stream;
   }
   onMount(() => {
-    let stream: EventSource | undefined;
+    let stream: ReturnType<typeof transcriptStream> | undefined;
     void start()
       .then((value) => {
         if (destroyed) value?.close();

@@ -12,7 +12,7 @@ from authlib.common.errors import AuthlibBaseError  # pyright: ignore[reportMiss
 from authlib.integrations.httpx_client import AsyncOAuth2Client  # pyright: ignore[reportMissingTypeStubs]
 from authlib.oidc.core import CodeIDToken  # pyright: ignore[reportMissingTypeStubs]
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from joserfc import jwt
 from joserfc.errors import JoseError
@@ -20,7 +20,6 @@ from joserfc.jwk import KeySet
 from pydantic import BaseModel, StrictBool
 
 from kiroku.config import Settings
-from kiroku.web.security import client_ip
 
 COOKIE = "kiroku_session"
 FLOW_COOKIE = "kiroku_login"
@@ -41,12 +40,11 @@ class Identity(BaseModel):
     email_verified: StrictBool
 
 
-@dataclass(frozen=True)
-class Flow:
+class Flow(BaseModel):
+    state: str
     nonce: str
     verifier: str
     expires: float
-    ip: str
 
 
 def require_owner(request: Request) -> str:
@@ -70,11 +68,15 @@ class OwnerAuth:
         self.config = settings.oidc
         self.provider = provider
         self.signer = (
-            URLSafeTimedSerializer(self.config.session_secret.reveal(), salt="kiroku-owner")
+            URLSafeTimedSerializer(self.config.session_secret.reveal(), salt="kiroku-owner-session")
             if self.config
             else None
         )
-        self.flows: dict[str, Flow] = {}
+        self.flow_signer = (
+            URLSafeTimedSerializer(self.config.session_secret.reveal(), salt="kiroku-login-flow")
+            if self.config
+            else None
+        )
 
     def email(self, request: Request) -> str | None:
         if self.signer is None or self.config is None:
@@ -98,16 +100,13 @@ class OwnerAuth:
             return {"login": self.config is not None}
 
         @router.get("/auth/login")
-        async def login(request: Request) -> RedirectResponse:
-            if self.config is None or self.signer is None:
+        async def login() -> RedirectResponse:
+            if self.config is None or self.signer is None or self.flow_signer is None:
                 raise HTTPException(503, "owner login is not configured")
-            now = time.monotonic()
-            self.flows = {key: flow for key, flow in self.flows.items() if flow.expires > now}
-            ip = client_ip(request.scope)
-            if len(self.flows) >= 128 or sum(flow.ip == ip for flow in self.flows.values()) >= 4:
-                raise HTTPException(429, "too many pending logins; try again later")
             state, nonce, verifier = (secrets.token_urlsafe(32) for _ in range(3))
-            self.flows[state] = Flow(nonce, verifier, now + FLOW_SECONDS, ip)
+            flow = Flow(
+                state=state, nonce=nonce, verifier=verifier, expires=time.time() + FLOW_SECONDS
+            )
             async with self.client() as client:
                 url, _ = client.create_authorization_url(
                     self.provider.authorize, state=state, nonce=nonce, code_verifier=verifier
@@ -115,7 +114,7 @@ class OwnerAuth:
             response = RedirectResponse(url, status_code=302)
             response.set_cookie(
                 FLOW_COOKIE,
-                self.signer.dumps(state),
+                self.flow_signer.dumps(flow.model_dump()),
                 max_age=FLOW_SECONDS,
                 secure=True,
                 httponly=True,
@@ -124,21 +123,32 @@ class OwnerAuth:
             )
             return response
 
-        @router.get("/auth/callback")
-        async def callback(request: Request) -> RedirectResponse:
-            if self.config is None or self.signer is None:
+        @router.get("/auth/callback", response_model=None)
+        async def callback(request: Request) -> RedirectResponse | JSONResponse:
+            try:
+                response = await complete(request)
+            except HTTPException as error:
+                response = JSONResponse({"detail": error.detail}, status_code=error.status_code)
+            response.delete_cookie(
+                FLOW_COOKIE, path="/auth", secure=True, httponly=True, samesite="lax"
+            )
+            return response
+
+        async def complete(request: Request) -> RedirectResponse:
+            if self.config is None or self.signer is None or self.flow_signer is None:
                 raise HTTPException(503, "owner login is not configured")
             try:
-                state = self.signer.loads(
-                    request.cookies.get(FLOW_COOKIE, ""), max_age=FLOW_SECONDS
+                flow = Flow.model_validate(
+                    self.flow_signer.loads(
+                        request.cookies.get(FLOW_COOKIE, ""), max_age=FLOW_SECONDS
+                    )
                 )
-            except BadSignature:
+            except (BadSignature, ValueError):
                 raise HTTPException(400, "invalid login state") from None
-            if not isinstance(state, str) or state != request.query_params.get("state"):
+            if flow.state != request.query_params.get("state"):
                 raise HTTPException(400, "invalid login state")
-            flow = self.flows.pop(state, None)
-            if flow is None or flow.expires <= time.monotonic():
-                raise HTTPException(400, "login expired or already used")
+            if flow.expires <= time.time():
+                raise HTTPException(400, "login expired")
             code = request.query_params.get("code")
             if not code:
                 raise HTTPException(400, "login was not completed")
@@ -156,7 +166,13 @@ class OwnerAuth:
                     decoded.claims,
                     decoded.header,
                     {
-                        "iss": {"value": self.provider.issuer},
+                        "iss": {
+                            "values": (
+                                ["https://accounts.google.com", "accounts.google.com"]
+                                if self.provider.issuer == "https://accounts.google.com"
+                                else [self.provider.issuer]
+                            )
+                        },
                         "aud": {"value": self.config.client_id.reveal()},
                     },
                     {
@@ -169,15 +185,12 @@ class OwnerAuth:
                 identity = Identity.model_validate(decoded.claims)
             except (JoseError, AuthlibBaseError, httpx.HTTPError, ValueError, KeyError, TypeError):
                 raise HTTPException(400, "invalid identity response") from None
-            if not identity.email_verified or identity.email != self.config.owner_email:
+            if not identity.email_verified or identity.email.lower() != self.config.owner_email:
                 raise HTTPException(403, "this Google account is not the owner")
             response = RedirectResponse("/", status_code=303)
-            response.delete_cookie(
-                FLOW_COOKIE, path="/auth", secure=True, httponly=True, samesite="lax"
-            )
             response.set_cookie(
                 COOKIE,
-                self.signer.dumps(identity.email),
+                self.signer.dumps(self.config.owner_email),
                 max_age=SESSION_SECONDS,
                 secure=True,
                 httponly=True,

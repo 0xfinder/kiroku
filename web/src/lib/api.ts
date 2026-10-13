@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { serverAvailable } from '#lib/connectivity.ts';
+import { connectionFailed, connectionSucceeded } from '#lib/connectivity.ts';
 
 const decimal = z.union([z.number(), z.string()]).pipe(z.coerce.number());
 export const sessionSchema = z.object({
@@ -149,11 +149,11 @@ export async function request(
       (response.status === 503 &&
         !response.headers.get('content-type')?.includes('application/json'))
     ) {
-      serverAvailable.set(false);
+      connectionFailed();
     }
     if (!response.ok) {
       const value: unknown = await response.json().catch((error: unknown) => {
-        if (error instanceof TypeError) serverAvailable.set(false);
+        if (error instanceof TypeError) throw error;
         return null;
       });
       const parsed = z.object({ detail: z.string() }).safeParse(value);
@@ -163,10 +163,12 @@ export async function request(
           : `Request failed (${response.status})`,
       );
     }
-    if (response.status === 204) return null;
-    return await response.json();
+    const value: unknown =
+      response.status === 204 ? null : await response.json();
+    connectionSucceeded();
+    return value;
   } catch (error) {
-    if (!response || error instanceof TypeError) serverAvailable.set(false);
+    if (!response || error instanceof TypeError) connectionFailed();
     throw error;
   }
 }
