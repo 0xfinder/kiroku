@@ -13,14 +13,18 @@ from decimal import ROUND_UP, Decimal
 from typing import Any, Final, Literal
 
 import httpx
+import psycopg
 
+from kiroku.budget import OverBudget
 from kiroku.config import Secret
 from kiroku.gate.windows import JSON
 from kiroku.groq_http import go_seconds, retry_delay
 from kiroku.ledger import CostEntry, Tokens
 from kiroku.llm import (
+    LLMAttempt,
     LLMAuthError,
     LLMBadResponse,
+    LLMCancelled,
     LLMRequest,
     LLMResult,
     LLMUnavailable,
@@ -75,6 +79,11 @@ def token_count(raw: object) -> int:
     return raw
 
 
+@dataclass(slots=True)
+class Dispatch:
+    started: bool = False
+
+
 class GroqLLM:
     def __init__(
         self,
@@ -103,9 +112,9 @@ class GroqLLM:
     ) -> LLMResult[T]:
         body = request_body(self._model, request, self._effort)
         estimate = estimate_tokens(body, request.max_output_tokens)
-        await request.guard.check(PRICE.usd(estimate))
         first = self._clock()
         costs: list[CostEntry] = []
+        attempts: list[LLMAttempt] = []
         attempt, bad = 0, 0
         wait, last = 0.0, "rate limited"
         while True:
@@ -113,21 +122,42 @@ class GroqLLM:
             left = request.give_up_s - (self._clock() - first)
             if left <= 0 or wait >= left:
                 raise LLMUnavailable(
-                    f"groq unavailable after {attempt} attempts: {last}", tuple(costs)
+                    f"groq unavailable after {attempt} attempts: {last}",
+                    tuple(costs),
+                    tuple(attempts),
                 )
-            if wait:
-                await self._sleep(wait)
+            try:
+                if wait:
+                    await self._sleep(wait)
+            except asyncio.CancelledError:
+                raise LLMCancelled(tuple(costs), tuple(attempts)) from None
+            try:
+                await request.guard.check(PRICE.usd(estimate) + sum(c.usd for c in costs))
+            except asyncio.CancelledError:
+                raise LLMCancelled(tuple(costs), tuple(attempts)) from None
+            except psycopg.OperationalError:
+                raise LLMUnavailable(
+                    "budget database unavailable", tuple(costs), tuple(attempts)
+                ) from None
+            except OverBudget as e:
+                raise OverBudget(e.refusal, tuple(costs), tuple(attempts)) from e
             attempt += 1
             started = self._clock()
             estimated = CostEntry(
                 PROVIDER, self._model, request.purpose, estimate, PRICE.usd(estimate), 0
             )
+            dispatch = Dispatch()
             try:
-                response = await self._send(request, body, first)
+                response = await self._send(request, body, first, dispatch)
                 if response is None:
                     continue
+            except asyncio.CancelledError:
+                if dispatch.started:
+                    costs.append(estimated)
+                    attempts.append(LLMAttempt("", "cancelled request; provider outcome unknown"))
+                raise LLMCancelled(tuple(costs), tuple(attempts)) from None
             except LLMUnavailable as e:
-                raise LLMUnavailable(e.reason, tuple(costs)) from e
+                raise LLMUnavailable(e.reason, tuple(costs), tuple(attempts)) from e
             except httpx.RequestError as e:
                 if not isinstance(e, httpx.ConnectError | httpx.ConnectTimeout):
                     costs.append(estimated)
@@ -137,8 +167,11 @@ class GroqLLM:
             latency = int((self._clock() - started) * 1000)
             status = response.status_code
             if status in (401, 403):
-                raise LLMAuthError(f"Groq rejected the API key (HTTP {status})", tuple(costs))
+                raise LLMAuthError(
+                    f"Groq rejected the API key (HTTP {status})", tuple(costs), tuple(attempts)
+                )
             if status == 429 or status >= 500:
+                attempts.append(LLMAttempt(response.text, f"HTTP {status}"))
                 wait = retry_delay(status, response.headers, attempt)
                 if status == 429:
                     self._not_before = max(self._not_before, self._clock() + wait)
@@ -152,14 +185,17 @@ class GroqLLM:
                 except (ValueError, TypeError, AttributeError):
                     invalid = False
                 if not invalid:
-                    raise LLMBadResponse(f"groq HTTP {status}", tuple(costs))
+                    attempts.append(LLMAttempt(response.text, f"HTTP {status}"))
+                    raise LLMBadResponse(f"groq HTTP {status}", tuple(costs), tuple(attempts))
+                attempts.append(LLMAttempt(response.text, "provider rejected JSON"))
                 costs.append(estimated)
                 bad += 1
                 if bad >= 2:
-                    raise LLMBadResponse("groq invalid JSON twice", tuple(costs))
+                    raise LLMBadResponse("groq invalid JSON twice", tuple(costs), tuple(attempts))
                 wait = 0.0
                 continue
             counted = False
+            content = response.text
             try:
                 raw = object_body(response.json())
                 usage = object_body(raw["usage"])
@@ -180,18 +216,22 @@ class GroqLLM:
                 if not isinstance(content, str):
                     raise ValueError("missing completion text")
                 value = parse(object_body(json.loads(content)))
-            except (ValueError, KeyError, TypeError, IndexError):
+            except (ValueError, KeyError, TypeError, IndexError) as e:
+                attempts.append(LLMAttempt(content, str(e)))
                 if not counted:
                     costs.append(estimated)
                 bad += 1
                 if bad >= 2:
-                    raise LLMBadResponse("groq malformed completion twice", tuple(costs)) from None
+                    raise LLMBadResponse(
+                        "groq malformed completion twice", tuple(costs), tuple(attempts)
+                    ) from None
                 wait = 0.0
                 continue
-            return LLMResult(value, f"{PROVIDER}:{model}", tuple(costs))
+            attempts.append(LLMAttempt(content))
+            return LLMResult(value, f"{PROVIDER}:{model}", tuple(costs), tuple(attempts))
 
     async def _send(
-        self, request: LLMRequest, body: Mapping[str, JSON], first: float
+        self, request: LLMRequest, body: Mapping[str, JSON], first: float, dispatch: Dispatch
     ) -> httpx.Response | None:
         # Only admission mutates the known available quota. HTTP calls run independently
         # so a slow Extraction cannot consume the Fallback's deadline while holding a lock.
@@ -200,7 +240,8 @@ class GroqLLM:
                 self._remaining_requests = None
             if (
                 self._remaining_requests is not None
-                and self._remaining_requests < request.min_remaining_requests
+                and self._remaining_requests <= request.min_remaining_requests
+                and request.min_remaining_requests > 0
             ):
                 raise LLMUnavailable("daily request quota reserved for Extraction")
             left = request.give_up_s - (self._clock() - first)
@@ -214,6 +255,7 @@ class GroqLLM:
             self._inflight += 1
         definite_failure = False
         try:
+            dispatch.started = True
             response = await self._http.post(
                 URL,
                 headers={"Authorization": f"Bearer {self._key.reveal()}"},

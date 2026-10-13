@@ -276,3 +276,22 @@ Shutdown first stops channels and drains transcription and their final Gate pass
 A send needs at least five seconds remaining before its deadline, plus the pacing wait. Insufficient time produces `stale` without sending or starting Cooldown. A started send gets its normal 15-second request timeout; staleness gates the start. Callbacks with a missing message date or `date: 0` confirm uncertain delivery at receipt time instead of 1970.
 
 Rejected: consuming a Window to persist primary-auth costs, stopping the primary for a Fallback key error, and cancelling the worker before final Gate decisions exist. Regression coverage includes a real ffmpeg shutdown replay, second-signal interruption, lost ledger acknowledgements, deadline pacing, and inaccessible callbacks.
+
+
+## D31. Rolling Notes use Groq, with Pack schemas and durable attempt records
+
+2026-10-13. Supersedes D7's Notes model assignment. Notes use Groq `openai/gpt-oss-120b` through the shared `LLM.complete_json` interface. An Anthropic key is not available. Pydantic v2 validates the Pack's versioned schema, then the parser checks every timestamp against the source span. The adapter retries a malformed result once.
+
+Notes tile the session audio clock in 180-second spans, including a closed session's final partial span. They wait for the transcript watermark and, when enabled, Gate progress. Mode is the most common answered Window Mode in the span, with ties going to the latest. The Segment at the span start selects the Pack. Unknown Mode, unsupported Modes, and Packs without Notes use the core `general` schema.
+
+One worker serves the process's claimed channels. It reads stored history, handles open sessions and sessions closed within 12 hours, and resumes from the last terminal Note. It never waits on the capture path. Transcript and Gate commits wake it, with a 30-second poll backstop. Notes reserve 300 requests for Extraction and Fallback. At one Fallback every 45 seconds, that reserve covers roughly 3.75 hours of Gate outage before counting Extraction. This is an initial operating margin, not a measured traffic forecast.
+
+Shutdown drains channels and Alerts, then gives an in-flight Notes request 35 seconds to finish its 30-second provider deadline and write. Notes stop admitting new spans when that drain starts. Cancellation preserves completed attempts in the retry journal and charges an estimate for an interrupted request with an uncertain result. Storage gets at most one extra second after cancellation. A second signal can interrupt storage. A sustained database outage or hard kill can lose an attempt before its journal commits; the pending span is retried. Pending spans resume on restart.
+
+A terminal `note` row and that call's Cost ledger rows commit in one transaction, keyed by `(session_id, start_ms)`. Unavailable or auth failures leave the span pending. A small `note_retry` journal stores those attempts and their ledger rows in its own idempotent transaction. This extends the issue's proposed storage: without a journal, a restart would lose billed pending attempts. Completion copies the attempts into the Note and deletes the journal entries atomically. Every attempt retains its original input, system prompt, model, raw output, and validation error, even if a restart changes the selected schema. JSON export streams terminal rows.
+
+The prompt carries teams, game number, and draft from previous Notes. It forbids copying previous timestamped items. The first live prototype demonstrated why: gpt-oss sometimes repeated previous takes with timestamps outside the new span. Validation rejected those results and the worker continued. The final recording and measured limits are in `spikes/README.md`.
+
+**Rejected:** running Notes inside the Gate loop, which would let a slow completion stall the Gate. A generic agent is unnecessary for this fixed summarization step.
+
+**Revisit:** the model, quota reserve, and prompt after measurements from live streams with reliable Speaker maps.

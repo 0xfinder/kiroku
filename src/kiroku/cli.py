@@ -15,13 +15,14 @@ import signal
 from collections.abc import Awaitable, Callable, Generator
 from contextlib import contextmanager
 from dataclasses import replace
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Annotated
 
 import httpx
 import typer
 
-from kiroku import alerting, backfill, dry_run, rules, sessions
+from kiroku import alerting, backfill, dry_run, notes, rules, sessions
 from kiroku.budget import Budget
 from kiroku.config import ConfigError, SecretName, Settings
 from kiroku.db import Pool, connect, open_pool
@@ -49,6 +50,8 @@ rule_app = typer.Typer(no_args_is_help=True, help="Alert Rules: what the Gate as
 app.add_typer(rule_app, name="rule")
 alert_app = typer.Typer(no_args_is_help=True, help="Recent Alerts and suppression reasons.")
 app.add_typer(alert_app, name="alert")
+notes_app = typer.Typer(no_args_is_help=True, help="Rolling Notes timeline and dataset.")
+app.add_typer(notes_app, name="notes")
 
 PACK_FACTORIES: dict[str, Callable[[httpx.AsyncClient, Settings], Pack]] = {
     LeaguePack.name: lambda http, settings: LeaguePack(
@@ -103,8 +106,9 @@ def watch_command(
     channels: Annotated[list[str], typer.Argument(help="Twitch logins, e.g. gorgc caedrel")],
     poll_s: Annotated[float, typer.Option(help="Seconds between live checks.")] = 60.0,
     no_gate: Annotated[
-        bool, typer.Option("--no-gate", help="Transcribe only; needs no JEV_API_KEY.")
+        bool, typer.Option("--no-gate", help="Skip the Gate; needs no JEV_API_KEY.")
     ] = False,
+    no_notes: Annotated[bool, typer.Option("--no-notes", help="Skip rolling Notes.")] = False,
     no_alerts: Annotated[
         bool, typer.Option("--no-alerts", help="Gate without Telegram Alerts or Labels.")
     ] = False,
@@ -145,6 +149,7 @@ def watch_command(
             packs = [factory(http, settings) for factory in PACK_FACTORIES.values()]
             budget = Budget(pool, settings.caps)
             llm = GroqLLM(http, groq_key)
+            transcriber = GroqTranscriber(http, groq_key)
             notifier = (
                 TelegramNotifier(http, telegram_key, chat_id)
                 if telegram_key is not None and chat_id is not None
@@ -158,13 +163,24 @@ def watch_command(
             await watch(
                 pool,
                 sources,
-                GroqTranscriber(http, groq_key),
+                transcriber,
                 settings.data_dir,
                 budget=budget,
                 gate=FallbackGate(JevGate(http, jev_key, give_up_s=20), LLMGate(llm))
                 if jev_key
                 else None,
                 alerts=alerts,
+                notes=notes.NotesWorker(
+                    pool,
+                    [c.id for c in claimed],
+                    transcriber.name,
+                    llm,
+                    budget,
+                    packs,
+                    gated=not no_gate,
+                )
+                if not no_notes
+                else None,
                 notifier=notifier,
                 database_url=settings.database_url,
                 poll_s=poll_s,
@@ -403,3 +419,38 @@ def alert_list(
 
     with _user_errors():
         asyncio.run(run(Settings.load()))
+
+
+@notes_app.command("list")
+def notes_list(
+    session: Annotated[int | None, typer.Option(help="Session id.")] = None,
+    last: Annotated[int, typer.Option(min=1, help="Number of spans.")] = 20,
+) -> None:
+    """Print structured Notes as a timestamped timeline."""
+
+    async def run() -> None:
+        async with open_pool(Settings.load().database_url) as pool:
+            for row in await notes.rows(pool, session_id=session, last=last):
+                typer.echo(notes.timeline(row))
+
+    with _user_errors():
+        asyncio.run(run())
+
+
+@notes_app.command("export")
+def notes_export(
+    since: Annotated[str, typer.Option(help="Inclusive UTC date, YYYY-MM-DD.")],
+) -> None:
+    """Write one distillation input/output pair per Notes span as JSONL."""
+
+    async def run(date: datetime) -> None:
+        async with open_pool(Settings.load().database_url) as pool:
+            async for row in notes.export(pool, date):
+                typer.echo(notes.canonical(row))
+
+    with _user_errors():
+        try:
+            date = datetime.strptime(since, "%Y-%m-%d").replace(tzinfo=UTC)
+        except ValueError:
+            raise KirokuError("--since must be a date in YYYY-MM-DD format") from None
+        asyncio.run(run(date))

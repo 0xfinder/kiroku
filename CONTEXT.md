@@ -33,7 +33,7 @@ The names kiroku's code, docs, and design discussions use. If a discussion needs
 ## Notes
 
 - **Window** — a 45 s slice of a session's audio clock that the Gate evaluates. Windows sit back to back; the last one of a session can be shorter. Stored as `gate_window` (`window` is reserved in SQL), with the exact state the Gate saw: `new` (what was said in the Window) and `context` (stream details and a short tail of earlier speech).
-- **Notes** — structured, timestamped summaries produced every few minutes by the Notes model. Their shape comes from the Pack's Notes schema for the current Mode. The notes step is the distillation target.
+- **Notes** — structured summaries of 180-second spans on the session audio clock. A closed session also gets a final partial span. The Segment at the span start selects the Pack; answered Windows select Mode by majority, with ties going to the latest. Pack schemas and the core `general` schema carry a name and version. Pydantic validates the body, and every `at_ms` must lie inside the source span. Empty and failed spans still advance the Notes timeline. Inputs and raw attempts form the distillation dataset. `kiroku notes list` reads the timeline; `kiroku notes export --since DATE` writes JSONL.
 
 ## Alerts
 

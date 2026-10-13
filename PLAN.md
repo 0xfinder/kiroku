@@ -13,7 +13,7 @@ Twitch watcher (streamlink metadata poll ~60 s: live? category?)
   → Utterances (speaker labels) → Speaker map (Jev) → Streamer turns
   → Windows (~45 s) ─┬→ Gate (Jev: Mode + every active Rule) → Extraction + Novelty check (Haiku)
                      │      → Notifier (Telegram 👍/👎) → Labels
-                     └→ Notes every ~3 min (Haiku, Pack schema for the current Mode)
+                     └→ Notes every 3 min (Groq gpt-oss, versioned Pack schema for Mode)
   → Postgres (transcript, Notes, Gate decisions, Alerts, Labels, Cost ledger)
   → FastAPI (SSE) → SvelteKit web app; Telegram /ask → Q&A agent
 ```
@@ -30,7 +30,8 @@ Twitch watcher (streamlink metadata poll ~60 s: live? category?)
 | `transcript_span` | Audio ranges a Transcriber has finalized; the exactly-once key and the completeness watermark |
 | `speaker_map` | Speaker label → role, probability, who decided it and when |
 | `gate_window` | Window bounds, the state the Gate saw, status, inferred Mode and its probability, Game key |
-| `note` | JSONB body, Pack, Mode, `schema_version`, model, time span, Game key |
+| `note` | Terminal Notes spans: validated JSONB body, Pack, Mode, schema name and version, model, Game key, exact input and every raw attempt |
+| `note_retry` | Pending Notes attempts and original inputs until terminal completion; billed attempts commit with their ledger rows |
 | `rule` | Owner, instructions, Pack scope, threshold, Cooldown, enabled |
 | `gate_decision` | Window × Rule: the question asked, probability, threshold, passed |
 | `alert` | Rule, Game key, content, Notifier, external message id, sent time |
@@ -57,7 +58,7 @@ Each phase ends with something that can be observed working.
 - Speaker map, Windows, Mode, and the Gate with every Rule in one Jev call.
 - Extraction, Novelty check, and Cooldown; Telegram Notifier with 👍/👎.
 - League Vocabulary and `get_live_match` from the `live-lol-esports` lolesports client are implemented (issue #6). Recorded Caedrel name audit: 15 errors with title-only, 9 with match Vocabulary. Teams and picks reach the Gate in replay; the live feed still needs verification during a pro match. The public endpoints do not expose bans.
-- Notes on a schedule using the League Pack's Notes schemas.
+- Rolling Notes with League schemas for `watching_pro`, `playing`, and `chatting`, plus core `general` Notes, are implemented in issue #7. Notes resume after restart and export the distillation dataset.
 - Cost ledger and Budget caps.
 - Minimal web app: live transcript, Notes timeline, Rule editor, Review queue.
 - **Done when:** during a live Caedrel co-stream, a "predicts the winner" Rule alerts within about 60 s with his reasoning, sends no duplicate for the same game, and the session's cost is visible.

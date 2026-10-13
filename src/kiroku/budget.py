@@ -13,7 +13,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Literal, Protocol
+from typing import TYPE_CHECKING, Literal, Protocol
+
+if TYPE_CHECKING:
+    from kiroku.llm import LLMAttempt
 
 from kiroku import ledger
 from kiroku.db import Pool
@@ -44,10 +47,16 @@ class Refusal:
 class OverBudget(Exception):
     """A paid call was refused. Expected and handled per call, so not a KirokuError."""
 
-    def __init__(self, refusal: Refusal, costs: tuple[ledger.CostEntry, ...] = ()) -> None:
+    def __init__(
+        self,
+        refusal: Refusal,
+        costs: tuple[ledger.CostEntry, ...] = (),
+        attempts: tuple[LLMAttempt, ...] = (),
+    ) -> None:
         super().__init__(str(refusal))
         self.refusal = refusal
         self.costs = costs
+        self.attempts = attempts
 
 
 def refusal(

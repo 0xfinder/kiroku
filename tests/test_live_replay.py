@@ -25,7 +25,7 @@ import httpx
 import pytest
 from psycopg import AsyncConnection
 
-from kiroku import alerting, backfill, rules, sessions, transcript
+from kiroku import alerting, backfill, notes, rules, sessions, transcript
 from kiroku.budget import Budget, Caps
 from kiroku.config import Secret
 from kiroku.db import Pool, open_pool
@@ -102,6 +102,7 @@ async def watch_until(
     select_pack: PackSelector = lambda category: None,
     llm: LLM | None = None,
     notifier: Notifier | None = None,
+    notes_llm: LLM | None = None,
 ) -> None:
     """Run `kiroku watch fake` until `done()` (a coroutine) returns True, then stop it."""
     async with (
@@ -123,6 +124,17 @@ async def watch_until(
                 data_dir,
                 budget=budget,
                 alerts=alerts,
+                notes=notes.NotesWorker(
+                    pool,
+                    [channels[0].id],
+                    "groq:whisper-large-v3-turbo",
+                    notes_llm,
+                    budget,
+                    gated=gate is not None,
+                    policy=notes.NotesPolicy(length_ms=45_000),
+                )
+                if notes_llm is not None
+                else None,
                 gate=gate,
                 poll_s=0.5,
                 select_pack=select_pack,
@@ -555,3 +567,59 @@ async def test_shutdown_alerts_decisions_from_drained_transcription(
     assert await (await conn.execute("SELECT start_ms, end_ms FROM gate_window")).fetchall() == [
         (0, 45_000)
     ]
+
+
+async def test_notes_hang_doesnt_stall_transcription_or_gate(
+    database_url: str,
+    pool: Pool,
+    conn: AsyncConnection,
+    tmp_path: Path,
+    fake_stream: Callable[[str], None],
+) -> None:
+    from collections.abc import Mapping
+
+    from kiroku.llm import LLMRequest, LLMResult
+    from tests.test_gating import FakeGate
+
+    fake_stream("100")
+    entered = asyncio.Event()
+
+    class HungNotes:
+        name = "hung"
+
+        async def complete_json[T](
+            self,
+            request: LLMRequest,
+            parse: Callable[[Mapping[str, Any]], T],
+        ) -> LLMResult[T]:
+            entered.set()
+            await asyncio.Event().wait()
+            raise AssertionError("cancelled Notes should not return")
+
+    async def done() -> bool:
+        gates = await (await conn.execute("SELECT count(*) FROM gate_window")).fetchone()
+        spans = await (
+            await conn.execute("SELECT max(audio_end_ms) FROM transcript_span")
+        ).fetchone()
+        return (
+            entered.is_set()
+            and gates is not None
+            and gates[0] >= 2
+            and spans is not None
+            and spans[0] >= 100_000
+        )
+
+    await watch_until(
+        database_url,
+        pool,
+        tmp_path / "data",
+        GroqStub(),
+        done,
+        gate=FakeGate(0.9),
+        notes_llm=HungNotes(),
+    )
+    assert entered.is_set()
+    assert await (await conn.execute("SELECT count(*) FROM note")).fetchone() == (0,)
+    assert await (
+        await conn.execute("SELECT count(*) FROM gate_window WHERE status='answered'")
+    ).fetchone() == (2,)

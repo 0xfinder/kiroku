@@ -34,6 +34,7 @@ from kiroku.db import Pool
 from kiroku.gate import Gate
 from kiroku.gate.windows import JSON, Bounds
 from kiroku.gating import GateLoop
+from kiroku.notes import NotesWorker
 from kiroku.notify import Notifier
 from kiroku.pack import LiveContext, Pack, PackSelector
 from kiroku.sessions import Channel
@@ -48,6 +49,7 @@ DRAIN_TIMEOUT_S = 120.0
 BACKFILL_STOP_TIMEOUT_S = 30.0  # one in-flight Transcriber call; the rest waits for next start
 GATE_DRAIN_TIMEOUT_S = 60.0
 ALERT_DRAIN_TIMEOUT_S = 20.0
+NOTES_DRAIN_TIMEOUT_S = 35.0  # one 30-second provider deadline plus its commit
 PACK_REFRESH_S = 60.0
 
 # ---- lifecycle: pure ---------------------------------------------------------------------
@@ -138,6 +140,7 @@ async def watch(
     poll_s: float = 60.0,
     select_pack: PackSelector = lambda category: None,
     alerts: AlertWorker | None = None,
+    notes: NotesWorker | None = None,
     notifier: Notifier | None = None,
     database_url: str | None = None,
 ) -> None:
@@ -151,10 +154,15 @@ async def watch(
         gate,
         select_pack,
         alerts.wake if alerts else lambda: None,
+        notes.wake if notes else lambda: None,
     )
     background: list[asyncio.Task[None]] = []
     worker: asyncio.Task[None] | None = None
+    notes_task: asyncio.Task[None] | None = None
     try:
+        if notes is not None:
+            notes_task = asyncio.create_task(notes.run())
+            background.append(notes_task)
         if alerts is not None:
             worker = asyncio.create_task(alerts.run())
             background.append(worker)
@@ -188,6 +196,16 @@ async def watch(
                     await asyncio.wait_for(asyncio.shield(worker), ALERT_DRAIN_TIMEOUT_S)
                 except TimeoutError:
                     log.warning("Alert drain timed out; remaining decisions wait for restart")
+            if (
+                notes is not None
+                and notes_task is not None
+                and (current is None or current.cancelling() < 2)
+            ):
+                notes.finish()
+                try:
+                    await asyncio.wait_for(asyncio.shield(notes_task), NOTES_DRAIN_TIMEOUT_S)
+                except TimeoutError:
+                    log.warning("Notes drain timed out; pending spans wait for restart")
     finally:
         for task in background:
             task.cancel()
@@ -205,6 +223,11 @@ class Services:
     gate: Gate | None
     select_pack: PackSelector = lambda category: None
     alerts_wake: Callable[[], None] = lambda: None
+    notes_wake: Callable[[], None] = lambda: None
+
+    def gate_committed(self) -> None:
+        self.alerts_wake()
+        self.notes_wake()
 
 
 async def _watch_channel(
@@ -275,7 +298,7 @@ async def _gate_closed_sessions(services: Services, channel: Channel) -> None:
             services.budget.guard(session_id),
             lambda stream=stream: stream,
             use_segments=True,
-            on_commit=services.alerts_wake,
+            on_commit=services.gate_committed,
         )
         loop.finish(session_ended=True)
         try:
@@ -314,6 +337,7 @@ class SessionRun:
             self._pack = self._selector(meta.category)
         except Exception:
             log.exception("session %d: Pack selection failed", session_id)
+        self._notes_wake = services.notes_wake
         self._pool = services.pool
         self._channel = channel
         self._source = source
@@ -330,7 +354,7 @@ class SessionRun:
                 self._stream,
                 live=self._live_for_window,
                 use_segments=True,
-                on_commit=services.alerts_wake,
+                on_commit=services.gate_committed,
                 blocked_from=lambda: self._pending_update[1] if self._pending_update else None,
             )
             if services.gate is not None
@@ -531,6 +555,7 @@ class SessionRun:
                 self._vocabulary,
                 self._guard,
                 stopping=self._stopping,
+                on_commit=self._notes_wake,
             )
         except Exception:
             log.exception("session %d: backfill failed; the gaps stay", self.session_id)
@@ -543,6 +568,7 @@ class SessionRun:
         context = Context(self._vocabulary, self._guard, previous_text)
         async for result in self._transcriber.transcribe(self._events(), context):
             await transcript.commit(self._pool, self.session_id, self._transcriber.name, result)
+            self._notes_wake()
             if self._gate_loop is not None:
                 self._gate_loop.wake()
 

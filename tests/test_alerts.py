@@ -444,7 +444,7 @@ async def test_connect_failure_does_not_spend_reserved_daily_requests() -> None:
         return httpx.Response(
             200,
             json=completion({"claim": "yes"}),
-            headers={"x-ratelimit-remaining-requests": "150", "x-ratelimit-reset-requests": "24h"},
+            headers={"x-ratelimit-remaining-requests": "151", "x-ratelimit-reset-requests": "24h"},
         )
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as http:
@@ -572,3 +572,101 @@ async def test_llm_token_limit_waits_for_minute_reset_not_daily_requests() -> No
         assert (await llm.complete_json(request(), parse)).value == "yes"
         assert (await llm.complete_json(request(), parse)).value == "yes"
     assert calls == 3 and clock.waits == [2]
+
+
+@pytest.mark.parametrize("remaining", [300, 301])
+async def test_notes_respects_exact_quota_reserve(remaining: int) -> None:
+    calls = 0
+
+    def respond(req: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(
+            200,
+            json=completion({"claim": "yes"}),
+            headers={
+                "x-ratelimit-remaining-requests": str(remaining),
+                "x-ratelimit-reset-requests": "24h",
+            },
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as http:
+        llm = GroqLLM(http, Secret("k"))
+        await llm.complete_json(request(), parse)
+        req = LLMRequest("s", "{}", Purpose.NOTES, Unlimited(), 512, 20, 300)
+        if remaining == 300:
+            with pytest.raises(LLMUnavailable, match="reserved"):
+                await llm.complete_json(req, parse)
+        else:
+            assert (await llm.complete_json(req, parse)).value == "yes"
+    assert calls == (1 if remaining == 300 else 2)
+
+
+async def test_cancel_during_retry_budget_check_keeps_paid_attempt() -> None:
+    import asyncio
+
+    from kiroku.llm import LLMCancelled
+
+    entered = asyncio.Event()
+
+    class Guard:
+        calls = 0
+
+        async def check(self, estimate_usd: Decimal) -> None:
+            self.calls += 1
+            if self.calls == 2:
+                entered.set()
+                await asyncio.Event().wait()
+
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(
+            lambda req: httpx.Response(200, json=completion({})),
+        )
+    ) as http:
+        llm = GroqLLM(http, Secret("k"))
+        req = LLMRequest("s", "{}", Purpose.NOTES, Guard(), 512, 20)
+        task = asyncio.create_task(llm.complete_json(req, parse))
+        await asyncio.wait_for(entered.wait(), 5)
+        task.cancel()
+        with pytest.raises(LLMCancelled) as error:
+            await task
+    assert len(error.value.costs) == 1 and len(error.value.attempts) == 1
+
+
+@pytest.mark.parametrize("dispatched", [False, True])
+async def test_cancel_costs_only_dispatched_request(
+    dispatched: bool,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import asyncio
+
+    from kiroku.llm import LLMCancelled
+
+    entered = asyncio.Event()
+
+    async def respond(req: httpx.Request) -> httpx.Response:
+        entered.set()
+        await asyncio.Event().wait()
+        raise AssertionError("cancelled request should not return")
+
+    class Guard:
+        async def check(self, estimate_usd: Decimal) -> None:
+            if not dispatched:
+                entered.set()
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as http:
+        llm = GroqLLM(http, Secret("k"))
+        lock = asyncio.Lock()
+        if not dispatched:
+            await lock.acquire()
+            monkeypatch.setattr(llm, "_admission", lock)
+        req = LLMRequest("s", "{}", Purpose.NOTES, Guard(), 512, 20)
+        task = asyncio.create_task(llm.complete_json(req, parse))
+        await asyncio.wait_for(entered.wait(), 5)
+        task.cancel()
+        with pytest.raises(LLMCancelled) as error:
+            await task
+        if not dispatched:
+            lock.release()
+    assert len(error.value.costs) == int(dispatched)
+    assert len(error.value.attempts) == int(dispatched)

@@ -158,6 +158,7 @@ async def run(
     guard: BudgetGuard,
     *,
     stopping: asyncio.Event | None = None,
+    on_commit: Callable[[], None] = lambda: None,
 ) -> bool:
     """Transcribe and commit the session's gaps. Returns False, doing nothing, while another
     backfill of the session runs.
@@ -187,6 +188,7 @@ async def run(
             try:
                 async for result in transcriber.transcribe(audio, context):
                     await transcript.commit(pool, session_id, transcriber.name, result)
+                    on_commit()
             except ArchiveUnreadable as e:
                 log.warning("session %d: %s; the gap stays", session_id, e)
         if stopping.is_set():
