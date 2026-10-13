@@ -9,12 +9,12 @@ session, and a new broadcast closes the stale one first.
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Sequence
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import PurePosixPath
 
-from psycopg import sql
+from psycopg import Error, sql
 
 from kiroku.db import Pool, connect
 from kiroku.errors import KirokuError
@@ -60,32 +60,37 @@ async def claim_channels(
     """Upsert the channels and hold an advisory lock on each for the life of the block.
 
     Two watchers on one channel would write the same session twice. The locks live on a
-    dedicated connection (session locks belong to a connection), released when it closes.
+    dedicated connection (session locks belong to a connection). Cleanup waits for an
+    explicit unlock; closing a socket alone can return before Postgres releases its locks.
     """
     # Twitch logins are case-insensitive; dedupe so one process never watches a channel twice
     # (session advisory locks are re-entrant on their own connection).
     unique = list(dict.fromkeys(login.lower() for login in logins))
     async with connect(database_url) as conn:
         channels: list[Channel] = []
-        for login in unique:
-            cur = await conn.execute(
-                """
-                INSERT INTO channel (platform, login) VALUES (%s, %s)
-                ON CONFLICT (platform, login) DO UPDATE SET enabled = channel.enabled
-                RETURNING id
-                """,
-                [platform, login],
-            )
-            row = await cur.fetchone()
-            assert row is not None
-            cur = await conn.execute(
-                "SELECT pg_try_advisory_lock(%s, %s)", [WATCH_LOCK_CLASS, row[0]]
-            )
-            locked = await cur.fetchone()
-            if not (locked and locked[0]):
-                raise ChannelBusy(f"another `kiroku watch` is already watching {login}")
-            channels.append(Channel(row[0], platform, login))
-        yield channels
+        try:
+            for login in unique:
+                cur = await conn.execute(
+                    """
+                    INSERT INTO channel (platform, login) VALUES (%s, %s)
+                    ON CONFLICT (platform, login) DO UPDATE SET enabled = channel.enabled
+                    RETURNING id
+                    """,
+                    [platform, login],
+                )
+                row = await cur.fetchone()
+                assert row is not None
+                cur = await conn.execute(
+                    "SELECT pg_try_advisory_lock(%s, %s)", [WATCH_LOCK_CLASS, row[0]]
+                )
+                locked = await cur.fetchone()
+                if not (locked and locked[0]):
+                    raise ChannelBusy(f"another `kiroku watch` is already watching {login}")
+                channels.append(Channel(row[0], platform, login))
+            yield channels
+        finally:
+            with suppress(Error):
+                await conn.execute("SELECT pg_advisory_unlock_all()")
 
 
 async def open_session(pool: Pool, channel: Channel, meta: StreamMeta, now: datetime) -> int:
@@ -288,3 +293,62 @@ async def said_until(pool: Pool, session_id: int, end_ms: int) -> datetime | Non
         )
         row = await cur.fetchone()
     return row[0] if row else None
+
+
+@dataclass(frozen=True, slots=True)
+class Session:
+    id: int
+    channel: str
+    title: str
+    started_at: datetime
+    ended_at: datetime | None
+
+
+@dataclass(frozen=True, slots=True)
+class Summary(Session):
+    category: str | None
+    mode: str | None
+    alert_count: int
+    note_count: int
+
+
+SUMMARY_SQL = """
+    SELECT s.id,c.login,coalesce(seg.title,s.title,''),s.started_at,s.ended_at,
+           seg.category,
+           (SELECT mode FROM gate_window WHERE session_id=s.id AND mode IS NOT NULL
+            ORDER BY start_ms DESC LIMIT 1),
+           (SELECT count(*) FROM alert WHERE session_id=s.id),
+           (SELECT count(*) FROM note WHERE session_id=s.id)
+    FROM stream_session s JOIN channel c ON c.id=s.channel_id
+    LEFT JOIN LATERAL (SELECT title,category FROM segment WHERE session_id=s.id
+                       ORDER BY start_ms DESC LIMIT 1) seg ON true
+"""
+
+
+async def browse(pool: Pool, *, live: bool | None, limit: int) -> list[Summary]:
+    """Session cards, including latest context and counts, in one database round trip."""
+    async with pool.connection() as conn:
+        cur = await conn.execute(
+            SUMMARY_SQL + " WHERE (%s::boolean IS NULL OR (s.ended_at IS NULL)=%s) "
+            "ORDER BY s.started_at DESC,s.id DESC LIMIT %s",
+            [live, live, limit],
+        )
+        return [Summary(*row) for row in await cur.fetchall()]
+
+
+async def summary_by_id(pool: Pool, session_id: int) -> Summary | None:
+    async with pool.connection() as conn:
+        row = await (await conn.execute(SUMMARY_SQL + " WHERE s.id=%s", [session_id])).fetchone()
+        return Summary(*row) if row else None
+
+
+async def by_id(pool: Pool, session_id: int) -> Session | None:
+    async with pool.connection() as conn:
+        row = await (
+            await conn.execute(
+                "SELECT s.id,c.login,coalesce(s.title,''),s.started_at,s.ended_at "
+                "FROM stream_session s JOIN channel c ON c.id=s.channel_id WHERE s.id=%s",
+                [session_id],
+            )
+        ).fetchone()
+    return Session(*row) if row else None

@@ -9,14 +9,14 @@ Cost ledger row (purpose rule_test, no session) and counts against the monthly B
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, cast
 
 from kiroku import ledger
 from kiroku.budget import BudgetGuard, OverBudget
 from kiroku.db import Pool
-from kiroku.gate import Gate, GateFailed, GateRequest, RuleQuestion, passes
+from kiroku.gate import Gate, GateAuthError, GateFailed, GateRequest, RuleQuestion, passes
 from kiroku.gate.windows import GateState
 from kiroku.ledger import Purpose
 
@@ -38,7 +38,9 @@ class Trial:
     error: str | None = None
 
 
-async def stored_windows(pool: Pool, *, session_id: int | None, last: int) -> list[StoredWindow]:
+async def stored_windows(
+    pool: Pool, *, session_id: int | None, last: int | None
+) -> list[StoredWindow]:
     """Windows with speech in `new`, oldest first: one session's, or the latest `last`."""
     async with pool.connection() as conn:
         cur = await conn.execute(
@@ -50,7 +52,7 @@ async def stored_windows(pool: Pool, *, session_id: int | None, last: int) -> li
                 LIMIT %(n)s) w
             ORDER BY session_id, start_ms
             """,
-            {"s": session_id, "n": None if session_id is not None else last},
+            {"s": session_id, "n": last},
         )
         rows = await cur.fetchall()
     out: list[StoredWindow] = []
@@ -68,22 +70,33 @@ async def run(
     guard: BudgetGuard,
     question: RuleQuestion,
     windows: Sequence[StoredWindow],
+    *,
+    progress: Callable[[Trial], None] | None = None,
 ) -> list[Trial]:
     """One paid call per Window, a few at a time. Decisions are not stored; costs are."""
     slots = asyncio.Semaphore(CONCURRENCY)
 
-    async def one(window: StoredWindow) -> Trial:
+    async def evaluate(window: StoredWindow) -> Trial:
         request = GateRequest(window.state, (question,), guard, Purpose.RULE_TEST, ask_mode=False)
         async with slots:
             try:
                 answer = await gate.evaluate(request)
             except OverBudget as e:
                 return Trial(window, None, str(e.refusal))
+            except GateAuthError as e:
+                await _record(pool, e.costs)
+                raise
             except GateFailed as e:
                 await _record(pool, e.costs)
                 return Trial(window, None, e.reason)
         await _record(pool, answer.costs)
         return Trial(window, answer.probabilities[question.rule_id])
+
+    async def one(window: StoredWindow) -> Trial:
+        trial = await evaluate(window)
+        if progress is not None:
+            progress(trial)
+        return trial
 
     # Let every call finish and record its cost before an error (a wrong key, a database
     # blip) propagates: a paid call must never miss the ledger.
@@ -102,26 +115,19 @@ async def _record(pool: Pool, costs: Sequence[ledger.CostEntry]) -> None:
 
 def report(name: str, question: RuleQuestion, trials: Sequence[Trial], *, examples: int = 3) -> str:
     """The score spread, the pass rate, and the highest- and lowest-scoring Windows."""
-    scored = sorted(
-        (t for t in trials if t.probability is not None),
-        key=lambda t: t.probability or 0.0,
-        reverse=True,
-    )
     failed = [t for t in trials if t.probability is None]
-    passed = [t for t in scored if passes(t.probability or 0.0, question.threshold)]
+    summary = summarize(question, trials, examples=examples)
     lines = [
-        f"{name}: {len(passed)} of {len(scored)} Windows pass at {question.threshold}"
+        f"{name}: {summary.passed} of {summary.scored} Windows pass at {question.threshold}"
         + (f" ({len(failed)} not scored)" if failed else ""),
         "",
     ]
-    buckets = [0] * 10
-    for t in scored:
-        buckets[min(int((t.probability or 0.0) * 10), 9)] += 1
+    buckets = summary.histogram
     width = max(buckets, default=0) or 1
     for i in reversed(range(10)):
         bar = "#" * round(buckets[i] / width * 30)
         lines.append(f"  {i / 10:.1f}-{(i + 1) / 10:.1f} {buckets[i]:4} {bar}")
-    for title, chosen in (("Highest", scored[:examples]), ("Lowest", scored[-examples:][::-1])):
+    for title, chosen in (("Highest", summary.highest), ("Lowest", summary.lowest)):
         lines += ["", f"{title}:"]
         lines += [
             f"  {_where(t)}  {t.probability:.2f}  {_excerpt(t.window.state.new)}" for t in chosen
@@ -138,3 +144,36 @@ def _where(t: Trial) -> str:
 
 def _excerpt(text: str, chars: int = 100) -> str:
     return text if len(text) <= chars else text[: chars - 1] + "…"
+
+
+@dataclass(frozen=True, slots=True)
+class Summary:
+    scored: int
+    passed: int
+    failed: int
+    histogram: tuple[int, ...]
+    highest: tuple[Trial, ...]
+    lowest: tuple[Trial, ...]
+
+    @property
+    def pass_rate(self) -> float:
+        return self.passed / self.scored if self.scored else 0.0
+
+
+def summarize(question: RuleQuestion, trials: Sequence[Trial], *, examples: int = 3) -> Summary:
+    scored = sorted(
+        (t for t in trials if t.probability is not None),
+        key=lambda t: t.probability or 0.0,
+        reverse=True,
+    )
+    buckets = [0] * 10
+    for t in scored:
+        buckets[min(int((t.probability or 0.0) * 10), 9)] += 1
+    return Summary(
+        len(scored),
+        sum(passes(t.probability or 0.0, question.threshold) for t in scored),
+        len(trials) - len(scored),
+        tuple(buckets),
+        tuple(scored[:examples]),
+        tuple(scored[-examples:][::-1]),
+    )

@@ -4,3 +4,11 @@
 .env
 __pycache__/
 .venv/
+node_modules/
+web/.svelte-kit/
+web/test-results/
+web/playwright-report/
+src/kiroku/web/static/
+docs/web/screenshots/
+.web-e2e.json
+dist/

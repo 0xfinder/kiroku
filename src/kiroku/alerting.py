@@ -13,6 +13,7 @@ from typing import Any, cast
 
 import psycopg
 from psycopg import AsyncConnection, sql
+from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from kiroku import extraction, ledger, sessions
@@ -573,3 +574,18 @@ class AlertWorker:
                 "Alert database write",
                 lambda: mark_sent(self._pool, alert_id, delivery, self._now()),
             )
+
+
+async def session_rows(pool: Pool, session_id: int, limit: int) -> list[dict[str, Any]]:
+    async with pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+        await cur.execute(
+            "SELECT a.id,a.decision_id,r.name AS rule,a.outcome,a.said_at,w.start_ms,"
+            "coalesce(a.content->>'claim',a.content->>'summary',a.content->>'excerpt','') AS text,"
+            "(SELECT l.applies FROM label l WHERE l.decision_id=a.decision_id "
+            "AND l.source='telegram' LIMIT 1) AS label "
+            "FROM alert a JOIN gate_decision d ON d.id=a.decision_id "
+            "JOIN gate_window w ON w.id=d.window_id JOIN rule r ON r.id=a.rule_id "
+            "WHERE a.session_id=%s ORDER BY a.id DESC LIMIT %s",
+            [session_id, limit],
+        )
+        return list(reversed(await cur.fetchall()))

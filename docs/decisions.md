@@ -340,3 +340,62 @@ Gate process that has stopped.
 
 **Revisit:** a finite attempt policy only if repeated real attempts prove a permanent span problem;
 model quality with reliable Speaker maps and more annotated games.
+
+## D33. Static web app and a shared transcript listener (issue #8)
+
+FastAPI serves a Svelte 5 and SvelteKit SPA, built with adapter-static. `kiroku serve` uses
+one Uvicorn worker, one small query pool and one dedicated LISTEN connection. It binds
+loopback by default under D18. A non-loopback host logs a warning naming the required
+Tailscale or Cloudflare Access exposure. Serving reads and editing Rules need no keys;
+Rule tests require Jev credentials only when dispatched.
+
+The build is ignored in Git and produced by npm in CI and before running or packaging
+locally. This keeps generated bundles out of review and avoids a production Node process
+on the 2-vCPU host. Missing assets produce a CLI build instruction. Revisit a committed
+build only if installing from source without Node becomes a requirement.
+
+`transcript.commit` emits a session-ID notification inside its transaction. The shared
+listener wakes subscribers, which reread committed pages; a five-second poll covers missed
+notifications. Keepalives run every fifteen seconds. SSE IDs remain audio offsets, grouping
+comparison transcribers at the same offset. A reconciliation hint and a full paged read on
+connection open handle historical Backfill, whose inserts cannot be expressed by a forward
+audio cursor. Forward appends do not refetch history. Overlapping reconciliation hints schedule
+a second scan. Open streams have a five-second shutdown limit. Notes, Gate passes and Alerts poll every thirty seconds.
+
+The HTTP layer reads through each table owner. It exposes timeline fields rather than raw
+Notes prompts and attempts. Review labels upsert by decision and source; undo deletes only
+Review's row. The UI shows the next card optimistically and serializes save/undo before
+allowing another vote. Telegram verdicts remain independent.
+
+Rule tests use the existing provider, month guard and Cost ledger. Both selectors are capped
+at 100 Windows, and the process admits one web test at a time. The UI confirms an estimated
+cost before dispatch and shows the shared dry-run histogram, pass rate and extremes. The
+estimate is approximate, not a billing ceiling. Cross-process Budget admission retains the
+existing watcher/CLI semantics.
+
+Rejected: an SSR Node server, one LISTEN connection per tab, and polling-only live transcript.
+The static build and shared listener keep the production process and connection count small.
+
+
+## D34. Background web Rule tests and transcript commit cursors (issue #8)
+
+This supersedes D33's synchronous Rule-test response and reconciliation scans on every
+connection open. A paid test can exceed the Cloudflare Access proxy's HTTP timeout under
+D18. The POST now validates and returns a job ID with HTTP 202. The UI polls progress
+and then reads the report or error. One job runs at a time, its terminal result remains
+in memory until the next test starts, and server shutdown cancels it within the existing
+five-second bound. A database job table is unnecessary for the single-worker process;
+results disappear on restart. A disconnect leaves an accepted test running.
+
+SSE reads new Utterances through an indexed per-session ID cursor instead of counting
+all speech behind its audio cursor. Transcript commits take a session row lock before
+allocating Utterance IDs, ensuring a late commit cannot appear below a consumed ID.
+The initial browser scan uses a fixed ID snapshot, then subscribes from that commit ID.
+Backfill hints carry the earliest affected offset; reconnects still scan the full
+history. This removes duplicate initial downloads and confines hint-driven reads to the
+changed range without missing commits between the snapshot and SSE subscription.
+
+Rejected: retaining a paid operation inside an HTTP request through a proxy timeout;
+using maximum IDs without commit ordering; relying on notifications alone to detect
+Backfill during listener outages. Revisit persisted jobs if process restarts must preserve
+reports or multiple serve workers become necessary.

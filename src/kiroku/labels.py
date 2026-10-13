@@ -69,3 +69,24 @@ async def run_taps(pool: Pool, database_url: str, notifier: Notifier) -> None:
         except Exception as e:
             log.warning("Label connection failed (%s); retrying", type(e).__name__)
             await asyncio.sleep(5.0)
+
+
+async def record_review(pool: Pool, decision_id: int, applies: bool) -> bool:
+    """Latest Review verdict wins. Telegram's verdict remains independent."""
+    async with pool.connection() as conn:
+        cur = await conn.execute(
+            "INSERT INTO label(decision_id,applies,source) "
+            "SELECT id,%s,'review' FROM gate_decision WHERE id=%s "
+            "ON CONFLICT(decision_id,source) DO UPDATE "
+            "SET applies=excluded.applies,labelled_at=now() RETURNING id",
+            [applies, decision_id],
+        )
+        return await cur.fetchone() is not None
+
+
+async def undo_review(pool: Pool, decision_id: int) -> None:
+    async with pool.connection() as conn:
+        await conn.execute(
+            "DELETE FROM label WHERE decision_id=%s AND source='review'",
+            [decision_id],
+        )

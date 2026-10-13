@@ -390,7 +390,9 @@ def rule_test(
         if threshold is not None:
             rule = replace(rule, threshold=threshold)
         rules.check(rule.name, rule.instructions, rule.threshold)
-        windows = await dry_run.stored_windows(pool, session_id=session, last=last)
+        windows = await dry_run.stored_windows(
+            pool, session_id=session, last=None if session is not None else last
+        )
         if not windows:
             raise KirokuError("no stored Windows with speech yet; run `kiroku watch` first")
         question = rule_question(rule)
@@ -454,3 +456,30 @@ def notes_export(
         except ValueError:
             raise KirokuError("--since must be a date in YYYY-MM-DD format") from None
         asyncio.run(run(date))
+
+
+@app.command("serve")
+def serve_command(
+    host: Annotated[
+        str, typer.Option(help="D18: expose only through Tailscale or Cloudflare Access.")
+    ] = "127.0.0.1",
+    port: Annotated[int, typer.Option(min=1, max=65535)] = 8737,
+) -> None:
+    """Serve the static web app and API. Build it first with `cd web && npm ci && npm run build`."""
+    import uvicorn
+
+    from kiroku.web.app import STATIC, create_app, warn_bind
+
+    with _user_errors():
+        _log_to_stderr()
+        if not (STATIC / "index.html").is_file():
+            raise KirokuError("web build missing; run `cd web && npm ci && npm run build`")
+        warn_bind(host)
+        uvicorn.run(
+            create_app(Settings.load()),
+            host=host,
+            port=port,
+            workers=1,
+            access_log=False,
+            timeout_graceful_shutdown=5,
+        )

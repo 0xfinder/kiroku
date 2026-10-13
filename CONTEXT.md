@@ -47,10 +47,12 @@ The names kiroku's code, docs, and design discussions use. If a discussion needs
 - **Alert** — the durable outcome of a passing Gate decision: `stale`, `cooldown`, `duplicate`, `sending`, `sent`, `unconfirmed` or `failed`. Deliverable Alerts send one message through a Notifier.
 - **Notifier** — an output channel for Alerts. Telegram first; Discord later.
 - **Label** — a human judgment on a Gate decision. Labels come from Telegram 👍/👎 buttons or from the Review queue.
-- **Review queue** — borderline Gate decisions (probability 0.3–0.7) shown in the web app for labelling, so recall can be measured and not just precision.
+- **Review queue** — borderline Gate decisions (probability 0.3–0.7) shown in the web app for labelling, so recall can be measured and not just precision. A Review label is independent of the Telegram label for the same decision. The latest Review verdict wins; undo removes only that Review label.
 
 ## Operations
 
 - **Cost ledger** — one row per paid call (transcription, Jev, LLM) with its cost. It is the source of truth for Budget caps.
 - **Budget cap** — hard per-session and per-month spending limits. Paid calls stop when a cap is reached.
 - **Fallback** — the replacement used when a vendor is unavailable. The Transcriber falls back to Groq Whisper in chunks, with no speaker labels. The Gate falls back to Groq `openai/gpt-oss-120b` answering the same Rule and Mode questions.
+
+- **Live transcript stream** — the web app's SSE feed of committed Utterances. Event IDs are session audio offsets and group speech at the same offset. Backfill behind the cursor triggers reconciliation from the earliest affected audio offset. A separate Utterance-ID cursor follows commit order and bridges the initial snapshot to the stream.

@@ -22,9 +22,10 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
-from typing import Literal
+from typing import Any, Literal
 
 import psycopg
+from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from kiroku import ledger, rules, segments, transcript
@@ -395,3 +396,31 @@ def _log_window(
             log.info("session %d: window %s: %s; %s", session_id, span, answer.mode, scores or "-")
         case NotAsked(status, reason):
             log.info("session %d: window %s: %s %s", session_id, span, status, reason or "")
+
+
+async def review_queue(pool: Pool, limit: int) -> list[dict[str, Any]]:
+    async with pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+        await cur.execute(
+            "SELECT d.id,d.question,d.probability,d.threshold,d.passed,r.name AS rule,"
+            "w.session_id,w.start_ms,w.state->>'new' AS new,"
+            "coalesce(w.state->'context'->>'earlier','') AS earlier,c.login AS channel "
+            "FROM gate_decision d JOIN gate_window w ON w.id=d.window_id "
+            "JOIN rule r ON r.id=d.rule_id JOIN stream_session s ON s.id=w.session_id "
+            "JOIN channel c ON c.id=s.channel_id WHERE d.probability BETWEEN 0.3 AND 0.7 "
+            "AND NOT EXISTS(SELECT 1 FROM label l WHERE l.decision_id=d.id AND l.source='review') "
+            "ORDER BY w.closed_at DESC,d.id DESC LIMIT %s",
+            [limit],
+        )
+        return list(await cur.fetchall())
+
+
+async def session_passes(pool: Pool, session_id: int, limit: int) -> list[dict[str, Any]]:
+    async with pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+        await cur.execute(
+            "SELECT d.id,r.name AS rule,d.question,d.probability,d.threshold,w.start_ms "
+            "FROM gate_decision d JOIN gate_window w ON w.id=d.window_id "
+            "JOIN rule r ON r.id=d.rule_id WHERE w.session_id=%s AND d.passed "
+            "ORDER BY w.start_ms DESC,d.id DESC LIMIT %s",
+            [session_id, limit],
+        )
+        return list(reversed(await cur.fetchall()))

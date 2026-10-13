@@ -14,6 +14,7 @@ from typing import Any, Literal, cast
 from uuid import UUID, uuid4
 
 import psycopg
+from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from kiroku import gating, ledger, segments, transcript
@@ -642,3 +643,14 @@ def timeline(row: Mapping[str, Any]) -> str:
                     text = "; ".join(str(v) for k, v in item.items() if k != "at_ms")
                     lines.append(f"  {clock(item['at_ms'])} {text}")
     return "\n".join(lines)
+
+
+async def timeline_rows(pool: Pool, session_id: int) -> list[dict[str, Any]]:
+    """Timeline including pending statuses; never expose prompts or raw model attempts."""
+    async with pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+        await cur.execute(
+            "SELECT id,start_ms,end_ms,pack,mode,status,body,schema_name,schema_version "
+            "FROM note WHERE session_id=%s ORDER BY start_ms",
+            [session_id],
+        )
+        return list(await cur.fetchall())
