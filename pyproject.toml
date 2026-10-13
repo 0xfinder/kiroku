@@ -13,6 +13,8 @@ dependencies = [
     "pydantic>=2.14.1",
     "fastapi>=0.143.0",
     "uvicorn>=0.54.0",
+    "authlib>=1.8",
+    "itsdangerous>=2.2",
 ]
 
 [project.scripts]

@@ -8,11 +8,10 @@ from collections.abc import AsyncGenerator, Awaitable, Callable
 from dataclasses import replace
 from pathlib import Path
 from typing import Annotated
-from urllib.parse import urlsplit
 from uuid import uuid4
 
 import httpx
-from fastapi import FastAPI, HTTPException, Query, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StaticHTTPException
@@ -26,6 +25,8 @@ from kiroku.errors import KirokuError
 from kiroku.gate import RuleQuestion, rule_question
 from kiroku.gate.jev import JevGate
 from kiroku.web import models as m
+from kiroku.web.auth import OwnerAuth, Provider, require_owner
+from kiroku.web.security import Limits, PublicBoundary
 from kiroku.web.stream import TranscriptHub, events
 
 STATIC = Path(__file__).with_name("static")
@@ -40,7 +41,7 @@ def warn_bind(host: str) -> None:
         loopback = host == "localhost"
     if not loopback:
         logging.getLogger(__name__).warning(
-            "D18: non-loopback bind %s; expose only through Tailscale or Cloudflare Access", host
+            "Non-loopback bind %s; use the public HTTPS tunnel and owner login (D35)", host
         )
 
 
@@ -54,7 +55,9 @@ class SPA(StaticFiles):
             return FileResponse(STATIC / "index.html")
 
 
-def create_app(settings: Settings) -> FastAPI:
+def create_app(
+    settings: Settings, *, provider: Provider | None = None, limits: Limits | None = None
+) -> FastAPI:
     pool: Pool
     hub = TranscriptHub(settings.database_url)
     test_lock = asyncio.Lock()
@@ -78,7 +81,11 @@ def create_app(settings: Settings) -> FastAPI:
                     async with asyncio.timeout(5):
                         await asyncio.gather(*tasks, return_exceptions=True)
 
-    app = FastAPI(title="Kiroku", lifespan=lifespan)
+    app = FastAPI(
+        title="Kiroku", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None
+    )
+    app.state.auth = OwnerAuth(settings, provider or Provider())
+    app.include_router(app.state.auth.routes())
 
     @app.middleware("http")
     async def same_origin(
@@ -86,12 +93,10 @@ def create_app(settings: Settings) -> FastAPI:
     ) -> Response:
         if request.method not in {"GET", "HEAD", "OPTIONS"}:
             origin = request.headers.get("origin")
-            hosts = {
-                host
-                for host in (request.headers.get("host"), request.headers.get("x-forwarded-host"))
-                if host
-            }
-            if origin and urlsplit(origin).netloc not in hosts:
+            allowed = (
+                settings.oidc.public_url if settings.oidc else str(request.base_url).rstrip("/")
+            )
+            if origin and origin != allowed:
                 return JSONResponse({"detail": "cross-origin writes are refused"}, status_code=403)
         return await next(request)
 
@@ -190,7 +195,7 @@ def create_app(settings: Settings) -> FastAPI:
     async def rule_list() -> list[m.Rule]:
         return [m.Rule.model_validate(rule) for rule in await rules.all_rules(pool)]
 
-    @app.post("/api/rules", status_code=201)
+    @app.post("/api/rules", status_code=201, dependencies=[Depends(require_owner)])
     async def rule_create(body: m.RuleCreate) -> m.Rule:
         rule = await rules.add(
             pool,
@@ -203,7 +208,7 @@ def create_app(settings: Settings) -> FastAPI:
         )
         return m.Rule.model_validate(rule)
 
-    @app.patch("/api/rules/{name}")
+    @app.patch("/api/rules/{name}", dependencies=[Depends(require_owner)])
     async def rule_edit(name: str, body: m.RuleEdit) -> m.Rule:
         rule = await rules.edit(
             pool,
@@ -217,11 +222,11 @@ def create_app(settings: Settings) -> FastAPI:
         )
         return m.Rule.model_validate(rule)
 
-    @app.post("/api/rules/{name}/enable")
+    @app.post("/api/rules/{name}/enable", dependencies=[Depends(require_owner)])
     async def rule_enable(name: str) -> m.Rule:
         return m.Rule.model_validate(await rules.set_enabled(pool, name, True))
 
-    @app.post("/api/rules/{name}/disable")
+    @app.post("/api/rules/{name}/disable", dependencies=[Depends(require_owner)])
     async def rule_disable(name: str) -> m.Rule:
         return m.Rule.model_validate(await rules.set_enabled(pool, name, False))
 
@@ -297,7 +302,7 @@ def create_app(settings: Settings) -> FastAPI:
                 else "Rule test failed; see server log",
             )
 
-    @app.post("/api/rules/{name}/test", status_code=202)
+    @app.post("/api/rules/{name}/test", status_code=202, dependencies=[Depends(require_owner)])
     async def rule_test(name: str, body: m.RuleTest) -> m.RunningTest:
         nonlocal test_job, test_task
         if test_lock.locked() or (test_task is not None and not test_task.done()):
@@ -328,7 +333,9 @@ def create_app(settings: Settings) -> FastAPI:
             test_task = asyncio.create_task(run_test(job, name, question, windows, key))
             return job
 
-    @app.api_route("/api/rule-tests/{job_id}", methods=["GET", "HEAD"])
+    @app.api_route(
+        "/api/rule-tests/{job_id}", methods=["GET", "HEAD"], dependencies=[Depends(require_owner)]
+    )
     async def rule_test_status(job_id: str) -> m.TestJob:
         if test_job is None or test_job.id != job_id:
             raise HTTPException(
@@ -336,17 +343,17 @@ def create_app(settings: Settings) -> FastAPI:
             )
         return test_job
 
-    @app.api_route("/api/review", methods=["GET", "HEAD"])
+    @app.api_route("/api/review", methods=["GET", "HEAD"], dependencies=[Depends(require_owner)])
     async def review_queue(limit: Limit = 30) -> list[m.Review]:
         return [m.Review.model_validate(row) for row in await gating.review_queue(pool, limit)]
 
-    @app.post("/api/review/{decision_id}", status_code=204)
+    @app.post("/api/review/{decision_id}", status_code=204, dependencies=[Depends(require_owner)])
     async def review_label(decision_id: int, body: m.Verdict) -> Response:
         if not await labels.record_review(pool, decision_id, body.applies):
             raise HTTPException(404, "Gate decision not found")
         return Response(status_code=204)
 
-    @app.delete("/api/review/{decision_id}", status_code=204)
+    @app.delete("/api/review/{decision_id}", status_code=204, dependencies=[Depends(require_owner)])
     async def review_undo(decision_id: int) -> Response:
         await labels.undo_review(pool, decision_id)
         return Response(status_code=204)
@@ -357,4 +364,5 @@ def create_app(settings: Settings) -> FastAPI:
     # An ASGI mount accepts every method, including custom HTTP verbs, before the SPA.
     app.mount("/api", api_missing)
     app.mount("/", SPA(directory=STATIC, check_dir=False), name="web")
+    app.add_middleware(PublicBoundary, static=STATIC, limits=limits or Limits())
     return app

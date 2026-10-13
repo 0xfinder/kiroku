@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json && tsc --noEmit -p src/service-worker/tsconfig.json",
     "build": "vite build",
     "test": "vitest run",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "icons": "node generate-icons.mjs"
   },
   "dependencies": {
     "zod": "^4.0.0"
@@ -21,6 +22,7 @@
     "@types/node": "^22.20.5",
     "prettier": "^3.9.10",
     "prettier-plugin-svelte": "^3.4.0",
+    "sharp": "^0.35.5",
     "svelte": "^5.0.0",
     "svelte-check": "^4.0.0",
     "typescript": "^6.0.3",

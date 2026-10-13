@@ -4,6 +4,7 @@
   import { z } from 'zod';
   import {
     read,
+    request,
     message,
     sessionSchema,
     utteranceSchema,
@@ -136,6 +137,8 @@
     };
     stream.onerror = () => {
       connection = 'Reconnecting';
+      // A stream may reconnect while the API is healthy; probe before hiding data.
+      if (!destroyed) void request('/me').catch(() => {});
     };
     stream.addEventListener('transcript', (event: MessageEvent<string>) => {
       try {

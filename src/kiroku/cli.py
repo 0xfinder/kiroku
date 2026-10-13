@@ -461,7 +461,10 @@ def notes_export(
 @app.command("serve")
 def serve_command(
     host: Annotated[
-        str, typer.Option(help="D18: expose only through Tailscale or Cloudflare Access.")
+        str,
+        typer.Option(
+            help="Bind address; public access uses the HTTPS tunnel and owner login (D35)."
+        ),
     ] = "127.0.0.1",
     port: Annotated[int, typer.Option(min=1, max=65535)] = 8737,
 ) -> None:
@@ -481,5 +484,6 @@ def serve_command(
             port=port,
             workers=1,
             access_log=False,
+            proxy_headers=False,
             timeout_graceful_shutdown=5,
         )

@@ -584,8 +584,7 @@ footer {
   .site-header {
     padding: 20px;
   }
-  .brand-caption,
-  .private-chip {
+  .brand-caption {
     display: none;
   }
   nav {
