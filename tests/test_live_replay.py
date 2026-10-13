@@ -577,6 +577,7 @@ async def test_notes_hang_doesnt_stall_transcription_or_gate(
     tmp_path: Path,
     fake_stream: Callable[[str], None],
     monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     from collections.abc import Mapping
 
@@ -621,8 +622,8 @@ async def test_notes_hang_doesnt_stall_transcription_or_gate(
         done,
         gate=FakeGate(0.9),
         notes_llm=HungNotes(),
-        timeout_s=10,
     )
+    assert "Notes drain timed out; pending spans wait for restart" in caplog.messages
     assert entered.is_set()
     assert await (await conn.execute("SELECT count(*) FROM note")).fetchone() == (0,)
     assert await (

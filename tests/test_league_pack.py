@@ -1,8 +1,10 @@
 """Recorded lolesports + Data Dragon -> Pack -> live transcript -> Gate -> Postgres."""
 
+import asyncio
 import json
 import os
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator, AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -12,10 +14,11 @@ import pytest
 from psycopg import AsyncConnection
 
 from kiroku import rules
+from kiroku.audio import BYTES_PER_SAMPLE, SAMPLES_PER_MS
 from kiroku.config import Secret
 from kiroku.db import Pool, open_pool
 from kiroku.gate.jev import JevGate
-from kiroku.pack import pack_selector
+from kiroku.pack import LiveContext, pack_selector
 from kiroku.packs.league import LeaguePack, vocabulary
 from kiroku.packs.league.data import (
     DATA_TTL_S,
@@ -25,6 +28,7 @@ from kiroku.packs.league.data import (
     roster_terms,
     select_event,
 )
+from kiroku.source import Capture, StreamlinkSource
 from kiroku.transcriber.groq import build_prompt
 from tests.test_live_replay import GroqStub, query_rows, spans_cover, watch_until
 from tests.test_live_replay import fake_stream as fake_stream
@@ -74,6 +78,54 @@ class LeagueReplay:
         else:
             assert "x-api-key" not in request.headers
         return httpx.Response(200, json=body)
+
+
+def hold_audio(
+    monkeypatch: pytest.MonkeyPatch, *at_ms: int
+) -> list[tuple[asyncio.Event, asyncio.Event]]:
+    """Pause real ffmpeg PCM at exact capture positions until the test releases it."""
+    original = StreamlinkSource.capture
+    barriers = [(asyncio.Event(), asyncio.Event()) for _ in at_ms]
+
+    async def read(capture: Capture) -> AsyncIterator[bytes]:
+        delivered = 0
+        step = 0
+        async for block in capture.pcm:
+            while step < len(at_ms):
+                boundary = at_ms[step] * SAMPLES_PER_MS * BYTES_PER_SAMPLE
+                if delivered + len(block) < boundary:
+                    break
+                prefix = boundary - delivered
+                if prefix:
+                    yield block[:prefix]
+                block = block[prefix:]
+                delivered = boundary
+                reached, resume = barriers[step]
+                reached.set()
+                await resume.wait()
+                step += 1
+            if block:
+                yield block
+                delivered += len(block)
+
+    class HeldCapture:
+        def __init__(self, inner: Capture) -> None:
+            self.inner = inner
+
+        @property
+        def pcm(self) -> AsyncIterator[bytes]:
+            return read(self.inner)
+
+        async def stop_input(self) -> None:
+            await self.inner.stop_input()
+
+    @asynccontextmanager
+    async def capture(source: StreamlinkSource, archive: Path) -> AsyncGenerator[Capture]:
+        async with original(source, archive) as inner:
+            yield HeldCapture(inner)
+
+    monkeypatch.setattr(StreamlinkSource, "capture", capture)
+    return barriers
 
 
 @pytest.fixture
@@ -276,7 +328,7 @@ def test_malformed_data_fails_at_the_boundary_and_feed_ids_must_match() -> None:
         ("versions", httpx.HTTPStatusError),
         ("window", httpx.HTTPStatusError),
         ("window_204", json.JSONDecodeError),
-        ("window_metadata", KeyError),
+        ("window_metadata", Exception),
         ("getLive_403", httpx.HTTPStatusError),
     ],
 )
@@ -284,8 +336,18 @@ async def test_pack_endpoint_failures(tmp_path: Path, fail: str, error: type[Exc
     replay = LeagueReplay(fail=fail)
     async with httpx.AsyncClient(transport=httpx.MockTransport(replay)) as api:
         pack = LeaguePack(api, tmp_path, "public-test-key")
-        with pytest.raises(error):
+        with pytest.raises(error) as exc:
             await pack.get_live_match(TITLE)
+        if isinstance(exc.value, httpx.HTTPStatusError):
+            expected_url = {
+                "versions": "https://ddragon.leagueoflegends.com/api/versions.json",
+                "window": "https://feed.lolesports.com/livestats/v1/window/117133830114188937",
+                "getLive_403": "https://esports-api.lolesports.com/persisted/gw/getLive",
+            }[fail]
+            assert exc.value.response.status_code == (403 if fail == "getLive_403" else 503)
+            assert str(exc.value.request.url.copy_with(query=None)) == expected_url
+        else:
+            assert any("/window/" in request.url.path for request in replay.calls)
         if fail == "versions":
             with pytest.raises(httpx.HTTPStatusError):
                 await pack.vocabulary(TITLE, None)
@@ -293,9 +355,6 @@ async def test_pack_endpoint_failures(tmp_path: Path, fail: str, error: type[Exc
             words = await pack.vocabulary(TITLE, None)
             assert "Gryffinn" in words and "Aegis" in words
             assert len(words) <= 350
-    # Ensure the failing endpoint was exercised, rather than an offline/ambiguous early exit.
-    endpoint = {"versions": "versions", "getLive_403": "getLive"}.get(fail, "/window/")
-    assert any(endpoint in request.url.path for request in replay.calls)
 
 
 @pytest.mark.parametrize(
@@ -373,7 +432,7 @@ async def test_session_sends_pack_context_and_rules_or_survives_http_failure(
     assert await query_rows(
         conn, "SELECT r.name FROM gate_decision d JOIN rule r ON r.id=d.rule_id"
     ) == [("league_take",)]
-    if fail and fail != "getTeams":
+    if fail == "getLive":
         assert "live" not in states[0]["context"]
         assert await query_rows(conn, "SELECT game_key FROM gate_window") == [(None,)]
     else:
@@ -386,7 +445,7 @@ async def test_session_sends_pack_context_and_rules_or_survives_http_failure(
         assert await query_rows(conn, "SELECT game_key FROM gate_window") == [(expected_key,)]
     if fail == "getTeams":
         assert all("Gryffinn" not in p for p in prompts)
-    elif fail:
+    elif fail == "getLive":
         assert any("Gryffinn" in p and "Aegis" in p for p in prompts)
     else:
         assert any("Gryffinn" in p and "Yunara" in p for p in prompts)
@@ -413,17 +472,33 @@ async def test_refresh_discards_context_after_category_change_or_failure(
         pool, "league_take", "Does he say words?", threshold=Decimal("0.7"), pack="league"
     )
     replay = LeagueReplay()
+    initial, changed_audio = hold_audio(monkeypatch, 0, 65_000)
     changed = False
+
+    class ControlledPack(LeaguePack):
+        async def vocabulary(self, title: str, live: LiveContext | None) -> str:
+            words = await super().vocabulary(title, live)
+            initial[1].set()
+            if replay.fail == "getLive":
+                changed_audio[1].set()
+            return words
 
     async def done() -> bool:
         nonlocal changed
         windows = await query_rows(conn, "SELECT count(*) FROM gate_window")
-        if windows[0][0] >= 1 and not changed:
+        if windows[0][0] >= 1 and changed_audio[0].is_set() and not changed:
             if change == "category":
                 monkeypatch.setenv("FAKE_CATEGORY", "Just Chatting")
             else:
                 replay.fail = "getLive"
             changed = True
+        if change == "category" and changed:
+            segments = await query_rows(
+                conn, "SELECT start_ms FROM segment WHERE category='Just Chatting'"
+            )
+            if segments:
+                assert segments == [(65_000,)]
+                changed_audio[1].set()
         return windows[0][0] >= 3
 
     from tests.test_live_replay import jev_stub
@@ -432,7 +507,7 @@ async def test_refresh_discards_context_after_category_change_or_failure(
         httpx.AsyncClient(transport=httpx.MockTransport(replay)) as api,
         httpx.AsyncClient(transport=httpx.MockTransport(jev_stub)) as jev,
     ):
-        pack = LeaguePack(api, tmp_path, "public-test-key")
+        pack = ControlledPack(api, tmp_path, "public-test-key")
         await watch_until(
             database_url,
             pool,
@@ -598,6 +673,7 @@ async def test_metadata_write_retry_keeps_the_first_observed_audio_boundary(
     monkeypatch.setenv("FAKE_PACE", "40")
     monkeypatch.setenv("FAKE_CATEGORY", "League of Legends")
     monkeypatch.setenv("FAKE_TITLE", TITLE)
+    barriers = hold_audio(monkeypatch, 65_000, 75_000, 85_000)
     original = segments.record
     boundaries: list[int] = []
 
@@ -615,8 +691,12 @@ async def test_metadata_write_retry_keeps_the_first_observed_audio_boundary(
             if len(boundaries) <= 2:
                 if revert:
                     monkeypatch.setenv("FAKE_CATEGORY", "League of Legends")
+                barriers[len(boundaries) - 1][1].set()
+                await barriers[len(boundaries)][0].wait()
                 raise psycopg.OperationalError("simulated Segment write failure")
         await original(pool, session_id, start_ms, meta, pack, restart=restart)
+        if meta.category == "Just Chatting":
+            barriers[2][1].set()
 
     monkeypatch.setattr(segments, "record", flaky)
     changed = False
@@ -624,7 +704,7 @@ async def test_metadata_write_retry_keeps_the_first_observed_audio_boundary(
     async def done() -> bool:
         nonlocal changed
         found = await query_rows(conn, "SELECT count(*) FROM gate_window")
-        if found[0][0] >= 1 and not changed:
+        if found[0][0] >= 1 and barriers[0][0].is_set() and not changed:
             changed = True
             monkeypatch.setenv("FAKE_CATEGORY", "Just Chatting")
         return found[0][0] >= 3
@@ -639,6 +719,6 @@ async def test_metadata_write_retry_keeps_the_first_observed_audio_boundary(
             gate=JevGate(http, Secret("k")),
             poll_s=0.1,
         )
-    assert len(boundaries) == 3 and len(set(boundaries)) == 1
+    assert boundaries == [65_000, 65_000, 65_000]
     rows = await query_rows(conn, "SELECT start_ms FROM segment WHERE category='Just Chatting'")
     assert rows == [(boundaries[0],)]
