@@ -271,17 +271,40 @@ def test_malformed_data_fails_at_the_boundary_and_feed_ids_must_match() -> None:
 
 
 @pytest.mark.parametrize(
+    "fail,error",
+    [
+        ("versions", httpx.HTTPStatusError),
+        ("window", httpx.HTTPStatusError),
+        ("window_204", json.JSONDecodeError),
+        ("window_metadata", KeyError),
+        ("getLive_403", httpx.HTTPStatusError),
+    ],
+)
+async def test_pack_endpoint_failures(tmp_path: Path, fail: str, error: type[Exception]) -> None:
+    replay = LeagueReplay(fail=fail)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(replay)) as api:
+        pack = LeaguePack(api, tmp_path, "public-test-key")
+        with pytest.raises(error):
+            await pack.get_live_match(TITLE)
+        if fail == "versions":
+            with pytest.raises(httpx.HTTPStatusError):
+                await pack.vocabulary(TITLE, None)
+        else:
+            words = await pack.vocabulary(TITLE, None)
+            assert "Gryffinn" in words and "Aegis" in words
+            assert len(words) <= 350
+    # Ensure the failing endpoint was exercised, rather than an offline/ambiguous early exit.
+    endpoint = {"versions": "versions", "getLive_403": "getLive"}.get(fail, "/window/")
+    assert any(endpoint in request.url.path for request in replay.calls)
+
+
+@pytest.mark.parametrize(
     "fail,mode",
     [
         (None, "watching_pro"),
         (None, "playing"),
-        ("versions", "watching_pro"),
         ("getLive", "watching_pro"),
         ("getTeams", "watching_pro"),
-        ("window", "watching_pro"),
-        ("window_204", "watching_pro"),
-        ("window_metadata", "watching_pro"),
-        ("getLive_403", "watching_pro"),
     ],
 )
 async def test_session_sends_pack_context_and_rules_or_survives_http_failure(
@@ -361,7 +384,7 @@ async def test_session_sends_pack_context_and_rules_or_survives_http_failure(
         }
         expected_key = "league:117133830114188936:1" if mode == "watching_pro" else None
         assert await query_rows(conn, "SELECT game_key FROM gate_window") == [(expected_key,)]
-    if fail in {"versions", "getTeams"}:
+    if fail == "getTeams":
         assert all("Gryffinn" not in p for p in prompts)
     elif fail:
         assert any("Gryffinn" in p and "Aegis" in p for p in prompts)
@@ -379,8 +402,9 @@ async def test_refresh_discards_context_after_category_change_or_failure(
     monkeypatch: pytest.MonkeyPatch,
     change: str,
 ) -> None:
-    fake_stream("180")
+    fake_stream("150")
     monkeypatch.setenv("FAKE_HOLD", "1")
+    monkeypatch.setenv("FAKE_PACE", "40")
     monkeypatch.setenv("FAKE_CATEGORY", "League of Legends")
     monkeypatch.setenv("FAKE_TITLE", TITLE)
     monkeypatch.setattr("kiroku.watch.PACK_REFRESH_S", 0.1)
@@ -417,6 +441,7 @@ async def test_refresh_discards_context_after_category_change_or_failure(
             done,
             gate=JevGate(jev, Secret("k")),
             select_pack=pack_selector([pack]),
+            poll_s=0.1,
         )
     windows = await query_rows(conn, "SELECT state FROM gate_window ORDER BY start_ms")
     assert windows[0][0]["context"]["live"]["teams"][0]["name"] == "RED Kalunga"
@@ -568,8 +593,9 @@ async def test_metadata_write_retry_keeps_the_first_observed_audio_boundary(
     from kiroku.source import StreamMeta
     from tests.test_live_replay import jev_stub
 
-    fake_stream("180")
+    fake_stream("150")
     monkeypatch.setenv("FAKE_HOLD", "1")
+    monkeypatch.setenv("FAKE_PACE", "40")
     monkeypatch.setenv("FAKE_CATEGORY", "League of Legends")
     monkeypatch.setenv("FAKE_TITLE", TITLE)
     original = segments.record
@@ -605,7 +631,13 @@ async def test_metadata_write_retry_keeps_the_first_observed_audio_boundary(
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(jev_stub)) as http:
         await watch_until(
-            database_url, pool, tmp_path / "data", GroqStub(), done, gate=JevGate(http, Secret("k"))
+            database_url,
+            pool,
+            tmp_path / "data",
+            GroqStub(),
+            done,
+            gate=JevGate(http, Secret("k")),
+            poll_s=0.1,
         )
     assert len(boundaries) == 3 and len(set(boundaries)) == 1
     rows = await query_rows(conn, "SELECT start_ms FROM segment WHERE category='Just Chatting'")
