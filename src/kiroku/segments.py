@@ -64,3 +64,15 @@ async def at(pool: Pool, session_id: int, start_ms: int) -> Segment | None:
         )
         row = await cur.fetchone()
     return Segment(*row) if row else None
+
+
+async def latest(pool: Pool, session_id: int) -> Segment | None:
+    async with pool.connection() as conn:
+        row = await (
+            await conn.execute(
+                "SELECT title,category,pack FROM segment WHERE session_id=%s "
+                "ORDER BY start_ms DESC LIMIT 1",
+                [session_id],
+            )
+        ).fetchone()
+    return Segment(*row) if row else None

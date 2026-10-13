@@ -573,3 +573,31 @@ class AlertWorker:
                 "Alert database write",
                 lambda: mark_sent(self._pool, alert_id, delivery, self._now()),
             )
+
+
+async def session_rows(pool: Pool, session_id: int, limit: int) -> list[dict[str, Any]]:
+    async with pool.connection() as conn:
+        cur = await conn.execute(
+            "SELECT a.id,a.decision_id,r.name AS rule,a.outcome,a.said_at,w.start_ms,"
+            "coalesce(a.content->>'claim',a.content->>'summary',a.content->>'excerpt','') AS text,"
+            "(SELECT l.applies FROM label l WHERE l.decision_id=a.decision_id "
+            "AND l.source='telegram' LIMIT 1) AS label "
+            "FROM alert a JOIN gate_decision d ON d.id=a.decision_id "
+            "JOIN gate_window w ON w.id=d.window_id JOIN rule r ON r.id=a.rule_id "
+            "WHERE a.session_id=%s ORDER BY a.id DESC LIMIT %s",
+            [session_id, limit],
+        )
+        names = [col.name for col in cur.description or ()]
+        return [dict(zip(names, row, strict=True)) for row in reversed(await cur.fetchall())]
+
+
+async def count_for_session(pool: Pool, session_id: int) -> int:
+    async with pool.connection() as conn:
+        row = await (
+            await conn.execute(
+                "SELECT count(*) FROM alert WHERE session_id=%s",
+                [session_id],
+            )
+        ).fetchone()
+    assert row is not None
+    return row[0]

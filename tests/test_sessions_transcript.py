@@ -14,7 +14,7 @@ from psycopg import AsyncConnection
 from kiroku import sessions, transcript
 from kiroku.budget import Budget, Caps
 from kiroku.config import Secret
-from kiroku.db import Pool, SchemaOutOfDate, open_pool
+from kiroku.db import Pool, SchemaOutOfDate, connect, open_pool
 from kiroku.ledger import AudioSeconds, CostEntry, Purpose
 from kiroku.sessions import Channel, UnsealedLeg, claim_channels
 from kiroku.source import Capture, Online, Probe, StreamMeta
@@ -106,6 +106,32 @@ async def test_sealing_for_another_process_skips_a_watched_channel(
         assert [x.audio_end_ms for x in await sessions.legs(pool, session)] == [None]
     # The watch is gone: the leg is a crashed one now.
     assert await sessions.end_leg(pool, leg, 9_000, unless_watched=watched)
+
+
+async def test_channel_claim_releases_before_socket_disconnect(
+    database_url: str, pool: Pool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    claimed: tuple[Channel, sessions.Leg] | None = None
+
+    @asynccontextmanager
+    async def delayed_disconnect(url: str) -> AsyncGenerator[AsyncConnection]:
+        async with connect(url) as conn:
+            yield conn
+            # Keep the server connection alive through the claim's cleanup. This exposes
+            # a delayed socket disconnect without depending on PostgreSQL scheduling.
+            assert claimed is not None
+            channel, leg = claimed
+            assert await sessions.end_leg(pool, leg, 9_000, unless_watched=channel), (
+                "channel claim kept its advisory lock until socket disconnect"
+            )
+
+    monkeypatch.setattr(sessions, "connect", delayed_disconnect)
+    async with claim_channels(database_url, "twitch", ["gorgc"]) as (watched,):
+        session = await sessions.open_session(pool, watched, A, T0)
+        leg = await sessions.next_leg(pool, watched, session)
+        await sessions.record_leg(pool, leg, T0)
+        claimed = watched, leg
+        assert not await sessions.end_leg(pool, leg, 9_000, unless_watched=watched)
 
 
 class _FlakyPool:

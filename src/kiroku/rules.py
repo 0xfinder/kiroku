@@ -73,17 +73,18 @@ async def add(
     cooldown_s: int = 600,
     pack: str | None = None,
     owner: str = "me",
+    enabled: bool = True,
 ) -> Rule:
     check(name, instructions, threshold, cooldown_s=cooldown_s, pack=pack)
     async with pool.connection() as conn:
         try:
             cur = await conn.execute(
                 f"""
-                INSERT INTO rule (owner, name, instructions, threshold, cooldown_s, pack)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO rule (owner, name, instructions, threshold, cooldown_s, pack, enabled)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 RETURNING {_COLUMNS}
                 """,
-                [owner, name, instructions.strip(), threshold, cooldown_s, pack],
+                [owner, name, instructions.strip(), threshold, cooldown_s, pack, enabled],
             )
         except psycopg.errors.UniqueViolation:
             raise RuleError(f"a rule named {name} already exists; use `kiroku rule edit`") from None
@@ -112,6 +113,7 @@ async def edit(
     cooldown_s: int | None = None,
     pack: str | None = None,
     clear_pack: bool = False,
+    enabled: bool | None = None,
     owner: str = "me",
 ) -> Rule:
     """Change the given fields. Past decisions keep the wording they were asked with."""
@@ -125,7 +127,7 @@ async def edit(
         cur = await conn.execute(
             f"""
             UPDATE rule SET instructions = %s, threshold = %s, cooldown_s = %s, pack = %s,
-                            updated_at = now()
+                            enabled = coalesce(%s, enabled), updated_at = now()
             WHERE id = %s
             RETURNING {_COLUMNS}
             """,
@@ -134,6 +136,7 @@ async def edit(
                 new_threshold,
                 new_cooldown,
                 new_pack,
+                enabled,
                 old.id,
             ],
         )

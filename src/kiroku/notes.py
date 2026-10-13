@@ -642,3 +642,27 @@ def timeline(row: Mapping[str, Any]) -> str:
                     text = "; ".join(str(v) for k, v in item.items() if k != "at_ms")
                     lines.append(f"  {clock(item['at_ms'])} {text}")
     return "\n".join(lines)
+
+
+async def timeline_rows(pool: Pool, session_id: int) -> list[dict[str, Any]]:
+    """Timeline including pending statuses; never expose prompts or raw model attempts."""
+    async with pool.connection() as conn:
+        cur = await conn.execute(
+            "SELECT id,start_ms,end_ms,pack,mode,status,body,schema_name,schema_version "
+            "FROM note WHERE session_id=%s ORDER BY start_ms",
+            [session_id],
+        )
+        names = [col.name for col in cur.description or ()]
+        return [dict(zip(names, row, strict=True)) for row in await cur.fetchall()]
+
+
+async def count_for_session(pool: Pool, session_id: int) -> int:
+    async with pool.connection() as conn:
+        row = await (
+            await conn.execute(
+                "SELECT count(*) FROM note WHERE session_id=%s",
+                [session_id],
+            )
+        ).fetchone()
+    assert row is not None
+    return row[0]

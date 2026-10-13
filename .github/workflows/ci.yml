@@ -14,9 +14,29 @@ jobs:
         with:
           enable-cache: true
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      # Keep type checkers and build/test processes sequential on small hosts.
+      - run: npm ci && npm run check && npm run test && npm run build
+        working-directory: web
       - run: uv sync --locked
       - run: uv run ruff check
       - run: uv run ruff format --check
       - run: uv run pyright
       - run: docker compose up -d --wait
       - run: uv run pytest
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+      - run: npm run e2e
+        working-directory: web
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: web-acceptance
+          path: |
+            docs/web/screenshots/
+            web/playwright-report/
+            web/test-results/

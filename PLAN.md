@@ -59,7 +59,7 @@ Each phase ends with something that can be observed working.
 - League Vocabulary and `get_live_match` from the `live-lol-esports` lolesports client are implemented (issue #6). Recorded Caedrel name audit: 15 errors with title-only, 9 with match Vocabulary. Teams and picks reach the Gate in replay; the live feed still needs verification during a pro match. The public endpoints do not expose bans.
 - Rolling Notes with League schemas for `watching_pro`, `playing`, and `chatting`, plus core `general` Notes, are implemented in issue #7. Notes resume after restart and export the distillation dataset.
 - Cost ledger and Budget caps.
-- Minimal web app: live transcript, Notes timeline, Rule editor, Review queue.
+- The web app (issue #8) serves a static SvelteKit build from `kiroku serve`: live transcript over SSE, Notes timeline, Rule editing and paid tests, and the borderline Review queue with undo. It defaults to loopback under D18.
 - **Done when:** during a live Caedrel co-stream, a "predicts the winner" Rule alerts within about 60 s with his reasoning, sends no duplicate for the same game, and the session's cost is visible.
 
 ### Phase 2 — Measurement

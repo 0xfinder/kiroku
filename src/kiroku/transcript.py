@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import logging
+from datetime import datetime
 
 import psycopg
 
@@ -72,6 +73,7 @@ async def _commit_once(pool: Pool, session_id: int, transcriber: str, result: Re
             )
         if result.cost is not None:
             await ledger.record(conn, dataclasses.replace(result.cost, session_id=session_id))
+        await conn.execute("SELECT pg_notify('kiroku_transcript', %s)", [str(session_id)])
         return True
 
 
@@ -114,6 +116,44 @@ async def watermark(pool: Pool, session_id: int, transcriber: str) -> int:
                 "SELECT coalesce(max(audio_end_ms), 0) FROM transcript_span "
                 "WHERE session_id=%s AND transcriber=%s",
                 [session_id, transcriber],
+            )
+        ).fetchone()
+    assert row is not None
+    return row[0]
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class Row:
+    id: int
+    audio_start_ms: int
+    audio_end_ms: int
+    spoken_at: datetime
+    text: str
+    transcriber: str
+
+
+async def page(pool: Pool, session_id: int, *, after_ms: int, limit: int) -> list[Row]:
+    """Oldest first; never split utterances sharing one SSE audio-clock ID."""
+    async with pool.connection() as conn:
+        cur = await conn.execute(
+            "WITH offsets AS (SELECT DISTINCT audio_start_ms FROM utterance "
+            "WHERE session_id=%(s)s AND audio_start_ms>%(after)s "
+            "ORDER BY audio_start_ms LIMIT %(limit)s) "
+            "SELECT id,u.audio_start_ms,audio_end_ms,spoken_at,text,transcriber "
+            "FROM utterance u JOIN offsets o USING(audio_start_ms) WHERE session_id=%(s)s "
+            "ORDER BY u.audio_start_ms,id",
+            {"s": session_id, "after": after_ms, "limit": limit},
+        )
+        return [Row(*row) for row in await cur.fetchall()]
+
+
+async def count_through(pool: Pool, session_id: int, through_ms: int) -> int:
+    """Rows at or behind a stream cursor. A rise beyond rows sent is late Backfill."""
+    async with pool.connection() as conn:
+        row = await (
+            await conn.execute(
+                "SELECT count(*) FROM utterance WHERE session_id=%s AND audio_start_ms<=%s",
+                [session_id, through_ms],
             )
         ).fetchone()
     assert row is not None

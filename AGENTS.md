@@ -32,6 +32,7 @@ uv run ruff check && uv run ruff format --check && uv run pyright && uv run pyte
 - After a crash, `kiroku watch` backfills the session's transcript gaps from the archive when it resumes the session. For a session it won't resume, run `KIROKU_DATA_DIR=... .venv/bin/kiroku backfill <channel> [--session N]`. It is safe beside a running watch. It refuses only while another backfill of the session runs.
 - Read an Opus archive's length with `kiroku.archive.decoded_ms`, not ffprobe's `duration`. The `duration` field overstates it by the 6.5 ms pre-skip.
 - After killing an asyncio subprocess whose stdout you stopped reading, reap it with `communicate()`, not `wait()`. On Python 3.12, `wait()` also waits for stdout to close, and a paused pipe never closes.
+- Channel claims explicitly unlock their dedicated Postgres connection before closing it. A socket close can return before Postgres releases advisory locks; immediate Backfill or watch handoff must wait for the unlock acknowledgement.
 - Try a Rule's wording with `kiroku rule test <name> [--session ID | --last N] [--instructions "..."]` before relying on it. It makes real Jev calls against stored Windows (about $0.00003 each, counted against the monthly cap) and stores no decisions. Naming concrete events beats abstract categories (spikes/README.md, 2026-10-12).
 - If `docker` says permission denied right after Docker was installed, the session predates the `docker` group. Run commands as `sg docker -c "docker compose up -d --wait"`.
 - League uses a 24-hour cache at `<data_dir>/packs/league`. The lolesports website key is public; override it with `KIROKU_LOLESPORTS_API_KEY`, not secrets.env. Data Dragon includes unnamed internal items; skip those names, and validate API shapes before caching them.
@@ -78,3 +79,13 @@ uv run ruff check && uv run ruff format --check && uv run pyright && uv run pyte
 
 - When a task reveals a verified, reusable lesson, update this file in the same PR.
 - When a decision changes, add a new entry to docs/decisions.md that supersedes the old one. Don't rewrite history.
+
+## Web app
+
+- Run Python and web checks sequentially on the 2-vCPU, 3.7-GB host. Concurrent type checkers can exhaust memory and stall in direct reclaim. CI keeps these steps sequential too. For SvelteKit 3, extend `$app/tsconfig`; it loads generated ambient types through `compilerOptions.types = ["$app/types"]`. Explicit source `include` and generated-output `exclude` lists are valid. Do not switch to the stale SvelteKit 2 `.svelte-kit/tsconfig.json`.
+- Build the static Svelte app with `cd web && npm ci && npm run check && npm run test && npm run build`, then run `uv run kiroku serve`. It binds `127.0.0.1:8737` with one worker and needs no API keys until a paid Rule test. Shutdown bounds open SSE connections to five seconds. The build is ignored by Git, built in CI, and included when packaging after a build. Production runs no Node server.
+- D18: expose the app only through Tailscale or Cloudflare Access. A non-loopback `--host` is opt-in and logs a D18 warning. The app has no account system.
+- Web reads use table-owner APIs; Review writes and undo use `labels`, Rule edits use `rules`, and paid tests use `dry_run`. Web tests bound both recent and session-specific selectors to at most 100 Windows.
+- When a Rule edit omits `enabled`, preserve the current database value in the UPDATE. Writing a prior read's value can undo a concurrent CLI or web disablement.
+- Run `cd web && npx playwright install chromium && npm run e2e` for browser acceptance. It creates and drops its own migrated Postgres database, commits synthetic speech through `transcript.commit`, checks Review labels, and saves phone/desktop screenshots under `docs/web/screenshots/`. Never point this runner at the dev database.
+- An SSE audio-clock ID groups all Utterances at that offset. It cannot describe a late Backfill behind that clock. Reconcile stored transcript pages on reconnect and after the stream's reconciliation hint; deduplicate by Utterance ID.
