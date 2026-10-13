@@ -27,7 +27,7 @@ from typing import Literal
 import psycopg
 from psycopg.types.json import Jsonb
 
-from kiroku import ledger, rules, segments
+from kiroku import ledger, rules, segments, transcript
 from kiroku.budget import BudgetGuard, OverBudget
 from kiroku.db import Pool, retrying
 from kiroku.gate import (
@@ -52,6 +52,7 @@ from kiroku.gate.windows import (
     due_windows,
 )
 from kiroku.ledger import CostEntry
+from kiroku.llm import LLMDatabaseError
 from kiroku.pack import LiveContext
 
 log = logging.getLogger(__name__)
@@ -81,20 +82,23 @@ class NotAsked:
 type Outcome = Answered | NotAsked
 
 
+async def watermark(pool: Pool, session_id: int) -> int:
+    """End of persisted Gate Windows, including terminal failures."""
+    async with pool.connection() as conn:
+        row = await (
+            await conn.execute(
+                "SELECT coalesce(max(end_ms), 0) FROM gate_window WHERE session_id=%s", [session_id]
+            )
+        ).fetchone()
+    assert row is not None
+    return row[0]
+
+
 async def progress(pool: Pool, session_id: int, transcriber: str) -> tuple[int, int]:
     """(where the next Window starts, the transcript watermark)."""
-    async with pool.connection() as conn:
-        cur = await conn.execute(
-            """
-            SELECT (SELECT coalesce(max(end_ms), 0) FROM gate_window WHERE session_id = %(s)s),
-                   (SELECT coalesce(max(audio_end_ms), 0) FROM transcript_span
-                    WHERE session_id = %(s)s AND transcriber = %(t)s)
-            """,
-            {"s": session_id, "t": transcriber},
-        )
-        row = await cur.fetchone()
-    assert row is not None
-    return row[0], row[1]
+    return await watermark(pool, session_id), await transcript.watermark(
+        pool, session_id, transcriber
+    )
 
 
 async def ungated_closed_sessions(
@@ -232,8 +236,10 @@ class GateLoop:
         policy: WindowPolicy | None = None,
         poll_s: float = POLL_S,
         on_commit: Callable[[], None] = lambda: None,
+        on_disabled: Callable[[int], None] = lambda session: None,
     ) -> None:
         self._on_commit = on_commit
+        self._on_disabled = on_disabled
         self._pool = pool
         self._session_id = session_id
         self._transcriber = transcriber
@@ -274,12 +280,14 @@ class GateLoop:
                 # The transcript is the part that can't be recovered later, so it keeps going.
                 # A restart with a fixed key gates the backlog from where this stopped.
                 log.error("session %d: %s; the Gate is off for this session", self._session_id, e)
+                self._on_disabled(self._session_id)
                 return
             except Exception:
                 # Likewise for a bug: log it loudly, but never take transcription down with it.
                 log.exception(
                     "session %d: Gate crashed; it is off for this session", self._session_id
                 )
+                self._on_disabled(self._session_id)
                 return
             if finishing is not None:
                 return
@@ -321,7 +329,7 @@ class GateLoop:
             questions = [rule_question(r) for r in await rules.active(self._pool, pack)]
             try:
                 outcome = await self._ask(state, questions)
-            except GateAuthError as e:
+            except (GateAuthError, LLMDatabaseError) as e:
                 if e.costs:
                     await ledger.record_session_costs(self._pool, self._session_id, e.costs)
                 raise

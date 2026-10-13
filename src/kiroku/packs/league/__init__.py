@@ -21,6 +21,7 @@ from kiroku.packs.league.data import (
     text,
     versions,
 )
+from kiroku.packs.league.notes import notes_schema
 
 VOCABULARY_CHARS = 350
 
@@ -53,6 +54,7 @@ def vocabulary(
 class LeaguePack:
     name = "league"
     categories = ("League of Legends",)
+    notes_schema = staticmethod(notes_schema)
 
     def __init__(self, http: httpx.AsyncClient, data_dir: Path, key: str) -> None:
         self.data = LeagueData(http, data_dir, key)

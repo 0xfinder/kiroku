@@ -525,3 +525,53 @@ async def test_backlog_before_the_first_segment_stays_unscoped(
     assert all(request.state.context["stream"] == {"title": "now"} for request in gate.requests)
     cur = await conn.execute("SELECT count(*) FROM gate_decision")
     assert await cur.fetchone() == (2,)
+
+
+async def test_budget_db_blip_after_paid_fallback_keeps_window_pending_and_costs(
+    pool: Pool,
+    session: int,
+    conn: AsyncConnection,
+) -> None:
+    from kiroku.gate import GateUnavailable
+    from kiroku.gate.fallback import FallbackGate
+    from kiroku.gate.llm import LLMGate
+    from kiroku.llm.groq import GroqLLM
+    from tests.test_alerts import completion
+
+    class Down:
+        name = "primary"
+
+        async def evaluate(self, request: GateRequest) -> GateAnswer:
+            raise GateUnavailable("offline")
+
+    retry_entered = asyncio.Event()
+
+    class FlakyGuard:
+        calls = 0
+
+        async def check(self, estimate_usd: Decimal) -> None:
+            self.calls += 1
+            if self.calls == 2:
+                raise psycopg.OperationalError("budget DB blip")
+            if self.calls == 3:
+                retry_entered.set()
+                await asyncio.Event().wait()
+
+    await speak(pool, session, 0, 45, "new words")
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda req: httpx.Response(200, json=completion({})))
+    ) as http:
+        gate_loop = loop(
+            pool, session, FallbackGate(Down(), LLMGate(GroqLLM(http, Secret("k")))), FlakyGuard()
+        )
+        task = asyncio.create_task(gate_loop.run())
+        try:
+            await asyncio.wait_for(retry_entered.wait(), 5)
+        finally:
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+    assert await (await conn.execute("SELECT count(*) FROM gate_window")).fetchone() == (0,)
+    assert await (
+        await conn.execute("SELECT count(*) FROM cost_ledger WHERE purpose='gate'")
+    ).fetchone() == (1,)

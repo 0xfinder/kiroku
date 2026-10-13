@@ -276,3 +276,67 @@ Shutdown first stops channels and drains transcription and their final Gate pass
 A send needs at least five seconds remaining before its deadline, plus the pacing wait. Insufficient time produces `stale` without sending or starting Cooldown. A started send gets its normal 15-second request timeout; staleness gates the start. Callbacks with a missing message date or `date: 0` confirm uncertain delivery at receipt time instead of 1970.
 
 Rejected: consuming a Window to persist primary-auth costs, stopping the primary for a Fallback key error, and cancelling the worker before final Gate decisions exist. Regression coverage includes a real ffmpeg shutdown replay, second-signal interruption, lost ledger acknowledgements, deadline pacing, and inaccessible callbacks.
+
+
+## D31. Rolling Notes use Groq, with Pack schemas and durable attempt records
+
+2026-10-13. Supersedes D7's Notes model assignment. Notes use Groq `openai/gpt-oss-120b` through the shared `LLM.complete_json` interface. An Anthropic key is not available. Pydantic v2 validates the Pack's versioned schema, then the parser checks every timestamp against the source span. The adapter retries a malformed result once.
+
+Notes tile the session audio clock in 180-second spans, including a closed session's final partial span. They wait for the transcript watermark and, when enabled, Gate progress. Mode is the most common answered Window Mode in the span, with ties going to the latest. The Segment at the span start selects the Pack. Unknown Mode, unsupported Modes, and Packs without Notes use the core `general` schema.
+
+One worker serves the process's claimed channels. It reads stored history, handles open sessions and sessions closed within 12 hours, and resumes from the last terminal Note. It never waits on the capture path. Transcript and Gate commits wake it, with a 30-second poll backstop. Notes reserve 300 requests for Extraction and Fallback. At one Fallback every 45 seconds, that reserve covers roughly 3.75 hours of Gate outage before counting Extraction. This is an initial operating margin, not a measured traffic forecast.
+
+Shutdown drains channels and Alerts, then gives an in-flight Notes request 35 seconds to finish its 30-second provider deadline and write. Notes stop admitting new spans when that drain starts. Cancellation preserves completed attempts in the retry journal and charges an estimate for an interrupted request with an uncertain result. Storage gets at most one extra second after cancellation. A second signal can interrupt storage. A sustained database outage or hard kill can lose an attempt before its journal commits; the pending span is retried. Pending spans resume on restart.
+
+A terminal `note` row and that call's Cost ledger rows commit in one transaction, keyed by `(session_id, start_ms)`. Unavailable or auth failures leave the span pending. A small `note_retry` journal stores those attempts and their ledger rows in its own idempotent transaction. This extends the issue's proposed storage: without a journal, a restart would lose billed pending attempts. Completion copies the attempts into the Note and deletes the journal entries atomically. Every attempt retains its original input, system prompt, model, raw output, and validation error, even if a restart changes the selected schema. JSON export streams terminal rows.
+
+The prompt carries teams, game number, and draft from previous Notes. It forbids copying previous timestamped items. The first live prototype demonstrated why: gpt-oss sometimes repeated previous takes with timestamps outside the new span. Validation rejected those results and the worker continued. The final recording and measured limits are in `spikes/README.md`.
+
+**Rejected:** running Notes inside the Gate loop, which would let a slow completion stall the Gate. A generic agent is unnecessary for this fixed summarization step.
+
+**Revisit:** the model, quota reserve, and prompt after measurements from live streams with reliable Speaker maps.
+
+
+## D32. Notes retry without a speech deadline, using one durable span row
+
+2026-10-13. Supersedes D31's retry journal, Gate barrier and previous-Note continuity rules.
+
+Notes are not freshness-sensitive Alerts. `LLMUnavailable` leaves a pending span indefinitely;
+old speech is not a reason to discard it. This includes quota admission refusals that dispatch
+nothing. A process-wide 30-second exponential backoff, capped at 15 minutes, limits provider
+and database work. A known provider pause or daily-request reset can extend that backoff.
+Authentication stops Notes for the process; bad output still retries once then becomes invalid.
+Bugs and budget refusals retain their distinct terminal outcomes. We do not invent an automatic
+retry-attempt limit without evidence that a temporary provider outage is a permanent span failure.
+The 12-hour filter selects new historical sessions only; once a session has a Note, its backlog
+continues across the cutoff, including after restart.
+
+Pending attempts and their costs now commit in `note` itself. Its pending status does not advance
+the terminal watermark. Receipt UUIDs make paid pending writes idempotent across lost commit
+acknowledgements. Refusals with no attempts or costs need no receipt UUID, and terminal writes
+clear pending receipts. Terminal status makes final writes idempotent. This removes `note_retry` and
+its copy/delete transaction. The owning row stores the initial input and system once; attempts
+refer to those columns implicitly and store overrides only when the request changed. Export
+includes the system column, preserving the full dataset without repeating the prompt each time.
+The Notes migration is still unmerged, so this changes that migration rather than shipping a
+second migration to remove an unreleased table.
+
+A span becomes due when its transcript is complete and the Gate covers it, or the transcript is
+270 seconds beyond its end (two 45-second Windows plus three minutes). Closed tails wait at most
+five wall-clock minutes after session close. Auth and bug exits explicitly release that session's
+barrier for the process. Mode and live context still come from available historical Windows;
+unknown Mode selects general. Previous continuity requires at most a ten-minute speech gap and
+the same Pack, Segment, Mode and, when both are known, Game key.
+
+General v2 includes timestamped winner predictions so no-Pack co-streams can represent forecasts.
+League playing v2 also accepts predictions to match the global writing contract.
+League watching_pro v2 describes favorites, odds and implicit loser statements in the JSON schema
+as well as the writing instructions. Prediction recall is measured against a committed annotation
+list; objective plans, reported results and conditional comeback paths are documented separately.
+
+**Rejected:** expiring old speech after one provider refusal; treating database failure as provider
+unavailability; storing duplicate request bodies in every output; permanently blocking Notes on a
+Gate process that has stopped.
+
+**Revisit:** a finite attempt policy only if repeated real attempts prove a permanent span problem;
+model quality with reliable Speaker maps and more annotated games.

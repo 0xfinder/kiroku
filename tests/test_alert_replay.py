@@ -1065,3 +1065,39 @@ async def test_bug_outcome_never_enters_sending(
     assert await alerting.in_cooldown(pool, first) is None
     assert await alerting.recover(pool, [channel]) == 0
     assert sink.messages == []
+
+
+async def test_budget_db_blip_after_paid_extraction_keeps_decision_pending_and_costs(
+    pool: Pool,
+    database_url: str,
+    conn: AsyncConnection,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import psycopg
+
+    channel, _, now = await seed(pool, database_url)
+    original = Budget.check
+    checks = 0
+
+    async def flaky(self: Budget, session: int | None, estimate: Decimal) -> None:
+        nonlocal checks
+        checks += 1
+        if checks == 2:
+            raise psycopg.OperationalError("budget DB blip")
+        await original(self, session, estimate)
+
+    monkeypatch.setattr(Budget, "check", flaky)
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda req: httpx.Response(200, json=completion({})))
+    ) as http:
+        sink = Sink()
+        w = alerting.AlertWorker(
+            pool, [channel], GroqLLM(http, Secret("k")), sink, Budget(pool, Caps()), now=lambda: now
+        )
+        with pytest.raises(psycopg.OperationalError):
+            await w.drain()
+    assert sink.messages == []
+    assert await (await conn.execute("SELECT count(*) FROM alert")).fetchone() == (0,)
+    assert await (
+        await conn.execute("SELECT count(*) FROM cost_ledger WHERE purpose='extraction'")
+    ).fetchone() == (1,)

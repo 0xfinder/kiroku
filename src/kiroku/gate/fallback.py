@@ -5,6 +5,8 @@ import time
 from collections.abc import Callable
 from dataclasses import replace
 
+import psycopg
+
 from kiroku.budget import OverBudget
 from kiroku.gate import (
     Gate,
@@ -16,6 +18,7 @@ from kiroku.gate import (
     GateUnavailable,
 )
 from kiroku.ledger import CostEntry
+from kiroku.llm import LLMDatabaseError
 
 log = logging.getLogger(__name__)
 
@@ -62,6 +65,12 @@ class FallbackGate:
             )
         try:
             answer = await self._fallback.evaluate(request)
+        except LLMDatabaseError as e:
+            raise LLMDatabaseError(costs + e.costs, e.attempts) from e
+        except psycopg.OperationalError:
+            if costs:
+                raise LLMDatabaseError(costs, ()) from None
+            raise
         except OverBudget as e:
             raise OverBudget(e.refusal, costs + e.costs) from e
         except GateAuthError as e:

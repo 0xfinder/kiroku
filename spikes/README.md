@@ -154,3 +154,90 @@ The interrupted first prototype is in [alert-extraction-prototype.jsonl](results
 Offline acceptance replays all three Extraction repeats by canonical request body, uses the recorded Bot API Message shape, verifies duplicate linkage and Cost ledger rows, and labels the stored Gate decision through the documented callback shape. Failure tests cover uncertain sends, restart recovery, Label redelivery and changed verdicts, staleness, per-channel Cooldown, Pack keys, Budget refusal, provider failures, quota expiry and concurrent admission, poller ownership handoff, lost database acknowledgements and worker bugs. Synthetic audio through real ffmpeg proves a blocked Telegram send does not stall transcription or the Gate.
 
 Still unmeasured: said-to-sent latency and human Labels from a live pro match after merge. The ten-minute freshness cutoff and twenty-minute coarse-key gap remain initial values to tune from that measurement.
+
+## 2026-10-13: Rolling Notes with per-Pack schemas (issue #7)
+
+The initial run, before the second review, used `uv run python spikes/notes_replay.py spikes/results/2026-10-13-notes.jsonl --database kiroku_spike_7_notes_final_v3`. It ran the production NotesWorker and Groq adapter over two stored transcripts, three repeats each. The scratch database is isolated and migrated by the script. The dev database is untouched. Calls are paced at 16 seconds, use `openai/gpt-oss-120b` with low reasoning effort and temperature 0, and commit `Purpose.NOTES` costs under each fixture session.
+
+The League fixture is #6's 611.072-second Caedrel RED Kalunga–FlyQuest transcript (`2026-10-12-league-vocabulary/pack.jsonl`). Production transcript and Gate commit functions seed its Utterances and answered `watching_pro` Windows. The recorded completed-match snapshot from #6 supplies team and champion spelling. Three 180-second spans and a 71.072-second final span produce four `league.watching_pro` Notes per repeat. The no-Pack fixture is #1's 240-second Gorgc transcript (`2026-10-11-gorgc-blast-slam.jsonl`), with a 180-second span and a 60-second final span using `general`. Each fixture session is closed before Notes run. No live stream or fresh speech recognition is measured here.
+
+The [initial recording](results/2026-10-13-notes-review-1.jsonl) contains every canonical HTTP request, real response, stored Note, and ledger total. Its [initial counts](results/2026-10-13-notes-review-1-metrics.json) are archived; the current counter validates the v2 schemas measured below.
+
+- **Validity:** 18 of 18 calls and terminal Notes validate, without retries. All 18 summaries are nonempty.
+- **Timestamps:** all 90 timestamped items fall inside their source span. The parser rejects an item at the exclusive end boundary, a negative timestamp, or a boolean masquerading as an integer.
+- **Teams and draft:** all 12 League Notes name RED Kalunga and FlyQuest. Teams, game number, and draft carry the recorded match state; that state is not evidence of newly spoken events.
+- **Prediction capture:** all three repeats preserve “RED should be still favorable” at 518.940 seconds as a take. All 12 `predictions` arrays are empty, even after the writing instructions explicitly included a named favorite. This fixture does not prove reliable structured prediction capture. The Gorgc 70–30 Spirit call appears in the general schema's takes in all three repeats.
+- **Cost:** the 18 successful calls total **$0.008709**, matching both response token usage at list price and the Notes ledger. League repeats cost $0.001859, $0.001679, and $0.001977. General repeats cost $0.001096, $0.001031, and $0.001067.
+
+Two earlier recordings remain for review. The [prototype](results/2026-10-13-notes-prototype.jsonl) copied previous timestamped items into later spans: 12 Notes succeeded, five became `invalid`, and one span remained pending after a provider deadline. It made 24 HTTP calls. Response usage cost $0.014797, but its stored ledger reported $0.034152 because an early adapter edit double-counted the estimate after parse failures. The final adapter and a regression test correct that accounting error. The [second revision](results/2026-10-13-notes-revision-2.jsonl) stopped copying old timestamps and produced 18 valid Notes for $0.007306, but six League summaries were empty. The final schema requires a nonempty summary and the prompt explicitly requests one. These prototypes are evidence of the iteration, not the CI or distillation target.
+
+Offline CI matches canonical request bodies against all three current repeats, then compares validated bodies and ledger totals. Failure tests prove one retry and both raw outputs for invalid responses, progress on later spans, empty spans without calls, provider backoff with pending spans, budget refusal, process-wide auth disablement, exactly-once commits under racing receipts, restart recovery, Mode ties, historical Pack selection, the 12-hour limit, and unknown Mode without the Gate. Attempt records retain the original input, system prompt, and model across a schema change on restart. Export streams rows through a server cursor. Synthetic audio through real ffmpeg proves a hung Notes call cannot stop transcription or gating. Cancellation tests cover paid retries, budget checks, HTTP dispatch, returned-result commits, and an unavailable database.
+
+Limits remain. Validation proves shape and timestamp bounds, not factual accuracy or completeness. For example, one initial summary says RED is “crushing fights” where the transcript says “butchering all the fights.” Background casters remain mixed into these transcripts until Speaker maps exist. The quota reserve and shutdown timings are operating choices, not throughput measurements. A hard kill or sustained database outage can lose an attempt before its pending write commits; its span remains pending for restart.
+
+
+### Second review: retry semantics and structured prediction recall
+
+Two new complete runs replayed both fixtures three times through the production worker and
+Groq adapter. The first [review prototype](results/2026-10-13-notes-review-2-prototype.jsonl)
+made 18 valid Notes for $0.013357, but classified past fights as predictions and named a hero
+as Gorgc's implicit winner. We strengthened the schema descriptions and prompt with generic
+examples of favorites, odds and implicit loser statements, and explicit exclusions for
+completed results, objective plans and hero matchups. General v2 gained `predictions`; League
+watching_pro v2 describes them in the JSON schema as well as its writing instructions.
+Playing v2 also includes predictions so the system instructions match every schema.
+
+The [current recording](results/2026-10-13-notes.jsonl), produced in isolated migrated database
+`kiroku_spike_7_notes_review_2_final`, contains three repeats with the pinned gpt-oss-120b model,
+low reasoning effort, temperature 0 and 16-second request spacing. It has **21 HTTP calls**,
+including three 429s, and **18/18 valid terminal Notes** without validation retries. All summaries
+are nonempty, **132/132 timestamps** are in span, and **12/12 League Notes** name RED Kalunga and
+FlyQuest. Successful response usage and Notes ledger costs both total **$0.012530**. Repeat costs
+(League/general) are $0.003119/$0.001357, $0.002580/$0.001282 and $0.002821/$0.001371.
+
+The [annotation list](results/2026-10-13-notes-predictions.json) identifies one Caedrel favorite
+(518.940 s, RED) and two Gorgc winner statements (chunk 0's 69%/70–30 Spirit call and chunk 7's
+implicit “no way you can fight”/“too much” for PARIVISION). Each must have its source timestamp
+and the correct competing team to count as recalled. The file documents excluded objective
+plans, reported results and a conditional PARIVISION comeback path; it does not silently treat
+those as missed favorites.
+
+- Caedrel: **1/1 per repeat, 3/3 overall**; the favorite is now a structured prediction.
+- Gorgc explicit odds: **3/3**. Implicit winner: **0/3** because all three responses name “AIM”,
+  a hero transcription, instead of Team Spirit. Gorgc recall is **1/2 in each repeat**.
+- Combined recall: **6/9 (66.7%)**. Of 13 prediction items, seven do not match the annotations:
+  the three wrong-hero items, three FlyQuest completed-fight evaluations, and one Drake plan.
+  Structured predictions improve on the initial empty arrays, but are not reliably complete or
+  precise. Pydantic shape validation cannot establish forecast semantics or team identity.
+
+A medium-effort experiment was stopped after a successful first Note and a daily-token quota
+refusal. The provider reported roughly 11 minutes to admit the next request, with insufficient
+headroom for a complete batch. Its [partial database observation](results/2026-10-13-notes-review-2-medium-partial.jsonl)
+contains the pending span and **one billed ledger entry, $0.001500**. It is not an HTTP cassette:
+the interrupted old recorder had not flushed its in-memory responses. No quality or repeat
+comparison is claimed for medium, and the shipped configuration remains the fully measured low
+effort. Total billed spend for this review's two complete runs and partial experiment is
+**$0.027387**. The replay script now flushes calls between passes, including on interruption,
+and bounds quota waits by a one-hour measurement limit instead of twenty immediate passes.
+
+Reproduce the current metrics with
+`uv run python spikes/notes_counts.py spikes/results/2026-10-13-notes.jsonl`.
+The [metrics file](results/2026-10-13-notes-metrics.json) includes every observed prediction and
+every missed annotation, not just aggregate counts. Offline tests replay all three repeats by
+canonical request body and verify both bodies and ledger totals.
+
+Notes now keep a provider-refused span pending regardless of speech age. Per-process backoff
+starts at 30 seconds, doubles up to 15 minutes, and honors longer provider pauses/resets. A
+pending `note` row stores attempts and their costs atomically; `note_retry` is removed. Started
+backlogs continue beyond the 12-hour selection cutoff, while completed old sessions are not
+rescanned for transcript progress. Pending tails retain their original bounds after reopening.
+
+New regression coverage includes quota/reset wake storms, old backlog restarts, a stopped Gate,
+closed-tail wait limits, prior context changes, NUL output and paid commit bugs, cancelled writes
+that fail during grace, unknown transport outcomes, and Budget database errors both before and
+after a paid attempt. The latter leave Extraction decisions and Gate Windows pending, retaining
+paid costs rather than converting database errors to degraded provider outcomes. Common request
+input/system are stored once; rare changed-request attempts carry overrides. Quota refusals
+without attempts or costs add no receipt UUID. A lost-ack regression proves pending writes
+store each paid attempt once, and completion clears their receipt UUIDs. Raw literal NUL
+outputs use reversible JSON-string encoding because PostgreSQL jsonb cannot store NUL text.

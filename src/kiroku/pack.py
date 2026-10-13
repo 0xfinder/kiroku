@@ -2,9 +2,10 @@
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from kiroku.gate.windows import JSON
+from kiroku.notes_schema import NotesSchema
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,6 +25,13 @@ class Pack(Protocol):
     async def vocabulary(self, title: str, live: LiveContext | None) -> str: ...
 
     async def get_live_match(self, title: str) -> LiveContext | None: ...
+
+
+@runtime_checkable
+class NotesPack(Protocol):
+    """Optional Pack capability; Packs without Notes use the core general schema."""
+
+    def notes_schema(self, mode: str | None) -> NotesSchema | None: ...
 
 
 type PackSelector = Callable[[str | None], Pack | None]
