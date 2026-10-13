@@ -81,7 +81,7 @@ class LeagueReplay:
 
 
 def hold_audio(
-    monkeypatch: pytest.MonkeyPatch, *at_ms: int
+    monkeypatch: pytest.MonkeyPatch, *at_ms: int, timeout_s: float = 15
 ) -> list[tuple[asyncio.Event, asyncio.Event]]:
     """Pause real ffmpeg PCM at exact capture positions until the test releases it."""
     original = StreamlinkSource.capture
@@ -102,7 +102,12 @@ def hold_audio(
                 delivered = boundary
                 reached, resume = barriers[step]
                 reached.set()
-                await resume.wait()
+                try:
+                    await asyncio.wait_for(resume.wait(), timeout_s)
+                except TimeoutError:
+                    raise AssertionError(
+                        f"audio barrier at {at_ms[step]} ms was not released"
+                    ) from None
                 step += 1
             if block:
                 yield block
@@ -117,15 +122,84 @@ def hold_audio(
             return read(self.inner)
 
         async def stop_input(self) -> None:
+            release_all()
             await self.inner.stop_input()
+
+    def release_all() -> None:
+        for _, resume in barriers:
+            resume.set()
 
     @asynccontextmanager
     async def capture(source: StreamlinkSource, archive: Path) -> AsyncGenerator[Capture]:
         async with original(source, archive) as inner:
-            yield HeldCapture(inner)
+            try:
+                yield HeldCapture(inner)
+            finally:
+                release_all()
 
     monkeypatch.setattr(StreamlinkSource, "capture", capture)
     return barriers
+
+
+@pytest.mark.parametrize("finish", ["timeout", "stop", "body_failure"])
+async def test_audio_barrier_deadline_and_teardown(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, finish: str
+) -> None:
+    pcm = b"\0" * (30 * SAMPLES_PER_MS * BYTES_PER_SAMPLE)
+
+    class FakeCapture:
+        @property
+        def pcm(self) -> AsyncIterator[bytes]:
+            async def blocks() -> AsyncIterator[bytes]:
+                yield pcm
+
+            return blocks()
+
+        async def stop_input(self) -> None:
+            assert all(resume.is_set() for _, resume in barriers)
+
+    @asynccontextmanager
+    async def fake_capture(source: StreamlinkSource, archive: Path) -> AsyncGenerator[Capture]:
+        try:
+            yield FakeCapture()
+        finally:
+            assert all(resume.is_set() for _, resume in barriers)
+
+    monkeypatch.setattr(StreamlinkSource, "capture", fake_capture)
+    barriers = hold_audio(monkeypatch, 10, 20, timeout_s=0.1 if finish == "timeout" else 15)
+    source = StreamlinkSource("fake")
+
+    async def consume() -> None:
+        async with source.capture(tmp_path / "fake.opus") as capture:
+            blocks = capture.pcm
+            assert await anext(blocks) == pcm[: len(pcm) // 3]
+            pending = asyncio.ensure_future(anext(blocks))
+            try:
+                await asyncio.wait_for(barriers[0][0].wait(), 1)
+                assert not pending.done()
+                assert not barriers[1][0].is_set()
+                if finish == "timeout":
+                    with pytest.raises(
+                        AssertionError, match="audio barrier at 10 ms was not released"
+                    ):
+                        await pending
+                elif finish == "stop":
+                    await capture.stop_input()
+                    assert await asyncio.wait_for(pending, 1) == pcm[: len(pcm) // 3]
+                    assert await anext(blocks) == pcm[: len(pcm) // 3]
+                else:
+                    raise RuntimeError("simulated test body failure")
+            finally:
+                if not pending.done():
+                    pending.cancel()
+                    await asyncio.gather(pending, return_exceptions=True)
+
+    if finish == "body_failure":
+        with pytest.raises(RuntimeError, match="simulated test body failure"):
+            await consume()
+    else:
+        await consume()
+    assert all(resume.is_set() for _, resume in barriers)
 
 
 @pytest.fixture
@@ -328,17 +402,20 @@ def test_malformed_data_fails_at_the_boundary_and_feed_ids_must_match() -> None:
         ("versions", httpx.HTTPStatusError),
         ("window", httpx.HTTPStatusError),
         ("window_204", json.JSONDecodeError),
-        ("window_metadata", Exception),
+        ("window_metadata", (KeyError, DataError)),
         ("getLive_403", httpx.HTTPStatusError),
     ],
 )
-async def test_pack_endpoint_failures(tmp_path: Path, fail: str, error: type[Exception]) -> None:
+async def test_pack_endpoint_failures(
+    tmp_path: Path, fail: str, error: type[Exception] | tuple[type[Exception], ...]
+) -> None:
     replay = LeagueReplay(fail=fail)
     async with httpx.AsyncClient(transport=httpx.MockTransport(replay)) as api:
         pack = LeaguePack(api, tmp_path, "public-test-key")
         with pytest.raises(error) as exc:
             await pack.get_live_match(TITLE)
-        if isinstance(exc.value, httpx.HTTPStatusError):
+        if fail in {"versions", "window", "getLive_403"}:
+            assert isinstance(exc.value, httpx.HTTPStatusError)
             expected_url = {
                 "versions": "https://ddragon.leagueoflegends.com/api/versions.json",
                 "window": "https://feed.lolesports.com/livestats/v1/window/117133830114188937",
@@ -476,10 +553,22 @@ async def test_refresh_discards_context_after_category_change_or_failure(
     changed = False
 
     class ControlledPack(LeaguePack):
+        live_unavailable = False
+
+        async def get_live_match(self, title: str) -> LiveContext | None:
+            self.live_unavailable = False
+            try:
+                live = await super().get_live_match(title)
+            except httpx.HTTPError:
+                self.live_unavailable = True
+                raise
+            self.live_unavailable = live is None
+            return live
+
         async def vocabulary(self, title: str, live: LiveContext | None) -> str:
             words = await super().vocabulary(title, live)
             initial[1].set()
-            if replay.fail == "getLive":
+            if changed and self.live_unavailable:
                 changed_audio[1].set()
             return words
 
@@ -492,7 +581,7 @@ async def test_refresh_discards_context_after_category_change_or_failure(
             else:
                 replay.fail = "getLive"
             changed = True
-        if change == "category" and changed:
+        if change == "category" and changed and not changed_audio[1].is_set():
             segments = await query_rows(
                 conn, "SELECT start_ms FROM segment WHERE category='Just Chatting'"
             )
@@ -676,6 +765,11 @@ async def test_metadata_write_retry_keeps_the_first_observed_audio_boundary(
     barriers = hold_audio(monkeypatch, 65_000, 75_000, 85_000)
     original = segments.record
     boundaries: list[int] = []
+    attempts = (
+        (barriers[0][1], barriers[1][0], 75_000),
+        (barriers[1][1], barriers[2][0], 85_000),
+        (barriers[2][1], None, None),
+    )
 
     async def flaky(
         pool: Pool,
@@ -686,17 +780,26 @@ async def test_metadata_write_retry_keeps_the_first_observed_audio_boundary(
         *,
         restart: bool = False,
     ) -> None:
+        resume = None
         if meta.category == "Just Chatting":
+            assert len(boundaries) < len(attempts), (
+                f"unexpected Segment write attempt {len(boundaries) + 1} at {start_ms} ms; "
+                f"expected {len(attempts)} attempts"
+            )
+            resume, reached, next_ms = attempts[len(boundaries)]
             boundaries.append(start_ms)
-            if len(boundaries) <= 2:
+            if reached is not None:
                 if revert:
                     monkeypatch.setenv("FAKE_CATEGORY", "League of Legends")
-                barriers[len(boundaries) - 1][1].set()
-                await barriers[len(boundaries)][0].wait()
+                resume.set()
+                try:
+                    await asyncio.wait_for(reached.wait(), 15)
+                except TimeoutError:
+                    raise AssertionError(f"audio barrier at {next_ms} ms was not reached") from None
                 raise psycopg.OperationalError("simulated Segment write failure")
         await original(pool, session_id, start_ms, meta, pack, restart=restart)
-        if meta.category == "Just Chatting":
-            barriers[2][1].set()
+        if resume is not None:
+            resume.set()
 
     monkeypatch.setattr(segments, "record", flaky)
     changed = False
