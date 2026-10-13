@@ -103,6 +103,7 @@ async def watch_until(
     llm: LLM | None = None,
     notifier: Notifier | None = None,
     notes_llm: LLM | None = None,
+    poll_s: float = 0.5,
 ) -> None:
     """Run `kiroku watch fake` until `done()` (a coroutine) returns True, then stop it."""
     async with (
@@ -136,7 +137,7 @@ async def watch_until(
                 if notes_llm is not None
                 else None,
                 gate=gate,
-                poll_s=0.5,
+                poll_s=poll_s,
                 select_pack=select_pack,
             )
         )
@@ -575,12 +576,15 @@ async def test_notes_hang_doesnt_stall_transcription_or_gate(
     conn: AsyncConnection,
     tmp_path: Path,
     fake_stream: Callable[[str], None],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from collections.abc import Mapping
 
     from kiroku.llm import LLMRequest, LLMResult
     from tests.test_gating import FakeGate
 
+    # Exercise the drain timeout without waiting for a real provider's 30-second deadline.
+    monkeypatch.setattr("kiroku.watch.NOTES_DRAIN_TIMEOUT_S", 0.1)
     fake_stream("100")
     entered = asyncio.Event()
 
@@ -617,6 +621,7 @@ async def test_notes_hang_doesnt_stall_transcription_or_gate(
         done,
         gate=FakeGate(0.9),
         notes_llm=HungNotes(),
+        timeout_s=10,
     )
     assert entered.is_set()
     assert await (await conn.execute("SELECT count(*) FROM note")).fetchone() == (0,)
