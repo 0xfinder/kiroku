@@ -1,14 +1,175 @@
 {
-  "requests": 18,
+  "requests": 21,
   "notes": 18,
   "ok": 18,
-  "timestamps": 90,
-  "timestamps_in_span": 90,
+  "timestamps": 132,
+  "timestamps_in_span": 132,
   "nonempty_summaries": 18,
   "league_notes": 12,
   "league_team_pairs": 12,
-  "league_prediction_items": 0,
-  "favorite_takes_at_518940": 3,
-  "response_usage_usd": "0.008709",
-  "ledger_usd": "0.008709"
+  "league_prediction_items": 7,
+  "favorite_takes_at_518940": 2,
+  "prediction_items": 13,
+  "prediction_matches": 6,
+  "prediction_annotations_across_repeats": 9,
+  "prediction_unmatched_items": 7,
+  "prediction_recall": [
+    {
+      "fixture": "league",
+      "repeat": 0,
+      "captured": 1,
+      "expected": 1,
+      "missed": [],
+      "observed": [
+        {
+          "at_ms": 518940,
+          "quote": "RED should be still favorable, I think.",
+          "winner": "RED Kalunga"
+        },
+        {
+          "at_ms": 562040,
+          "quote": "FlyQuest is better at teamfighting by far.",
+          "winner": "FlyQuest"
+        }
+      ]
+    },
+    {
+      "fixture": "general",
+      "repeat": 0,
+      "captured": 1,
+      "expected": 2,
+      "missed": [
+        {
+          "fixture": "general",
+          "at_ms": 210000,
+          "winner": "Team Spirit",
+          "winner_aliases": [
+            "Spirit",
+            "Team Spirit"
+          ],
+          "quote": "There's no way you can fight, really. That's gonna be a tough fight for them. They might have the MKB before. But they have to fight this Aegis. I think it's too much.",
+          "kind": "implicit winner: too much for PARIVISION"
+        }
+      ],
+      "observed": [
+        {
+          "at_ms": 0,
+          "quote": "69% for Spirit.",
+          "winner": "Spirit"
+        },
+        {
+          "at_ms": 210000,
+          "quote": "There's no way you can fight, really.",
+          "winner": "AIM"
+        }
+      ]
+    },
+    {
+      "fixture": "league",
+      "repeat": 1,
+      "captured": 1,
+      "expected": 1,
+      "missed": [],
+      "observed": [
+        {
+          "at_ms": 15620,
+          "quote": "Red will click on Drake and this should be...",
+          "winner": "RED Kalunga"
+        },
+        {
+          "at_ms": 518940,
+          "quote": "So RED should be still favorable, I think.",
+          "winner": "RED Kalunga"
+        },
+        {
+          "at_ms": 562040,
+          "quote": "FlyQuest is better at teamfighting by far.",
+          "winner": "FlyQuest"
+        }
+      ]
+    },
+    {
+      "fixture": "general",
+      "repeat": 1,
+      "captured": 1,
+      "expected": 2,
+      "missed": [
+        {
+          "fixture": "general",
+          "at_ms": 210000,
+          "winner": "Team Spirit",
+          "winner_aliases": [
+            "Spirit",
+            "Team Spirit"
+          ],
+          "quote": "There's no way you can fight, really. That's gonna be a tough fight for them. They might have the MKB before. But they have to fight this Aegis. I think it's too much.",
+          "kind": "implicit winner: too much for PARIVISION"
+        }
+      ],
+      "observed": [
+        {
+          "at_ms": 0,
+          "quote": "69% for Spirit.",
+          "winner": "Spirit"
+        },
+        {
+          "at_ms": 210000,
+          "quote": "There's no way you can fight, really. That's gonna be a tough fight for them.",
+          "winner": "AIM"
+        }
+      ]
+    },
+    {
+      "fixture": "league",
+      "repeat": 2,
+      "captured": 1,
+      "expected": 1,
+      "missed": [],
+      "observed": [
+        {
+          "at_ms": 518940,
+          "quote": "RED should be still favorable, I think.",
+          "winner": "RED Kalunga"
+        },
+        {
+          "at_ms": 562040,
+          "quote": "FlyQuest is better at teamfighting by far.",
+          "winner": "FlyQuest"
+        }
+      ]
+    },
+    {
+      "fixture": "general",
+      "repeat": 2,
+      "captured": 1,
+      "expected": 2,
+      "missed": [
+        {
+          "fixture": "general",
+          "at_ms": 210000,
+          "winner": "Team Spirit",
+          "winner_aliases": [
+            "Spirit",
+            "Team Spirit"
+          ],
+          "quote": "There's no way you can fight, really. That's gonna be a tough fight for them. They might have the MKB before. But they have to fight this Aegis. I think it's too much.",
+          "kind": "implicit winner: too much for PARIVISION"
+        }
+      ],
+      "observed": [
+        {
+          "at_ms": 0,
+          "quote": "69% for Spirit.",
+          "winner": "Spirit"
+        },
+        {
+          "at_ms": 210000,
+          "quote": "There's no way you can fight, really. That's gonna be a tough fight for them.",
+          "winner": "AIM"
+        }
+      ]
+    }
+  ],
+  "response_usage_usd": "0.012530",
+  "ledger_usd": "0.012530"
 }

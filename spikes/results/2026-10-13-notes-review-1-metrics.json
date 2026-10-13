@@ -1,0 +1,14 @@
+{
+  "requests": 18,
+  "notes": 18,
+  "ok": 18,
+  "timestamps": 90,
+  "timestamps_in_span": 90,
+  "nonempty_summaries": 18,
+  "league_notes": 12,
+  "league_team_pairs": 12,
+  "league_prediction_items": 0,
+  "favorite_takes_at_518940": 3,
+  "response_usage_usd": "0.008709",
+  "ledger_usd": "0.008709"
+}

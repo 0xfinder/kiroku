@@ -295,3 +295,48 @@ The prompt carries teams, game number, and draft from previous Notes. It forbids
 **Rejected:** running Notes inside the Gate loop, which would let a slow completion stall the Gate. A generic agent is unnecessary for this fixed summarization step.
 
 **Revisit:** the model, quota reserve, and prompt after measurements from live streams with reliable Speaker maps.
+
+
+## D32. Notes retry without a speech deadline, using one durable span row
+
+2026-10-13. Supersedes D31's retry journal, Gate barrier and previous-Note continuity rules.
+
+Notes are not freshness-sensitive Alerts. `LLMUnavailable` leaves a pending span indefinitely;
+old speech is not a reason to discard it. This includes quota admission refusals that dispatch
+nothing. A process-wide 30-second exponential backoff, capped at 15 minutes, limits provider
+and database work. A known provider pause or daily-request reset can extend that backoff.
+Authentication stops Notes for the process; bad output still retries once then becomes invalid.
+Bugs and budget refusals retain their distinct terminal outcomes. We do not invent an automatic
+retry-attempt limit without evidence that a temporary provider outage is a permanent span failure.
+The 12-hour filter selects new historical sessions only; once a session has a Note, its backlog
+continues across the cutoff, including after restart.
+
+Pending attempts and their costs now commit in `note` itself. Its pending status does not advance
+the terminal watermark. Receipt UUIDs make paid pending writes idempotent across lost commit
+acknowledgements. Refusals with no attempts or costs need no receipt UUID, and terminal writes
+clear pending receipts. Terminal status makes final writes idempotent. This removes `note_retry` and
+its copy/delete transaction. The owning row stores the initial input and system once; attempts
+refer to those columns implicitly and store overrides only when the request changed. Export
+includes the system column, preserving the full dataset without repeating the prompt each time.
+The Notes migration is still unmerged, so this changes that migration rather than shipping a
+second migration to remove an unreleased table.
+
+A span becomes due when its transcript is complete and the Gate covers it, or the transcript is
+270 seconds beyond its end (two 45-second Windows plus three minutes). Closed tails wait at most
+five wall-clock minutes after session close. Auth and bug exits explicitly release that session's
+barrier for the process. Mode and live context still come from available historical Windows;
+unknown Mode selects general. Previous continuity requires at most a ten-minute speech gap and
+the same Pack, Segment, Mode and, when both are known, Game key.
+
+General v2 includes timestamped winner predictions so no-Pack co-streams can represent forecasts.
+League playing v2 also accepts predictions to match the global writing contract.
+League watching_pro v2 describes favorites, odds and implicit loser statements in the JSON schema
+as well as the writing instructions. Prediction recall is measured against a committed annotation
+list; objective plans, reported results and conditional comeback paths are documented separately.
+
+**Rejected:** expiring old speech after one provider refusal; treating database failure as provider
+unavailability; storing duplicate request bodies in every output; permanently blocking Notes on a
+Gate process that has stopped.
+
+**Revisit:** a finite attempt policy only if repeated real attempts prove a permanent span problem;
+model quality with reliable Speaker maps and more annotated games.

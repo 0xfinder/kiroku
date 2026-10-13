@@ -670,3 +670,98 @@ async def test_cancel_costs_only_dispatched_request(
             lock.release()
     assert len(error.value.costs) == int(dispatched)
     assert len(error.value.attempts) == int(dispatched)
+
+
+@pytest.mark.parametrize("consumer", ["extraction", "fallback"])
+async def test_budget_database_failure_propagates_to_llm_consumers(consumer: str) -> None:
+    import psycopg
+
+    from kiroku.extraction import extract
+
+    failure = psycopg.OperationalError("budget database unavailable")
+
+    class DownGuard:
+        async def check(self, estimate_usd: Decimal) -> None:
+            raise failure
+
+    class DownGate:
+        name = "primary"
+
+        async def evaluate(self, request: GateRequest) -> Any:
+            raise GateUnavailable("primary offline")
+
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda req: pytest.fail("DB refusal dispatched HTTP"))
+    ) as http:
+        llm = GroqLLM(http, Secret("k"))
+        with pytest.raises(psycopg.OperationalError) as error:
+            if consumer == "extraction":
+                await extract(llm, DownGuard(), "winner", "gorgc", GateState({}, "new"), None)
+            else:
+                await FallbackGate(DownGate(), LLMGate(llm)).evaluate(
+                    GateRequest(GateState({}, "new"), (), DownGuard())
+                )
+        assert error.value is failure
+
+
+@pytest.mark.parametrize("recovers", [True, False])
+async def test_transport_outcome_unknown_has_an_attempt_for_each_billed_dispatch(
+    recovers: bool,
+) -> None:
+    clock = Clock()
+    calls = 0
+
+    def respond(req: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1 or not recovers:
+            raise httpx.ReadTimeout("lost response", request=req)
+        return httpx.Response(200, json=completion({"claim": "yes"}))
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as http:
+        llm = GroqLLM(http, Secret("k"), clock=clock.now, sleep=clock.sleep)
+        if recovers:
+            result = await llm.complete_json(request(), parse)
+        else:
+            with pytest.raises(LLMUnavailable) as error:
+                await llm.complete_json(request(), parse)
+            result = error.value
+    assert len(result.costs) == len(result.attempts) == calls
+    assert result.attempts[0].output == ""
+    assert result.attempts[0].error == "ReadTimeout; provider outcome unknown"
+
+
+@pytest.mark.parametrize("consumer", ["extraction", "fallback"])
+async def test_paid_attempts_remain_available_when_a_retry_budget_read_fails(consumer: str) -> None:
+    import psycopg
+
+    from kiroku.extraction import extract
+    from kiroku.llm import LLMDatabaseError
+
+    class FlakyGuard:
+        calls = 0
+
+        async def check(self, estimate_usd: Decimal) -> None:
+            self.calls += 1
+            if self.calls == 2:
+                raise psycopg.OperationalError("budget DB down")
+
+    class DownGate:
+        name = "primary"
+
+        async def evaluate(self, request: GateRequest) -> Any:
+            raise GateUnavailable("offline")
+
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda req: httpx.Response(200, json=completion({})))
+    ) as http:
+        llm = GroqLLM(http, Secret("k"))
+        with pytest.raises(LLMDatabaseError) as error:
+            if consumer == "extraction":
+                await extract(llm, FlakyGuard(), "winner", "gorgc", GateState({}, "new"), None)
+            else:
+                await FallbackGate(DownGate(), LLMGate(llm)).evaluate(
+                    GateRequest(GateState({}, "new"), (), FlakyGuard())
+                )
+        assert isinstance(error.value, psycopg.OperationalError)
+        assert len(error.value.costs) == len(error.value.attempts) == 1

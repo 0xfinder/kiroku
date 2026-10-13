@@ -38,6 +38,21 @@ def main(path):
                                       r["response"]["usage"]["completion_tokens"]))
                       for r in calls if r["status"] == 200), Decimal(0))
     ledger_cost = sum((Decimal(r["ledger"][1]) for r in results), Decimal(0))
+    annotations = json.loads(Path("spikes/results/2026-10-13-notes-predictions.json").read_text())
+    recall = []
+    for result in results:
+        expected = [a for a in annotations["predictions"] if a["fixture"] == result["fixture"]]
+        observed = [p for n in result["notes"] if n["status"] == "ok"
+                    for p in n["body"].get("predictions", [])]
+        captured = [a for a in expected if any(
+            p["at_ms"] == a["at_ms"] and p["winner"].casefold() in
+            [name.casefold() for name in a["winner_aliases"]] for p in observed)]
+        recall.append({"fixture": result["fixture"], "repeat": result["repeat"],
+                       "captured": len(captured), "expected": len(expected),
+                       "missed": [a for a in expected if a not in captured], "observed": observed})
+    items = [p for r in recall for p in r["observed"]]
+    matched = sum(r["captured"] for r in recall)
+    expected = sum(r["expected"] for r in recall)
     report = {
         "requests": len(calls), "notes": len(entries), "ok": len(ok),
         "timestamps": len(stamps),
@@ -47,6 +62,10 @@ def main(path):
         "league_team_pairs": sum(n["body"]["teams"] == ["RED Kalunga", "FlyQuest"] for n in league),
         "league_prediction_items": sum(len(n["body"]["predictions"]) for n in league),
         "favorite_takes_at_518940": sum(t["at_ms"] == 518_940 for n in league for t in n["body"]["takes"]),
+        "prediction_items": len(items), "prediction_matches": matched,
+        "prediction_annotations_across_repeats": expected,
+        "prediction_unmatched_items": len(items) - matched,
+        "prediction_recall": recall,
         "response_usage_usd": str(usage_cost), "ledger_usd": str(ledger_cost),
     }
     print(json.dumps(report, indent=2))

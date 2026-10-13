@@ -45,7 +45,12 @@ def read_recording() -> list[dict[str, Any]]:
 
 
 def good(at: int = 0) -> dict[str, Any]:
-    return {"topics": [{"at_ms": at, "topic": "match"}], "takes": [], "summary": "match"}
+    return {
+        "predictions": [],
+        "topics": [{"at_ms": at, "topic": "match"}],
+        "takes": [],
+        "summary": "match",
+    }
 
 
 def responder(request: httpx.Request) -> httpx.Response:
@@ -152,30 +157,30 @@ async def test_empty_spans_no_calls(pool: Pool, database_url: str) -> None:
     assert [r["status"] for r in await notes.rows(pool)] == ["empty", "empty"]
 
 
-async def test_unavailable_then_expiry(
+async def test_old_unavailable_spans_stay_pending_across_restart(
     pool: Pool, database_url: str, conn: AsyncConnection
 ) -> None:
-    channel, _, now = await seed(pool, database_url)
+    channel, _, now = await seed(pool, database_url, age=timedelta(hours=11))
     clock = Clock()
     async with httpx.AsyncClient(
         transport=httpx.MockTransport(lambda req: httpx.Response(500))
     ) as http:
         llm = GroqLLM(http, Secret("k"), clock=clock.now, sleep=clock.sleep)
-        w = notes.NotesWorker(
-            pool, [channel], TRANSCRIBER, llm, Budget(pool, Caps()), now=lambda: now
-        )
-        await w.drain()
-        assert await notes.rows(pool) == []
-        await notes.NotesWorker(
-            pool,
-            [channel],
-            TRANSCRIBER,
-            llm,
-            Budget(pool, Caps()),
-            now=lambda: now + timedelta(minutes=61),
-        ).drain()
-    assert [r["status"] for r in await notes.rows(pool)] == ["failed", "failed"]
-    assert await (await conn.execute("SELECT count(*) FROM note_retry")).fetchone() == (0,)
+        for age in (timedelta(), timedelta(hours=2)):
+            await notes.NotesWorker(
+                pool,
+                [channel],
+                TRANSCRIBER,
+                llm,
+                Budget(pool, Caps()),
+                now=lambda age=age: now + age,
+            ).drain()
+            assert await notes.rows(pool) == []
+    assert await (await conn.execute("SELECT status FROM note")).fetchone() == ("pending",)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(responder)) as http:
+        await worker(pool, channel, http, now=lambda: now + timedelta(hours=2)).drain()
+    # Once started, the entire backlog remains eligible beyond the 12-hour history boundary.
+    assert [r["status"] for r in await notes.rows(pool)] == ["ok", "ok"]
 
 
 async def test_pending_paid_attempt_survives_restart(
@@ -243,9 +248,8 @@ async def test_gate_barrier_history_and_no_gate(
     pool: Pool, database_url: str, conn: AsyncConnection
 ) -> None:
     channel, session, now = await seed(pool, database_url, "league", gate=False)
-    assert not await notes.pending(
-        pool, [channel], TRANSCRIBER, notes.NotesPolicy(), now, gated=True
-    )
+    # A stalled Gate releases spans with a 270-second transcript margin.
+    assert await notes.pending(pool, [channel], TRANSCRIBER, notes.NotesPolicy(), now, gated=True)
     async with httpx.AsyncClient(transport=httpx.MockTransport(responder)) as http:
         await worker(pool, channel, http, gated=False).drain()
     rows = await notes.rows(pool, session_id=session)
@@ -300,7 +304,7 @@ def test_cli_timeline_and_export(database_url: str, monkeypatch: pytest.MonkeyPa
     exported = runner.invoke(app, ["notes", "export", "--since", "2026-01-01"])
     assert exported.exit_code == 0
     rows = [json.loads(line) for line in exported.stdout.splitlines()]
-    assert len(rows) == 2 and rows[0]["schema"] == {"name": "general", "version": 1}
+    assert len(rows) == 2 and rows[0]["schema"] == {"name": "general", "version": 2}
     assert rows[0]["input"]["turns"] and rows[0]["output"][0]["error"] is None
     assert runner.invoke(app, ["notes", "export", "--since", "invalid"]).exit_code == 2
 
@@ -503,7 +507,8 @@ async def test_retry_dataset_keeps_original_input_after_gate_setting_changes(
         await worker(pool, channel, http, gated=False).drain()
     row = (await notes.rows(pool))[0]
     assert row["schema_name"] == "general"
-    assert row["outputs"][0]["input"]["schema"]["name"] == "league.watching_pro"
+    assert row["input"]["schema"]["name"] == "league.watching_pro"
+    assert "input" not in row["outputs"][0]
     assert row["outputs"][-1]["input"]["schema"]["name"] == "general"
 
 
@@ -584,3 +589,437 @@ async def test_cancelled_provider_with_unavailable_journal_still_stops(
         with pytest.raises(asyncio.CancelledError):
             await asyncio.wait_for(task, 0.5)
     assert not await notes.rows(pool)
+
+
+@pytest.mark.parametrize("refusal", ["quota", "pause"])
+async def test_old_backlog_backoff_honors_provider_reset_and_avoids_db_wakes(
+    pool: Pool,
+    database_url: str,
+    conn: AsyncConnection,
+    monkeypatch: pytest.MonkeyPatch,
+    refusal: str,
+) -> None:
+    channel, _, now = await seed(pool, database_url, age=timedelta(hours=11))
+    clock = Clock()
+    calls = 0
+
+    def respond(req: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return (
+                httpx.Response(429, headers={"retry-after": "600"})
+                if refusal == "pause"
+                else httpx.Response(
+                    200,
+                    json=completion({"claim": "prime quota"}),
+                    headers={
+                        "x-ratelimit-remaining-requests": "299",
+                        "x-ratelimit-reset-requests": "600s",
+                    },
+                )
+            )
+        return responder(req)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as http:
+        llm = GroqLLM(http, Secret("k"), clock=clock.now, sleep=clock.sleep)
+        if refusal == "quota":
+            from kiroku.budget import Unlimited
+
+            await llm.complete_json(
+                LLMRequest("s", "{}", Purpose.EXTRACTION, Unlimited(), 10, 30), lambda raw: raw
+            )
+        w = notes.NotesWorker(
+            pool,
+            [channel],
+            TRANSCRIBER,
+            llm,
+            Budget(pool, Caps()),
+            now=lambda: now,
+            clock=clock.now,
+        )
+        await w.drain()
+        assert await notes.rows(pool) == []
+        assert await (await conn.execute("SELECT status FROM note")).fetchone() == ("pending",)
+        original = notes.pending
+
+        async def no_db(*args: Any, **kwargs: Any) -> list[notes.Span]:
+            pytest.fail("backoff wake queried the database")
+
+        monkeypatch.setattr(notes, "pending", no_db)
+        for moment in (0, 30, 599):
+            clock.value = moment
+            w.wake()
+            await w.drain()
+        assert calls == 1
+        monkeypatch.setattr(notes, "pending", original)
+        clock.value = 600
+        await w.drain()
+    assert [r["status"] for r in await notes.rows(pool)] == ["ok", "ok"]
+    assert calls == 3
+
+
+async def test_notes_guard_database_failure_leaves_span_for_retry(
+    pool: Pool,
+    database_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import psycopg
+
+    channel, _, _ = await seed(pool, database_url)
+    original = Budget.check
+
+    async def down(*args: Any, **kwargs: Any) -> None:
+        raise psycopg.OperationalError("budget DB down")
+
+    monkeypatch.setattr(Budget, "check", down)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(responder)) as http:
+        w = worker(pool, channel, http)
+        with pytest.raises(psycopg.OperationalError):
+            await w.drain()
+        assert await notes.rows(pool) == []
+        monkeypatch.setattr(Budget, "check", original)
+        await w.drain()
+    assert [r["status"] for r in await notes.rows(pool)] == ["ok", "ok"]
+
+
+@pytest.mark.parametrize("problem", ["nul", "commit_bug"])
+async def test_paid_completion_survives_storage_bug_and_sanitizes_nul(
+    pool: Pool,
+    database_url: str,
+    conn: AsyncConnection,
+    monkeypatch: pytest.MonkeyPatch,
+    problem: str,
+) -> None:
+    import psycopg
+
+    channel, _, _ = await seed(pool, database_url)
+    original = notes.commit
+
+    async def broken(*args: Any, **kwargs: Any) -> bool:
+        if args[3].status == "ok":
+            raise psycopg.DataError("bad jsonb value")
+        return await original(*args, **kwargs)
+
+    def respond(req: httpx.Request) -> httpx.Response:
+        raw = json.loads(json.loads(req.content)["messages"][1]["content"])
+        body = good(raw["turns"][0]["at_ms"])
+        body["summary"] = "ma\u0000tch"
+        return httpx.Response(200, json=completion(body))
+
+    if problem == "commit_bug":
+        monkeypatch.setattr(notes, "commit", broken)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as http:
+        await worker(pool, channel, http).drain()
+    rows = await notes.rows(pool)
+    assert [r["status"] for r in rows] == (
+        ["ok", "ok"] if problem == "nul" else ["failed", "failed"]
+    )
+    assert all(len(r["outputs"]) == 1 for r in rows)
+    assert all("\\u0000" in r["outputs"][0]["output"] for r in rows)
+    if problem == "nul":
+        assert all(r["body"]["summary"] == "match" for r in rows)
+    assert await (
+        await conn.execute("SELECT count(*) FROM cost_ledger WHERE purpose='notes'")
+    ).fetchone() == (2,)
+
+
+async def test_failed_write_during_cancellation_does_not_pay_for_later_spans(
+    pool: Pool,
+    database_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    channel, _, _ = await seed(pool, database_url)
+    entered, release = asyncio.Event(), asyncio.Event()
+    calls = 0
+
+    async def broken(*args: Any, **kwargs: Any) -> bool:
+        entered.set()
+        await release.wait()
+        raise ValueError("write crashed during grace")
+
+    def respond(req: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return responder(req)
+
+    monkeypatch.setattr(notes, "commit", broken)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as http:
+        task = asyncio.create_task(worker(pool, channel, http).drain())
+        await asyncio.wait_for(entered.wait(), 5)
+        task.cancel()
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(task, 0.5)
+    assert calls == 1
+
+
+@pytest.mark.parametrize(
+    "change", ["none", "age", "pack", "segment", "mode", "game", "missing_game"]
+)
+async def test_previous_is_recent_and_has_same_context(
+    pool: Pool,
+    database_url: str,
+    conn: AsyncConnection,
+    change: str,
+) -> None:
+    from kiroku import segments
+    from kiroku.source import StreamMeta
+
+    channel, session, now = await seed(pool, database_url)
+    first = (
+        await notes.pending(pool, [channel], TRANSCRIBER, notes.NotesPolicy(), now, gated=True)
+    )[0]
+    prepared = await notes.prepare(pool, first, TRANSCRIBER, {}, gated=True)
+    prepared = notes.replace(prepared, game_key="game-a")
+    await notes.commit(pool, prepared, TRANSCRIBER, notes.Outcome("ok", good(), model="model"))
+    await conn.execute("UPDATE gate_window SET game_key='game-a' WHERE session_id=%s", [session])
+    if change == "pack":
+        await conn.execute("UPDATE note SET pack='league' WHERE session_id=%s", [session])
+    elif change == "segment":
+        await segments.record(
+            pool, session, 180_000, StreamMeta("new", "different", "Dota 2"), None
+        )
+    elif change == "mode":
+        await conn.execute(
+            "UPDATE gate_window SET mode='playing' WHERE session_id=%s AND start_ms>=180000",
+            [session],
+        )
+    elif change == "game":
+        await conn.execute(
+            "UPDATE gate_window SET game_key='game-b' WHERE session_id=%s AND start_ms>=180000",
+            [session],
+        )
+    elif change == "missing_game":
+        await conn.execute(
+            "UPDATE gate_window SET game_key=NULL WHERE session_id=%s AND start_ms>=180000",
+            [session],
+        )
+    bounds = Bounds(900_000, 1_080_000) if change == "age" else Bounds(180_000, 240_000)
+    next_note = await notes.prepare(
+        pool, notes.Span(session, bounds, None), TRANSCRIBER, {}, gated=True
+    )
+    assert (next_note.input["previous"] is not None) == (change in {"none", "missing_game"})
+
+
+@pytest.mark.parametrize("reason", ["auth", "bug"])
+async def test_gate_stopping_releases_notes_immediately(
+    pool: Pool,
+    database_url: str,
+    conn: AsyncConnection,
+    reason: str,
+) -> None:
+    from kiroku.budget import Unlimited
+    from kiroku.gate import GateAuthError
+    from kiroku.gating import GateLoop
+    from tests.test_gating import FakeGate
+
+    channel, session, now = await seed(pool, database_url, gate=False)
+    assert not await notes.pending(
+        pool, [channel], TRANSCRIBER, notes.NotesPolicy(), now, gated=True
+    )
+    async with httpx.AsyncClient(transport=httpx.MockTransport(responder)) as http:
+        w = worker(pool, channel, http, now=lambda: now)
+        loop = GateLoop(
+            pool,
+            session,
+            TRANSCRIBER,
+            FakeGate(GateAuthError("wrong key") if reason == "auth" else RuntimeError("bug")),
+            Unlimited(),
+            lambda: {},
+            on_disabled=w.gate_disabled,
+        )
+        await loop.run()
+        await w.drain()
+    assert [r["status"] for r in await notes.rows(pool)] == ["ok", "ok"]
+    assert all(r["mode"] is None for r in await notes.rows(pool))
+
+
+async def test_stalled_gate_uses_available_modes_and_closed_tail_wait_is_bounded(
+    pool: Pool,
+    database_url: str,
+    conn: AsyncConnection,
+) -> None:
+    channel, session, now = await seed(pool, database_url, "league")
+    await conn.execute("DELETE FROM gate_window WHERE session_id=%s AND start_ms>=45000", [session])
+    async with httpx.AsyncClient(transport=httpx.MockTransport(responder)) as http:
+        w = worker(pool, channel, http, now=lambda: now)
+        await w.drain()
+        rows = await notes.rows(pool)
+        assert len(rows) == 1 and rows[0]["mode"] == "watching_pro"
+        await worker(pool, channel, http, now=lambda: now + timedelta(minutes=5)).drain()
+    assert len(await notes.rows(pool)) == 4
+
+
+async def test_outputs_reference_common_input_and_system_once(
+    pool: Pool,
+    database_url: str,
+) -> None:
+    channel, _, _ = await seed(pool, database_url)
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda req: httpx.Response(200, json=completion({})))
+    ) as http:
+        await worker(pool, channel, http).drain()
+    rows = await notes.rows(pool)
+    assert all(len(r["outputs"]) == 2 for r in rows)
+    assert all(r["input"]["turns"] and r["system"] == notes.SYSTEM for r in rows)
+    assert all("input" not in a and "system" not in a for r in rows for a in r["outputs"])
+
+
+async def test_paid_attempt_then_budget_db_failure_is_journaled_and_retried(
+    pool: Pool,
+    database_url: str,
+    conn: AsyncConnection,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import psycopg
+
+    channel, _, _ = await seed(pool, database_url)
+    original = Budget.check
+    checks = 0
+
+    async def flaky(self: Budget, session: int | None, estimate: Decimal) -> None:
+        nonlocal checks
+        checks += 1
+        if checks == 2:
+            raise psycopg.OperationalError("budget DB down after paid response")
+        await original(self, session, estimate)
+
+    monkeypatch.setattr(Budget, "check", flaky)
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda req: httpx.Response(200, json=completion({})))
+    ) as http:
+        w = worker(pool, channel, http)
+        with pytest.raises(psycopg.OperationalError):
+            await w.drain()
+    assert not await notes.rows(pool)
+    assert await (
+        await conn.execute("SELECT count(*) FROM cost_ledger WHERE purpose='notes'")
+    ).fetchone() == (1,)
+    assert await (
+        await conn.execute("SELECT jsonb_array_length(outputs),status FROM note")
+    ).fetchone() == (1, "pending")
+    async with httpx.AsyncClient(transport=httpx.MockTransport(responder)) as http:
+        await worker(pool, channel, http).drain()
+    assert len((await notes.rows(pool))[0]["outputs"]) == 2
+    assert await (
+        await conn.execute("SELECT count(*) FROM cost_ledger WHERE purpose='notes'")
+    ).fetchone() == (3,)
+
+
+async def test_reopened_session_keeps_pending_tail_bounds(
+    pool: Pool,
+    database_url: str,
+    conn: AsyncConnection,
+) -> None:
+    from kiroku import transcript
+    from kiroku.llm import LLMUnavailable
+    from kiroku.transcriber import Result, Utterance
+
+    channel, session, now = await seed(pool, database_url)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(responder)) as http:
+        first = (
+            await notes.pending(pool, [channel], TRANSCRIBER, notes.NotesPolicy(), now, gated=True)
+        )[0]
+        await notes.commit(
+            pool,
+            await notes.prepare(pool, first, TRANSCRIBER, {}, gated=True),
+            TRANSCRIBER,
+            notes.Outcome("empty"),
+        )
+    tail = (
+        await notes.pending(pool, [channel], TRANSCRIBER, notes.NotesPolicy(), now, gated=True)
+    )[0]
+    prepared = await notes.prepare(pool, tail, TRANSCRIBER, {}, gated=True)
+    await notes.journal(pool, prepared, LLMUnavailable("offline"), "model", TRANSCRIBER)
+    await conn.execute("UPDATE stream_session SET ended_at=NULL WHERE id=%s", [session])
+    await transcript.commit(
+        pool,
+        session,
+        TRANSCRIBER,
+        Result(240_000, 420_000, (Utterance(300_000, 310_000, "later"),), None),
+    )
+    async with httpx.AsyncClient(transport=httpx.MockTransport(responder)) as http:
+        await worker(pool, channel, http, gated=False).drain()
+    rows = await notes.rows(pool)
+    assert [(r["start_ms"], r["end_ms"]) for r in rows] == [
+        (0, 180_000),
+        (180_000, 240_000),
+        (240_000, 420_000),
+    ]
+    assert rows[2]["body"]["topics"][0]["at_ms"] == 300_000
+    for row in rows[1:]:
+        GENERAL.parse(row["body"], Bounds(row["start_ms"], row["end_ms"]))
+
+
+async def test_literal_nul_in_invalid_raw_output_is_reversible(
+    pool: Pool,
+    database_url: str,
+) -> None:
+    channel, _, _ = await seed(pool, database_url)
+    raw = '{"summary":"bad\u0000text"}'
+    body = completion({})
+    body["choices"][0]["message"]["content"] = raw
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda req: httpx.Response(200, json=body))
+    ) as http:
+        await worker(pool, channel, http).drain()
+    for row in await notes.rows(pool):
+        assert row["status"] == "invalid"
+        for attempt in row["outputs"]:
+            assert attempt["output_encoding"] == "json-string"
+            assert json.loads(attempt["output"]) == raw
+
+
+async def test_pending_receipts_deduplicate_attempts_without_growing_on_quota_refusals(
+    pool: Pool,
+    database_url: str,
+    conn: AsyncConnection,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import psycopg
+
+    from kiroku.ledger import CostEntry, Tokens
+    from kiroku.llm import LLMAttempt, LLMUnavailable
+
+    channel, session, now = await seed(pool, database_url)
+    span = (
+        await notes.pending(pool, [channel], TRANSCRIBER, notes.NotesPolicy(), now, gated=True)
+    )[0]
+    prepared = await notes.prepare(pool, span, TRANSCRIBER, {}, gated=True)
+    for _ in range(3):
+        await notes.journal(pool, prepared, LLMUnavailable("quota reserved"), "model", TRANSCRIBER)
+    assert await (
+        await conn.execute("SELECT outputs,receipts FROM note WHERE session_id=%s", [session])
+    ).fetchone() == ([], [])
+
+    original = notes.commit
+    lost_ack = True
+
+    async def flaky(*args: Any, **kwargs: Any) -> bool:
+        nonlocal lost_ack
+        result = await original(*args, **kwargs)
+        if lost_ack:
+            lost_ack = False
+            raise psycopg.OperationalError("lost commit acknowledgement")
+        return result
+
+    monkeypatch.setattr(notes, "commit", flaky)
+    cost = CostEntry("groq", "model", Purpose.NOTES, Tokens(10, 20), Decimal(".0001"), 1)
+    await notes.journal(
+        pool,
+        prepared,
+        LLMUnavailable("unavailable", (cost,), (LLMAttempt("", "outcome unknown"),)),
+        "model",
+        TRANSCRIBER,
+    )
+    assert await (
+        await conn.execute("SELECT jsonb_array_length(outputs),cardinality(receipts) FROM note")
+    ).fetchone() == (1, 1)
+    assert await (
+        await conn.execute("SELECT count(*),sum(usd) FROM cost_ledger WHERE purpose='notes'")
+    ).fetchone() == (1, cost.usd)
+    await notes.commit(pool, prepared, TRANSCRIBER, notes.Outcome("ok", good(), model="model"))
+    row = (await notes.rows(pool))[0]
+    assert row["status"] == "ok" and len(row["outputs"]) == 1
+    assert await (await conn.execute("SELECT receipts FROM note")).fetchone() == ([],)

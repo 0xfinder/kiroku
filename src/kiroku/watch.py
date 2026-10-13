@@ -155,6 +155,7 @@ async def watch(
         select_pack,
         alerts.wake if alerts else lambda: None,
         notes.wake if notes else lambda: None,
+        notes.gate_disabled if notes else lambda session: None,
     )
     background: list[asyncio.Task[None]] = []
     worker: asyncio.Task[None] | None = None
@@ -224,6 +225,7 @@ class Services:
     select_pack: PackSelector = lambda category: None
     alerts_wake: Callable[[], None] = lambda: None
     notes_wake: Callable[[], None] = lambda: None
+    gate_disabled: Callable[[int], None] = lambda session: None
 
     def gate_committed(self) -> None:
         self.alerts_wake()
@@ -299,6 +301,7 @@ async def _gate_closed_sessions(services: Services, channel: Channel) -> None:
             lambda stream=stream: stream,
             use_segments=True,
             on_commit=services.gate_committed,
+            on_disabled=services.gate_disabled,
         )
         loop.finish(session_ended=True)
         try:
@@ -355,6 +358,7 @@ class SessionRun:
                 live=self._live_for_window,
                 use_segments=True,
                 on_commit=services.gate_committed,
+                on_disabled=services.gate_disabled,
                 blocked_from=lambda: self._pending_update[1] if self._pending_update else None,
             )
             if services.gate is not None

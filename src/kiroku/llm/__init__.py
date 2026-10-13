@@ -5,6 +5,8 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol, cast
 
+import psycopg
+
 from kiroku.budget import BudgetGuard
 from kiroku.errors import KirokuError
 from kiroku.ledger import CostEntry, Purpose
@@ -35,6 +37,14 @@ class LLMResult[T]:
     attempts: tuple[LLMAttempt, ...] = ()
 
 
+class LLMDatabaseError(psycopg.OperationalError):
+    """A retryable budget database failure after paid attempts; never a provider failure."""
+
+    def __init__(self, costs: tuple[CostEntry, ...], attempts: tuple[LLMAttempt, ...]) -> None:
+        super().__init__("budget database unavailable after completion attempts")
+        self.costs, self.attempts = costs, attempts
+
+
 class LLMFailed(Exception):
     def __init__(
         self,
@@ -49,7 +59,16 @@ class LLMFailed(Exception):
 
 
 class LLMUnavailable(LLMFailed):
-    pass
+    def __init__(
+        self,
+        reason: str,
+        costs: tuple[CostEntry, ...] = (),
+        attempts: tuple[LLMAttempt, ...] = (),
+        *,
+        retry_after_s: float | None = None,
+    ) -> None:
+        super().__init__(reason, costs, attempts)
+        self.retry_after_s = retry_after_s
 
 
 class LLMBadResponse(LLMFailed):

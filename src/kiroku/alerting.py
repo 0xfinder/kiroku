@@ -21,7 +21,7 @@ from kiroku.db import Pool, retrying
 from kiroku.extraction import Previous
 from kiroku.gate.windows import JSON, GateState
 from kiroku.ledger import CostEntry
-from kiroku.llm import LLM, LLMAuthError, LLMFailed
+from kiroku.llm import LLM, LLMAuthError, LLMDatabaseError, LLMFailed
 from kiroku.notify import (
     AlertMessage,
     Delivery,
@@ -503,6 +503,9 @@ class AlertWorker:
                 "quote": value.quote,
             }
             same = value.same_as_previous
+        except LLMDatabaseError as e:
+            await ledger.record_session_costs(self._pool, candidate.session_id, e.costs)
+            raise
         except (LLMFailed, OverBudget, LLMAuthError) as e:
             reason = e.reason if isinstance(e, LLMFailed) else str(e)
             costs = e.costs

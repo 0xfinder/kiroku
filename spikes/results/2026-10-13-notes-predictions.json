@@ -1,0 +1,16 @@
+{
+  "scope": "Winner forecasts and named favorites in the recorded speech; no speaker-role filtering is available yet. A conditional path to winning is annotated separately from a predicted/favored winner.",
+  "predictions": [
+    {"fixture": "league", "at_ms": 518940, "winner": "RED Kalunga", "winner_aliases": ["RED", "RED Kalunga"], "quote": "So RED should be still favorable, I think.", "kind": "named favorite"},
+    {"fixture": "general", "at_ms": 0, "winner": "Team Spirit", "winner_aliases": ["Spirit", "Team Spirit"], "quote": "69% for Spirit. I agree, it's like a 70-30 game, kinda.", "kind": "odds and agreement"},
+    {"fixture": "general", "at_ms": 210000, "winner": "Team Spirit", "winner_aliases": ["Spirit", "Team Spirit"], "quote": "There's no way you can fight, really. That's gonna be a tough fight for them. They might have the MKB before. But they have to fight this Aegis. I think it's too much.", "kind": "implicit winner: too much for PARIVISION"}
+  ],
+  "excluded": [
+    {"fixture": "league", "at_ms": 15620, "reason": "Drake-fight setup, continuing at 37540; an objective forecast rather than a game winner."},
+    {"fixture": "league", "at_ms": 183620, "reason": "Garbled speech including 'I'm not going to lose', with no identifiable team or game forecast."},
+    {"fixture": "league", "at_ms": 494120, "reason": "Conditional loss of Drake if Aegis dies attempting a steal; an objective plan."},
+    {"fixture": "league", "at_ms": 562040, "reason": "GG and FlyQuest being better at teamfighting report the result; repeated at 581180."},
+    {"fixture": "general", "at_ms": 120000, "reason": "PARIVISION can still win with MKB and opponent mistakes: a conditional comeback path, not a claimed favorite or likely winner."},
+    {"fixture": "general", "at_ms": 150000, "reason": "Hero scaling expectations without a predicted game winner."}
+  ]
+}

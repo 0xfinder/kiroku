@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import json
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -27,7 +28,7 @@ async def main(out, repeats, database):
     recorder = Recorder(pace_s=16)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({"header": {"model": "openai/gpt-oss-120b",
-                                        "database": database, "repeats": repeats,
+                                        "database": database, "repeats": repeats, "reasoning_effort": "low",
                                         "pace_s": 16}}) + "\n")
     async with open_pool(url) as pool, httpx.AsyncClient(transport=recorder) as http:
         llm = GroqLLM(http, settings.secrets.require(SecretName.GROQ))
@@ -38,14 +39,27 @@ async def main(out, repeats, database):
                 channel, session, now = await seed(pool, url, fixture)
                 worker = notes.NotesWorker(pool, [channel], TRANSCRIBER, llm,
                                            Budget(pool, Caps()), [pack], now=lambda: now)
-                for pass_number in range(20):
-                    await worker.drain()
-                    if not await notes.pending(pool, [channel], TRANSCRIBER, notes.NotesPolicy(), now, gated=True):
-                        break
-                    print(fixture, repeat, "pending; retrying", flush=True)
-                    await asyncio.sleep(16)
-                else:
-                    raise RuntimeError("Notes did not complete after 20 passes")
+                deadline = time.monotonic() + 3600
+                try:
+                    while True:
+                        await worker.drain()
+                        # Save real calls even when a later span waits through a quota pause.
+                        with out.open("a") as f:
+                            for call in recorder.rows:
+                                f.write(json.dumps({"fixture": fixture, "repeat": repeat, **call}) + "\n")
+                        recorder.rows.clear()
+                        if not await notes.pending(pool, [channel], TRANSCRIBER, notes.NotesPolicy(), now, gated=True):
+                            break
+                        if time.monotonic() >= deadline:
+                            raise RuntimeError("Notes remain pending after the one-hour measurement limit")
+                        print(fixture, repeat, "pending; waiting for provider backoff", flush=True)
+                        await asyncio.sleep(30)
+                finally:
+                    # Cancellation/measurement timeouts also preserve in-flight recordings.
+                    with out.open("a") as f:
+                        for call in recorder.rows:
+                            f.write(json.dumps({"fixture": fixture, "repeat": repeat, **call}) + "\n")
+                    recorder.rows.clear()
                 rows = await notes.rows(pool, session_id=session)
                 async with pool.connection() as conn:
                     cost = await (await conn.execute(

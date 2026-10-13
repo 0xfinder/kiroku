@@ -25,6 +25,7 @@ from kiroku.llm import (
     LLMAuthError,
     LLMBadResponse,
     LLMCancelled,
+    LLMDatabaseError,
     LLMRequest,
     LLMResult,
     LLMUnavailable,
@@ -125,6 +126,7 @@ class GroqLLM:
                     f"groq unavailable after {attempt} attempts: {last}",
                     tuple(costs),
                     tuple(attempts),
+                    retry_after_s=wait or None,
                 )
             try:
                 if wait:
@@ -136,9 +138,9 @@ class GroqLLM:
             except asyncio.CancelledError:
                 raise LLMCancelled(tuple(costs), tuple(attempts)) from None
             except psycopg.OperationalError:
-                raise LLMUnavailable(
-                    "budget database unavailable", tuple(costs), tuple(attempts)
-                ) from None
+                if costs or attempts:
+                    raise LLMDatabaseError(tuple(costs), tuple(attempts)) from None
+                raise
             except OverBudget as e:
                 raise OverBudget(e.refusal, tuple(costs), tuple(attempts)) from e
             attempt += 1
@@ -157,10 +159,13 @@ class GroqLLM:
                     attempts.append(LLMAttempt("", "cancelled request; provider outcome unknown"))
                 raise LLMCancelled(tuple(costs), tuple(attempts)) from None
             except LLMUnavailable as e:
-                raise LLMUnavailable(e.reason, tuple(costs), tuple(attempts)) from e
+                raise LLMUnavailable(
+                    e.reason, tuple(costs), tuple(attempts), retry_after_s=e.retry_after_s
+                ) from e
             except httpx.RequestError as e:
                 if not isinstance(e, httpx.ConnectError | httpx.ConnectTimeout):
                     costs.append(estimated)
+                    attempts.append(LLMAttempt("", f"{type(e).__name__}; provider outcome unknown"))
                 last = type(e).__name__
                 wait = retry_delay(None, {}, attempt)
                 continue
@@ -243,7 +248,10 @@ class GroqLLM:
                 and self._remaining_requests <= request.min_remaining_requests
                 and request.min_remaining_requests > 0
             ):
-                raise LLMUnavailable("daily request quota reserved for Extraction")
+                raise LLMUnavailable(
+                    "daily request quota reserved for Extraction",
+                    retry_after_s=max(0.0, self._requests_reset_at - self._clock()),
+                )
             left = request.give_up_s - (self._clock() - first)
             if left <= 0:
                 raise LLMUnavailable("groq unavailable: admission deadline reached")

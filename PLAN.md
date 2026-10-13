@@ -30,8 +30,7 @@ Twitch watcher (streamlink metadata poll ~60 s: live? category?)
 | `transcript_span` | Audio ranges a Transcriber has finalized; the exactly-once key and the completeness watermark |
 | `speaker_map` | Speaker label → role, probability, who decided it and when |
 | `gate_window` | Window bounds, the state the Gate saw, status, inferred Mode and its probability, Game key |
-| `note` | Terminal Notes spans: validated JSONB body, Pack, Mode, schema name and version, model, Game key, exact input and every raw attempt |
-| `note_retry` | Pending Notes attempts and original inputs until terminal completion; billed attempts commit with their ledger rows |
+| `note` | Pending and terminal Notes spans: validated JSONB body, Pack, Mode, schema version, model, Game key, input and system prompt once, every raw attempt, idempotent pending receipts |
 | `rule` | Owner, instructions, Pack scope, threshold, Cooldown, enabled |
 | `gate_decision` | Window × Rule: the question asked, probability, threshold, passed |
 | `alert` | Rule, Game key, content, Notifier, external message id, sent time |

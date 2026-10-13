@@ -104,3 +104,17 @@ async def spans(pool: Pool, session_id: int, transcriber: str) -> list[tuple[int
             [session_id, transcriber],
         )
         return list(await cur.fetchall())
+
+
+async def watermark(pool: Pool, session_id: int, transcriber: str) -> int:
+    """End of finalized transcript on the session audio clock."""
+    async with pool.connection() as conn:
+        row = await (
+            await conn.execute(
+                "SELECT coalesce(max(audio_end_ms), 0) FROM transcript_span "
+                "WHERE session_id=%s AND transcriber=%s",
+                [session_id, transcriber],
+            )
+        ).fetchone()
+    assert row is not None
+    return row[0]
