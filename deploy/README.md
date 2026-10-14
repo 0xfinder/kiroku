@@ -52,3 +52,37 @@ seen client when full. Only loopback peers may supply `CF-Connecting-IP`; Uvicor
 proxy-header rewriting is disabled. Admission is process-local, so serve stays at
 one worker. Login flows are stateless and need no shared storage. Cloudflare edge
 protections remain an operator concern.
+
+## Landing page
+
+`site/` is the static landing page for `https://orulon.com`. It needs no build step.
+Commit changes under `site/`, then run `deploy/site.sh --dry-run` to inspect the
+publish paths. Run `deploy/site.sh` to copy the page into
+`/srv/orulon/releases/<UTC timestamp>-<short git sha>` and atomically flip
+`/srv/orulon/current`. The script excludes `site/tools/`, makes directories 755
+and files 644, and keeps every old release. It refuses missing HTML pages and
+uncommitted files under `site/`, including ignored files. A repeat publish of the
+same commit in the same second fails rather than overwriting a release.
+
+Set `ORULON_ROOT` to publish elsewhere without sudo:
+
+```sh
+ORULON_ROOT=$(mktemp -d) deploy/site.sh
+```
+
+To roll back, replace the example release with a previous release path:
+
+```sh
+ln -sfn '/srv/orulon/releases/<previous-release>' /srv/orulon/current.next && mv -T /srv/orulon/current.next /srv/orulon/current
+```
+
+Caddy configuration is unchanged. It serves `current`, uses `404.html` for
+errors, and caches `/assets/*` and `/favicon.svg` for one day. After editing the
+CSS, bump its `?v=` query in both HTML pages. The favicon is copied from
+`assets/icon.svg`.
+
+For local visual checks, serve `site/` on loopback with `uv run python -m http.server
+--bind 127.0.0.1 --directory site <port>`. After `cd web && npm ci`, run
+`node site/tools/screenshots.mjs http://127.0.0.1:<port> /tmp/site-shots` from
+the repository root. It checks local requests and horizontal overflow, then
+saves phone, desktop and 360-pixel screenshots of both pages.
