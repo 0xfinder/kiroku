@@ -16,7 +16,6 @@
       property="og:description"
       content="Head home or open kiroku’s live esports notebook."
     />
-    <meta property="og:url" content="https://orulon.com/404.html" />
     <meta property="og:site_name" content="kiroku" />
     <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content="Page not found — kiroku" />
@@ -24,10 +23,15 @@
       name="twitter:description"
       content="Head home or open kiroku’s live esports notebook."
     />
-    <link rel="canonical" href="https://orulon.com/" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/assets/style.css?v=2" />
-    <script src="/assets/motion.js?v=2" defer></script>
+    <script>
+      if (matchMedia("(prefers-reduced-motion: no-preference)").matches && "IntersectionObserver" in window) {
+        document.documentElement.classList.add("motion");
+        window.motionTimeout = setTimeout(() => document.documentElement.classList.remove("motion"), 2500);
+      }
+    </script>
+    <link rel="stylesheet" href="/assets/style.css?v=fbb56eb8686a" />
+    <script src="/assets/motion.js?v=5ca644ca62bb" defer></script>
   </head>
   <body class="error-page">
     <a class="skip-link" href="#main">Skip to content</a>
@@ -37,13 +41,13 @@
       >
     </header>
     <main id="main" class="error-main wrap">
-      <p class="eyebrow">404 · Page not found</p>
-      <h1>This page isn’t here.</h1>
-      <p>
+      <p data-reveal="0" class="eyebrow">404 · Page not found</p>
+      <h1 data-reveal="70">This page isn’t here.</h1>
+      <p data-reveal="140">
         The streams have their own notebook. You can start there, or head back
         home.
       </p>
-      <div class="error-links">
+      <div data-reveal="210" class="error-links">
         <a class="button primary" href="/"
           >Back home <span aria-hidden="true">↗</span></a
         ><a class="button" href="https://kiroku.orulon.com"

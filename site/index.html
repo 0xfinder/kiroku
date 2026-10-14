@@ -31,8 +31,14 @@
     />
     <link rel="canonical" href="https://orulon.com/" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/assets/style.css?v=2" />
-    <script src="/assets/motion.js?v=2" defer></script>
+    <script>
+      if (matchMedia("(prefers-reduced-motion: no-preference)").matches && "IntersectionObserver" in window) {
+        document.documentElement.classList.add("motion");
+        window.motionTimeout = setTimeout(() => document.documentElement.classList.remove("motion"), 2500);
+      }
+    </script>
+    <link rel="stylesheet" href="/assets/style.css?v=fbb56eb8686a" />
+    <script src="/assets/motion.js?v=5ca644ca62bb" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -49,40 +55,40 @@
     <main id="main" class="wrap">
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-copy">
-          <p class="eyebrow">A personal esports project</p>
-          <h1 id="hero-title">kiroku<span class="title-dot">.</span></h1>
-          <p class="hero-pitch">
+          <p data-reveal="0" class="eyebrow">A personal esports project</p>
+          <h1 data-reveal="70" id="hero-title">kiroku<span class="title-dot">.</span></h1>
+          <p data-reveal="140" class="hero-pitch">
             A notebook for the streams<br />I can’t watch.
           </p>
-          <p class="hero-description">
+          <p data-reveal="210" class="hero-description">
             It absorbs esports co-streams, writes down what was said, and
             messages me when something I care about happens.
           </p>
-          <a class="button primary" href="https://kiroku.orulon.com"
+          <a data-reveal="280" class="button primary" href="https://kiroku.orulon.com"
             >Open the live notebook <span aria-hidden="true">↗</span></a
           >
-          <p class="cta-caption">
+          <p data-reveal="350" class="cta-caption">
             Public transcripts and Notes. No login needed to read.
           </p>
         </div>
 
-        <figure class="notebook">
+        <figure data-reveal="220" class="notebook">
           <figcaption class="notebook-heading">
             <span>From the recordings</span
             ><span class="tag">League of Legends</span>
           </figcaption>
-          <div class="notebook-source">
+          <div data-reveal="360" class="notebook-source">
             <span class="eyebrow">Caedrel</span>
             <p>RED Kalunga <span class="muted">vs</span> FlyQuest</p>
           </div>
-          <div class="notebook-entry">
+          <div data-reveal="490" class="notebook-entry">
             <span class="timestamp">08:38</span>
             <div>
               <p class="entry-label">Transcript excerpt</p>
               <blockquote>“RED should be still favorable.”</blockquote>
             </div>
           </div>
-          <div class="notebook-entry note-entry">
+          <div data-reveal="620" class="notebook-entry note-entry">
             <span class="timestamp">08:38</span>
             <div>
               <p class="entry-label">Structured prediction</p>
@@ -97,11 +103,11 @@
       </section>
 
       <section class="why section" aria-labelledby="why-title">
-        <div>
+        <div data-reveal="0">
           <p class="eyebrow">Why I built it</p>
           <h2 id="why-title">Too many games.<br />One pair of eyes.</h2>
         </div>
-        <div class="why-copy">
+        <div data-reveal="0" class="why-copy">
           <p>
             I love esports. On a big weekend, League, Dota, Valorant and CS2 can
             all be live at once. I can’t keep four streams open.
@@ -116,12 +122,12 @@
       </section>
 
       <section class="section" aria-labelledby="does-title">
-        <div class="section-heading">
+        <div data-reveal="0" class="section-heading">
           <p class="eyebrow">What it does</p>
           <h2 id="does-title">Speech becomes something I can use.</h2>
         </div>
         <div class="features">
-          <article class="feature">
+          <article data-reveal="0" class="feature">
             <span class="feature-number" aria-hidden="true">01</span>
             <h3>A live transcript</h3>
             <p>
@@ -129,7 +135,7 @@
               lands in Postgres about 20–30 seconds after it’s said.
             </p>
           </article>
-          <article class="feature">
+          <article data-reveal="70" class="feature">
             <span class="feature-number" aria-hidden="true">02</span>
             <h3>Rules that send alerts</h3>
             <p>
@@ -138,7 +144,7 @@
               feedback buttons.
             </p>
           </article>
-          <article class="feature">
+          <article data-reveal="140" class="feature">
             <span class="feature-number" aria-hidden="true">03</span>
             <h3>Rolling Notes</h3>
             <p>
@@ -146,7 +152,7 @@
               moments, takes and predictions, tied to timestamps.
             </p>
           </article>
-          <article class="feature">
+          <article data-reveal="210" class="feature">
             <span class="feature-number" aria-hidden="true">04</span>
             <h3>Game knowledge, in Packs</h3>
             <p>
@@ -155,7 +161,7 @@
               Dota is next.
             </p>
           </article>
-          <article class="feature feature-wide">
+          <article data-reveal="280" class="feature feature-wide">
             <span class="feature-number" aria-hidden="true">05</span>
             <h3>A notebook in the browser</h3>
             <p>
@@ -172,47 +178,47 @@
         class="section"
         aria-labelledby="pipeline-title"
       >
-        <div class="section-heading">
+        <div data-reveal="0" class="section-heading">
           <p class="eyebrow">How it works</p>
           <h2 id="pipeline-title">A fixed pipeline. Each step has a job.</h2>
         </div>
         <div class="pipeline">
           <ol class="pipeline-path" aria-label="Alert pipeline, in order">
-            <li>
+            <li data-reveal="0">
               <span class="step-label">Capture</span
               ><strong>Twitch audio</strong><span>streamlink + ffmpeg</span>
             </li>
-            <li>
+            <li data-reveal="140">
               <span class="step-label">Transcribe</span
               ><strong>Speech to text</strong><span>Groq Whisper</span>
             </li>
-            <li>
+            <li data-reveal="280">
               <span class="step-label">Check</span><strong>Gate + Rules</strong
               ><span>One Jev call per Window</span>
             </li>
-            <li>
+            <li data-reveal="420">
               <span class="step-label">Extract</span
               ><strong>Explain + deduplicate</strong><span>gpt-oss-120b</span>
             </li>
-            <li>
+            <li data-reveal="560">
               <span class="step-label">Notify</span><strong>Telegram</strong
               ><span>Alert + yes/no feedback</span>
             </li>
           </ol>
           <div class="pipeline-branches">
-            <p>
+            <p data-reveal="0">
               <span class="branch-label">From the transcript</span
               ><strong>Postgres → rolling Notes → web app</strong
               ><span>Three-minute spans · FastAPI + Server-Sent Events</span>
             </p>
-            <p>
+            <p data-reveal="70">
               <span class="branch-label">Alongside capture</span
               ><strong>Opus archive → crash Backfill</strong
               ><span>Recover missed speech after a restart</span>
             </p>
           </div>
         </div>
-        <p class="section-caption">
+        <p data-reveal="0" class="section-caption">
           The alert steps never change, so they run as a pipeline. An agent is
           reserved for the planned Q&amp;A path, where the steps depend on the
           question.
@@ -220,7 +226,7 @@
       </section>
 
       <section id="measured" class="section" aria-labelledby="measured-title">
-        <div class="section-heading">
+        <div data-reveal="0" class="section-heading">
           <p class="eyebrow">Measured, with limits</p>
           <h2 id="measured-title">What the recordings actually show.</h2>
           <p class="section-intro">
@@ -229,8 +235,8 @@
           </p>
         </div>
         <div class="measurements">
-          <article class="measurement">
-            <p class="metric">15 <span>→</span> 9</p>
+          <article data-reveal="0" class="measurement">
+            <p data-reveal="120" class="metric">15 <span>→</span> 9</p>
             <h3>Name errors with the League Pack</h3>
             <p>
               Out of 36 audited player and champion names on one Caedrel
@@ -241,8 +247,8 @@
               It cannot find names both versions missed.
             </p>
           </article>
-          <article class="measurement">
-            <p class="metric">18<span>/18</span></p>
+          <article data-reveal="70" class="measurement">
+            <p data-reveal="190" class="metric">18<span>/18</span></p>
             <h3>Notes passed schema validation</h3>
             <p>
               Across two recorded transcripts, repeated three times. All 132
@@ -253,8 +259,8 @@
               complete.
             </p>
           </article>
-          <article class="measurement">
-            <p class="metric">6<span>/9</span></p>
+          <article data-reveal="140" class="measurement">
+            <p data-reveal="260" class="metric">6<span>/9</span></p>
             <h3>Annotated predictions captured</h3>
             <p>
               Caedrel’s favorite and Gorgc’s explicit odds were caught in every
@@ -266,7 +272,7 @@
             </p>
           </article>
         </div>
-        <div class="work-in-progress">
+        <div data-reveal="0" class="work-in-progress">
           <h3>Still in progress</h3>
           <p>
             The full live pro-match acceptance check hasn’t run yet. Caster
@@ -277,7 +283,7 @@
       </section>
 
       <section class="section engineering" aria-labelledby="stack-title">
-        <div>
+        <div data-reveal="0">
           <p class="eyebrow">Under the hood</p>
           <h2 id="stack-title">
             Built to measure.<br />Built to keep running.
@@ -289,27 +295,27 @@
           </p>
         </div>
         <dl class="stack">
-          <div>
+          <div data-reveal="0">
             <dt>Backend</dt>
             <dd>Python 3.12 · asyncio · FastAPI · Pydantic · Typer · uv</dd>
           </div>
-          <div>
+          <div data-reveal="70">
             <dt>Storage &amp; audio</dt>
             <dd>
               Postgres 17 · psycopg 3 · raw SQL · streamlink · ffmpeg · Opus
             </dd>
           </div>
-          <div>
+          <div data-reveal="140">
             <dt>Models</dt>
             <dd>Groq Whisper · Jev · Groq gpt-oss-120b</dd>
           </div>
-          <div>
+          <div data-reveal="210">
             <dt>Web &amp; alerts</dt>
             <dd>
               SvelteKit · TypeScript · Server-Sent Events · Telegram Bot API
             </dd>
           </div>
-          <div>
+          <div data-reveal="280">
             <dt>Checks</dt>
             <dd>
               pytest · Playwright · Vitest · Pyright · Ruff · GitHub Actions

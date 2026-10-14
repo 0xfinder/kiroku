@@ -1,5 +1,6 @@
 """Publish into throwaway Git repositories and check the static page's local links."""
 
+import hashlib
 import os
 import re
 import shutil
@@ -89,11 +90,9 @@ def test_publish_flips_current_and_keeps_previous_release(site_repo: Path, tmp_p
 
 
 @pytest.mark.parametrize("kind", ["modified", "staged", "untracked", "ignored"])
-def test_publish_refuses_dirty_site(site_repo: Path, tmp_path: Path, kind: str) -> None:
+def test_publish_uses_head_despite_dirty_site(site_repo: Path, tmp_path: Path, kind: str) -> None:
     root = tmp_path / "served"
-    first = publish(site_repo, root)
-    assert first.returncode == 0, first.stderr
-    original = (root / "current").resolve()
+    original = (site_repo / "site/index.html").read_bytes()
     if kind in {"modified", "staged"}:
         (site_repo / "site/index.html").write_text("changed")
         if kind == "staged":
@@ -102,20 +101,54 @@ def test_publish_refuses_dirty_site(site_repo: Path, tmp_path: Path, kind: str) 
         (site_repo / "site" / f"{kind}.txt").write_text("uncommitted")
     for args in [(), ("--dry-run",)]:
         result = publish(site_repo, root, *args)
-        assert result.returncode != 0
-        assert "dirty under site/" in result.stderr
-    assert (root / "current").resolve() == original
-    assert list((root / "releases").iterdir()) == [original]
+        assert result.returncode == 0, result.stderr
+    assert (root / "current/index.html").read_bytes() == original
+    assert not (root / "current/untracked.txt").exists()
+    assert not (root / "current/ignored.txt").exists()
 
 
 @pytest.mark.parametrize("page", ["index.html", "404.html"])
 def test_publish_requires_both_pages(site_repo: Path, tmp_path: Path, page: str) -> None:
     (site_repo / "site" / page).unlink()
+    git(site_repo, "add", "site")
+    git(site_repo, "commit", "--quiet", "-m", "test: remove committed page")
     root = tmp_path / "served"
     result = publish(site_repo, root)
     assert result.returncode != 0
     assert f"site/{page} is missing" in result.stderr
     assert not root.exists()
+
+
+def test_publish_preserves_existing_directory_modes(site_repo: Path, tmp_path: Path) -> None:
+    root = tmp_path / "served"
+    root.mkdir(mode=0o700)
+    (root / "releases").mkdir(mode=0o750)
+    result = publish(site_repo, root)
+    assert result.returncode == 0, result.stderr
+    assert stat.S_IMODE(root.stat().st_mode) == 0o700
+    assert stat.S_IMODE((root / "releases").stat().st_mode) == 0o750
+
+
+@pytest.mark.parametrize("command", ["tar", "mv"])
+def test_failed_publish_cleans_release_and_keeps_current(
+    site_repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, command: str
+) -> None:
+    root = tmp_path / "served"
+    first = publish(site_repo, root)
+    assert first.returncode == 0, first.stderr
+    original = (root / "current").resolve()
+    git(site_repo, "commit", "--allow-empty", "--quiet", "-m", "test: next release")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    failing = bin_dir / command
+    failing.write_text("#!/bin/sh\nexit 1\n")
+    failing.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+    result = publish(site_repo, root)
+    assert result.returncode != 0
+    assert (root / "current").resolve() == original
+    assert list((root / "releases").iterdir()) == [original]
+    assert not list(root.glob(".publish.*"))
 
 
 def test_dry_run_writes_nothing_and_allows_unrelated_changes(
@@ -189,4 +222,6 @@ def test_motion_asset_size_and_cache_versions() -> None:
         parsed.feed(page.read_text())
         assets = [urlsplit(link) for link in parsed.links if link.startswith("/assets/")]
         assert {asset.path for asset in assets} == {"/assets/style.css", "/assets/motion.js"}
-        assert {asset.query for asset in assets} == {"v=2"}
+        for asset in assets:
+            version = hashlib.sha256((SITE / asset.path.lstrip("/")).read_bytes()).hexdigest()[:12]
+            assert asset.query == f"v={version}", (page, asset.path)

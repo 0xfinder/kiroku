@@ -11,39 +11,42 @@ elif [[ $# -ne 0 ]]; then
 fi
 
 repo=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+commit=$(git -C "$repo" rev-parse HEAD)
 for page in index.html 404.html; do
-    if [[ ! -f "$repo/site/$page" ]]; then
-        printf 'Refusing to publish: site/%s is missing.\n' "$page" >&2
+    if ! git -C "$repo" cat-file -e "$commit:site/$page" 2>/dev/null; then
+        printf 'Refusing to publish: site/%s is missing from HEAD.\n' "$page" >&2
         exit 1
     fi
 done
-if [[ -n $(git -C "$repo" status --porcelain --untracked-files=all --ignored -- site/) ]]; then
-    printf 'Refusing to publish: git worktree is dirty under site/. Commit or remove those changes first.\n' >&2
-    exit 1
-fi
-
 root=$(realpath -m -- "${ORULON_ROOT:-/srv/orulon}")
-sha=$(git -C "$repo" rev-parse --short HEAD)
+sha=$(git -C "$repo" rev-parse --short "$commit")
 release="$root/releases/$(date -u +%Y%m%dT%H%M%SZ)-$sha"
 
 if "$dry_run"; then
-    printf 'Would copy %s/site/ (excluding tools/) to %s\n' "$repo" "$release"
-    printf 'Would set directories to 755 and files to 644.\n'
+    printf 'Would publish %s HEAD:site (excluding tools/) to %s\n' "$repo" "$release"
+    printf 'Would set new directories to 755 and release files to 644.\n'
     printf 'Would atomically replace %s/current with a symlink to %s\n' "$root" "$release"
     printf 'Would keep all old releases.\n'
     exit 0
 fi
 
-mkdir -p -- "$root/releases"
-chmod 755 -- "$root" "$root/releases"
+mkdir -p -m 755 -- "$root" "$root/releases"
 # Exclusive creation refuses a same-second collision instead of modifying a served release.
 mkdir -- "$release"
-tar -C "$repo/site" --exclude='./tools' -cf - . | tar -C "$release" -xf -
+temporary=''
+published=false
+cleanup() {
+    if [[ -n "$temporary" ]]; then rm -rf -- "$temporary"; fi
+    if ! "$published"; then rm -rf -- "$release"; fi
+}
+trap cleanup EXIT
+git -C "$repo" archive --format=tar "$commit:site" | tar -C "$release" -xf -
+rm -rf -- "$release/tools"
 find "$release" -type d -exec chmod 755 {} +
 find "$release" -type f -exec chmod 644 {} +
 
 temporary=$(mktemp -d "$root/.publish.XXXXXX")
-trap 'rm -rf -- "$temporary"' EXIT
 ln -s -- "$release" "$temporary/current"
 mv -Tf -- "$temporary/current" "$root/current"
+published=true
 printf '%s\n' "$release"
