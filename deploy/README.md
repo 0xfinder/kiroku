@@ -52,3 +52,44 @@ seen client when full. Only loopback peers may supply `CF-Connecting-IP`; Uvicor
 proxy-header rewriting is disabled. Admission is process-local, so serve stays at
 one worker. Login flows are stateless and need no shared storage. Cloudflare edge
 protections remain an operator concern.
+
+## Landing page
+
+`site/` is the static landing page for `https://orulon.com`. It needs no build step.
+Commit changes under `site/`, then run `deploy/site.sh --dry-run` to inspect the
+publish paths. Run `deploy/site.sh` to extract the committed `HEAD:site` tree into
+`/srv/orulon/releases/<UTC timestamp>-<short git sha>` and atomically flip
+`/srv/orulon/current`. The script excludes `site/tools/`, makes new directories 755
+and release files 644, and keeps every old release. Existing root and releases
+directory modes stay unchanged. Uncommitted, untracked and ignored files do not
+affect the published content. It refuses HTML pages missing from HEAD and removes
+incomplete releases on failure. A repeat publish of the same commit in the same
+second fails rather than overwriting a release.
+
+Set `ORULON_ROOT` to publish elsewhere without sudo:
+
+```sh
+ORULON_ROOT=$(mktemp -d) deploy/site.sh
+```
+
+To roll back, replace the example release with a previous release path:
+
+```sh
+ln -sfn '/srv/orulon/releases/<previous-release>' /srv/orulon/current.next && mv -T /srv/orulon/current.next /srv/orulon/current
+```
+
+Caddy configuration is unchanged. It serves `current`, uses `404.html` for
+errors, and caches `/assets/*` and `/favicon.svg` for one day. After editing the
+CSS or JavaScript, run `uv run python site/tools/bust.py` before committing. It
+updates both HTML pages' `?v=` queries to the first 12 hex digits of each asset's
+SHA-256. Tests verify the hashes against the asset contents. The favicon is copied
+from `assets/icon.svg`.
+
+For local visual checks, serve `site/` on loopback with `uv run python -m http.server
+--bind 127.0.0.1 --directory site <port>`. After `cd web && npm ci`, run
+`node site/tools/screenshots.mjs http://127.0.0.1:<port> /tmp/site-shots` from
+the repository root. It checks local requests, horizontal overflow, motion,
+interaction timing, anchor jumps, reduced motion, disabled or failed JavaScript,
+delayed script loading and print visibility. It saves `r3-*.png` screenshots for
+desktop and phone views of both pages, reduced motion, disabled JavaScript, load
+fallbacks and print, plus desktop and phone motion videos.
