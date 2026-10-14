@@ -1,17 +1,20 @@
 """Title-relevant Dota Vocabulary; this slice has no live match data."""
 
+import asyncio
 import logging
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 import httpx
 
 from kiroku.pack import LiveContext
+from kiroku.packs.common import CACHE_ERRORS, budgeted_vocabulary, contains_term
+from kiroku.packs.common import VOCABULARY_CHARS as VOCABULARY_CHARS
 from kiroku.packs.dota.data import (
     API,
     CONSTANTS,
     DotaData,
-    contains_term,
     heroes,
     items,
     players,
@@ -19,21 +22,12 @@ from kiroku.packs.dota.data import (
     title_teams,
 )
 
-VOCABULARY_CHARS = 350
 log = logging.getLogger(__name__)
 
 
 def vocabulary(title: str, rosters: tuple[str, ...], catalogue: tuple[str, ...]) -> str:
     candidates = (*rosters, *(name for name in catalogue if contains_term(name, title)))
-    out = "Dota 2."
-    for term in dict.fromkeys(candidates):
-        if len(out) + len(term) + 2 <= VOCABULARY_CHARS:
-            out += f" {term},"
-    remaining = VOCABULARY_CHARS - len(out) - 1
-    if remaining > 0:
-        tail = title if len(title) <= remaining else title[: remaining + 1].rpartition(" ")[0]
-        out += " " + tail
-    return out.strip(" ,")
+    return budgeted_vocabulary("Dota 2.", candidates, title)
 
 
 class DotaPack:
@@ -43,28 +37,41 @@ class DotaPack:
     def __init__(self, http: httpx.AsyncClient, data_dir: Path) -> None:
         self.data = DotaData(http, data_dir)
 
-    async def vocabulary(self, title: str, live: LiveContext | None) -> str:
-        roster: list[str] = []
+    async def _names(
+        self, name: str, parse: Callable[[object], tuple[str, ...]]
+    ) -> tuple[str, ...]:
+        try:
+            return await self.data.cached(name, f"{CONSTANTS}/{name}.json", parse)
+        except CACHE_ERRORS as e:
+            log.warning("Dota %s unavailable (%s)", name, e)
+            return ()
+
+    async def _roster(self, team_id: int) -> tuple[str, ...]:
+        try:
+            members = await self.data.cached(
+                f"players-{team_id}", f"{API}/teams/{team_id}/players", players
+            )
+            return tuple(player.name for player in members)
+        except CACHE_ERRORS as e:
+            log.warning("Dota roster %d unavailable (%s)", team_id, e)
+            return ()
+
+    async def _rosters(self, title: str) -> tuple[str, ...]:
         try:
             catalogue = await self.data.cached("teams", f"{API}/teams", teams)
-            for team in title_teams(catalogue, title, time.time()):
-                try:
-                    members = await self.data.cached(
-                        f"players-{team.id}", f"{API}/teams/{team.id}/players", players
-                    )
-                except (httpx.HTTPError, OSError, ValueError, KeyError, IndexError) as e:
-                    log.warning("Dota roster %d unavailable (%s)", team.id, e)
-                    continue
-                roster.extend(player.name for player in members)
-        except (httpx.HTTPError, OSError, ValueError, KeyError, IndexError) as e:
+        except CACHE_ERRORS as e:
             log.warning("Dota teams unavailable (%s)", e)
-        names: list[str] = []
-        for name, parse in (("heroes", heroes), ("items", items)):
-            try:
-                names.extend(await self.data.cached(name, f"{CONSTANTS}/{name}.json", parse))
-            except (httpx.HTTPError, OSError, ValueError, KeyError, IndexError) as e:
-                log.warning("Dota %s unavailable (%s)", name, e)
-        return vocabulary(title, tuple(roster), tuple(names))
+            return ()
+        rosters = await asyncio.gather(
+            *(self._roster(team.id) for team in title_teams(catalogue, title, time.time()))
+        )
+        return tuple(name for roster in rosters for name in roster)
+
+    async def vocabulary(self, title: str, live: LiveContext | None) -> str:
+        roster, hero_names, item_names = await asyncio.gather(
+            self._rosters(title), self._names("heroes", heroes), self._names("items", items)
+        )
+        return vocabulary(title, roster, (*hero_names, *item_names))
 
     async def get_live_match(self, title: str) -> LiveContext | None:
         return None

@@ -1,7 +1,9 @@
 """Recorded free data -> Dota Vocabulary and the CLI's Category composition."""
 
+import asyncio
 import json
 import os
+import time
 from collections.abc import Callable
 from decimal import Decimal
 from pathlib import Path
@@ -18,16 +20,17 @@ from kiroku.config import Secret, Settings
 from kiroku.db import Pool
 from kiroku.gate.jev import JevGate
 from kiroku.pack import NotesPack, pack_selector
+from kiroku.packs.common import DATA_TTL_S, DataError, text
 from kiroku.packs.dota import VOCABULARY_CHARS, DotaPack, vocabulary
 from kiroku.packs.dota.data import (
     API,
-    DATA_TTL_S,
     TEAM_RECENCY_S,
-    DataError,
     DotaData,
+    Team,
     heroes,
     items,
     players,
+    team_index,
     teams,
     title_teams,
 )
@@ -114,8 +117,8 @@ def test_title_matching_recency_and_duplicates() -> None:
     assert not title_teams(catalogue, "Earthspirit pub games", RECORDED_NOW)
     assert not title_teams(catalogue, "Spiritual Yandexing", RECORDED_NOW)
     assert not title_teams(catalogue, TITLE, RECORDED_NOW + TEAM_RECENCY_S)
-    duplicate = catalogue[1].__class__(10, "Team. Spirit", "TSpirit", RECORDED_NOW - 100)
-    assert [t.id for t in title_teams((*catalogue, duplicate), "Spirit", RECORDED_NOW)] == [10]
+    duplicate = Team(10, "Team. Spirit", "TSpirit", RECORDED_NOW - 100)
+    assert [t.id for t in title_teams((*catalogue, duplicate), "Team Spirit", RECORDED_NOW)] == [10]
     assert not title_teams(catalogue, "Spirit", 0)  # future data
 
 
@@ -161,8 +164,12 @@ def test_invalid_shapes(parse: Any, body: object) -> None:
 
 
 async def test_stale_failure_retries_without_renewing_and_validates_before_write(
-    tmp_path: Path, caplog: pytest.LogCaptureFixture
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    now = 1000.0
+    monkeypatch.setattr(
+        "kiroku.packs.common.time", SimpleNamespace(time=time.time, monotonic=lambda: now)
+    )
     replay = Replay()
     async with httpx.AsyncClient(transport=httpx.MockTransport(replay)) as http:
         pack = DotaPack(http, tmp_path)
@@ -178,13 +185,14 @@ async def test_stale_failure_retries_without_renewing_and_validates_before_write
         calls = len(replay.calls)
         replay.fail = True
         assert await pack.vocabulary(TITLE, None) == first
-        assert len(replay.calls) == calls + len(paths)
+        assert len(replay.calls) == calls
         assert "using stale cache" in caplog.text
         assert DATA_TTL_S == 86400
         cold = DotaPack(http, tmp_path / "cold")
         assert await cold.vocabulary(TITLE, None) == "Dota 2. " + TITLE
         assert not cold.data.cache_dir.exists()
         replay.fail = replay.malformed = False
+        now += 300
         assert await pack.vocabulary(TITLE, None) == first
         assert all(path.stat().st_mtime > 0 for path in paths)
         paths[0].write_text("torn JSON")
@@ -212,6 +220,7 @@ async def test_mtime_memoization_and_shape_changes(tmp_path: Path) -> None:
         assert await data.cached("heroes", f"{API}/heroes.json", parse) == ("Kez",)
         assert calls == 2
         path.write_text("{}")
+        os.utime(path, ns=(stamp + 2_000_000, stamp + 2_000_000))
         assert await data.cached("heroes", f"{API}/heroes.json", parse) == first
         assert len(replay.calls) == 2
 
@@ -288,3 +297,145 @@ async def test_watch_uses_dota_vocabulary_without_live_context_and_survives_outa
     assert any(TITLE in prompt for prompt in prompts)
     assert any("Yatoro," in prompt for prompt in prompts) is (not failed)
     assert await query_rows(conn, "SELECT count(*) FROM utterance") != [(0,)]
+
+
+@pytest.mark.parametrize(
+    ("title", "expected"),
+    [
+        ("MMR grind, alt account later", []),
+        ("MMR grind - alt account later", []),
+        ("13K MMR GRIND - ALT ACCOUNT", []),
+        ("Gorgc | Re: watching OG vs Tundra", [2586976, 8291895]),
+        (TITLE, [7119388, 9823272]),
+        ("(EN) Tundra x OG - BLAST co-stream with PLD", [8291895, 2586976]),
+        ("Team Spirit - Team Yandex | GRAND FINALS", [7119388, 9823272]),
+        ("Team Liquid highlights | Spirit vs Yandex", [7119388, 9823272]),
+        ("13K MMR pubs | alt account | back to the grind", []),
+        ("Gorgc | Spirit Breaker pub games, watching replays later", []),
+        ("Ranked games with PLD | OG later", []),
+        ("Team Spirit highlights with PLD", [7119388]),
+        ("Spirit vs ty", [7119388]),
+    ],
+)
+def test_real_catalogue_title_selection(title: str, expected: list[int]) -> None:
+    catalogue = teams(read("teams"))
+    assert [team.id for team in title_teams(catalogue, title, RECORDED_NOW)] == expected
+    assert len(title_teams(catalogue, title, RECORDED_NOW)) <= 2
+
+
+def test_real_catalogue_skips_bad_rows_and_reuses_index() -> None:
+    rows = read("teams")
+    assert len(rows) == 1000
+    assert sum(not row["name"].strip() for row in rows) == 17
+    catalogue = teams(rows)
+    assert len(catalogue) == 983
+    assert teams([*rows, {"name": "Missing ID"}, {"team_id": 1, "name": " "}]) == catalogue
+    assert team_index(catalogue) is team_index(teams(rows))
+    assert any(row.get("dname") == " " for row in read("items").values())
+    assert items({"blank": {"dname": " "}, "named": {"dname": " Kez "}}) == ("Kez",)
+
+
+async def test_hanging_fetches_use_stale_cache_and_sources_run_independently(
+    tmp_path: Path,
+) -> None:
+    replay = Replay()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(replay)) as http:
+        first = await DotaPack(http, tmp_path).vocabulary(TITLE, None)
+    paths = list((tmp_path / "packs/dota").glob("*.json"))
+    for path in paths:
+        os.utime(path, (0, 0))
+    entered: set[str] = set()
+    catalogue_started = asyncio.Event()
+    rosters_started = asyncio.Event()
+
+    async def hang(request: httpx.Request) -> httpx.Response:
+        entered.add(request.url.path)
+        if request.url.path.endswith("items.json"):
+            catalogue_started.set()
+        if sum(path.endswith("/players") for path in entered) == 2:
+            rosters_started.set()
+        await asyncio.Future[None]()
+        raise AssertionError("hung request unexpectedly returned")
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(hang)) as http:
+        pack = DotaPack(http, tmp_path)
+        pack.data.fetch_timeout_s = 0.05
+        # Teams then parallel rosters take at most two fetch deadlines, independent
+        # of the stable catalogue's parallel requests. The outer timeout catches hangs.
+        async with asyncio.timeout(0.5):
+            task = asyncio.create_task(pack.vocabulary(TITLE, None))
+            await catalogue_started.wait()
+            await rosters_started.wait()
+            assert await task == first
+        assert len(entered) == 5
+        assert await pack.vocabulary(TITLE, None) == first
+        assert len(entered) == 5
+        assert all(path.stat().st_mtime == 0 for path in paths)
+        cold = DotaPack(http, tmp_path / "cold")
+        cold.data.fetch_timeout_s = 0.05
+        async with asyncio.timeout(0.5):
+            assert await cold.vocabulary("Pub games with Kez", None) == "Dota 2. Pub games with Kez"
+        assert not cold.data.cache_dir.exists()
+
+
+async def test_opendota_hang_preserves_fresh_catalogue_on_cold_start(tmp_path: Path) -> None:
+    async def api(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "api.opendota.com":
+            await asyncio.Future[None]()
+        return Replay()(request)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(api)) as http:
+        pack = DotaPack(http, tmp_path)
+        pack.data.fetch_timeout_s = 0.05
+        async with asyncio.timeout(0.5):
+            assert await pack.vocabulary("Pub games: Kez and Black King Bar", None) == (
+                "Dota 2. Kez, Black King Bar, Pub games: Kez and Black King Bar"
+            )
+
+
+async def test_failure_backoff_expires_without_touching_stale_timestamp(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    now = 1000.0
+    monkeypatch.setattr(
+        "kiroku.packs.common.time", SimpleNamespace(time=time.time, monotonic=lambda: now)
+    )
+    replay = Replay()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(replay)) as http:
+        data = DotaData(http, tmp_path)
+        first = await data.cached("heroes", f"{API}/heroes.json", heroes)
+        path = data.cache_dir / "heroes.json"
+        os.utime(path, (0, 0))
+        replay.fail = True
+        assert await data.cached("heroes", f"{API}/heroes.json", heroes) == first
+        assert len(replay.calls) == 2
+        now += 299
+        assert await data.cached("heroes", f"{API}/heroes.json", heroes) == first
+        assert len(replay.calls) == 2 and path.stat().st_mtime == 0
+        now += 1
+        replay.fail = False
+        assert await data.cached("heroes", f"{API}/heroes.json", heroes) == first
+        assert len(replay.calls) == 3 and path.stat().st_mtime > 0
+
+
+def test_duplicate_tag_prefers_recent_team_and_preserves_matchup_order() -> None:
+    catalogue = (
+        Team(1, "First Team", "ABC", RECORDED_NOW - 100),
+        Team(2, "Second Team", "ABC", RECORDED_NOW - 10),
+        Team(3, "Third Team", "THIRD", RECORDED_NOW - 5),
+    )
+    assert [
+        team.id for team in title_teams(catalogue, "First Team vs Second Team", RECORDED_NOW)
+    ] == [2]
+    assert [team.id for team in title_teams(catalogue, "ABC vs Third Team", RECORDED_NOW)] == [2, 3]
+
+
+def test_shared_text_preserves_league_and_trims_dota_explicitly() -> None:
+    assert text(" League ") == " League "
+    assert text(" ") == " "
+    assert text(" Dota ", strip=True) == "Dota"
+    with pytest.raises(DataError):
+        text(" ", strip=True)
+    assert items({"invalid": None, "blank": {"dname": " "}, "valid": {"dname": " Kez "}}) == (
+        "Kez",
+    )

@@ -6,6 +6,8 @@ from pathlib import Path
 import httpx
 
 from kiroku.pack import LiveContext
+from kiroku.packs.common import VOCABULARY_CHARS as VOCABULARY_CHARS
+from kiroku.packs.common import budgeted_vocabulary
 from kiroku.packs.league.data import (
     DDRAGON,
     FEED,
@@ -23,8 +25,6 @@ from kiroku.packs.league.data import (
 )
 from kiroku.packs.league.notes import notes_schema
 
-VOCABULARY_CHARS = 350
-
 
 def vocabulary(
     title: str,
@@ -40,15 +40,7 @@ def vocabulary(
     """
     candidates = list(live.vocabulary if live else rosters)
     candidates.extend(n for n in (*champions.values(), *items.values()) if contains_term(n, title))
-    out = "League of Legends."
-    for term in dict.fromkeys(candidates):
-        if len(out) + len(term) + 2 <= VOCABULARY_CHARS:
-            out += f" {term},"
-    remaining = VOCABULARY_CHARS - len(out) - 1
-    if remaining > 0 and live is None:
-        tail = title if len(title) <= remaining else title[: remaining + 1].rpartition(" ")[0]
-        out += " " + tail
-    return out.strip(" ,")
+    return budgeted_vocabulary("League of Legends.", candidates, title if live is None else None)
 
 
 class LeaguePack:

@@ -1,73 +1,42 @@
-"""Free OpenDota data, validated before caching; stale data remains usable."""
+"""Free Dota catalogues and conservative title-team selection."""
 
-import asyncio
-import json
-import logging
-import os
 import re
-import time
-from collections.abc import Callable
+from bisect import bisect_left
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
-from typing import cast
 
 import httpx
 
+from kiroku.packs.common import DATA_TTL_S as DATA_TTL_S
+from kiroku.packs.common import DataError, PackData, array, integer, obj, text
+
 CONSTANTS = "https://raw.githubusercontent.com/odota/dotaconstants/master/build"
 API = "https://api.opendota.com/api"
-DATA_TTL_S = 24 * 3600
 TEAM_RECENCY_S = 180 * 24 * 3600
-log = logging.getLogger(__name__)
-
-
-class DataError(ValueError):
-    pass
-
-
-def obj(value: object) -> dict[str, object]:
-    if not isinstance(value, dict):
-        raise DataError("expected an object")
-    return cast(dict[str, object], value)
-
-
-def array(value: object) -> list[object]:
-    if not isinstance(value, list):
-        raise DataError("expected an array")
-    return cast(list[object], value)
-
-
-def integer(value: object) -> int:
-    if not isinstance(value, int) or isinstance(value, bool):
-        raise DataError("expected an integer")
-    return value
-
-
-def text(value: object) -> str:
-    if not isinstance(value, str) or not value.strip():
-        raise DataError("expected a nonempty string")
-    return value.strip()
-
-
-def contains_term(term: str, title: str) -> bool:
-    return bool(term and re.search(rf"(?<!\w){re.escape(term)}(?!\w)", title, re.I))
+RETRY_S = 5 * 60
+# These common pub-title words collide with real team names/tags in /teams.
+TITLE_WORDS = frozenset({"mmr", "alt", "re", "grind", "pub", "pubs", "ranked", "games", "game"})
 
 
 def heroes(data: object) -> tuple[str, ...]:
-    names = tuple(text(obj(v)["localized_name"]) for v in obj(data).values())
+    names = tuple(text(obj(v)["localized_name"], strip=True) for v in obj(data).values())
     if not names:
         raise DataError("expected a nonempty hero catalogue")
     return names
 
 
 def items(data: object) -> tuple[str, ...]:
-    # dotaconstants includes internal items with no display name.
-    names = tuple(
-        text(n) for v in obj(data).values() if (n := obj(v).get("dname")) not in (None, "")
-    )
-
+    # Internal items can have missing, empty or whitespace-only display names.
+    names: list[str] = []
+    for value in obj(data).values():
+        try:
+            names.append(text(obj(value).get("dname"), strip=True))
+        except DataError:
+            continue
     if not names:
         raise DataError("expected named items")
-    return names
+    return tuple(names)
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,13 +50,23 @@ class Team:
 def teams(data: object) -> tuple[Team, ...]:
     result: list[Team] = []
     for value in array(data):
-        row = obj(value)
-        tag = row["tag"]
-        if not isinstance(tag, str):
-            raise DataError("expected a team tag string")
-        result.append(
-            Team(integer(row["team_id"]), text(row["name"]), tag, integer(row["last_match_time"]))
-        )
+        try:
+            row = obj(value)
+            tag = row["tag"]
+            if not isinstance(tag, str):
+                continue
+            team = Team(
+                integer(row["team_id"]),
+                text(row["name"], strip=True),
+                tag.strip(),
+                integer(row["last_match_time"]),
+            )
+            if team.id > 0:
+                result.append(team)
+        except (DataError, KeyError):
+            continue
+    if not result:
+        raise DataError("expected valid named teams")
     return tuple(result)
 
 
@@ -95,25 +74,127 @@ def short_name(name: str) -> str:
     return re.sub(r"^team[ .]+", "", name, flags=re.I).strip()
 
 
+def tokens(value: str) -> tuple[str, ...]:
+    return tuple(re.findall(r"\w+", value))
+
+
+@dataclass(frozen=True)
+class TeamIndex:
+    names: dict[tuple[str, ...], tuple[Team, ...]]
+    tags: dict[tuple[str, ...], tuple[Team, ...]]
+    full_names: dict[tuple[str, ...], tuple[Team, ...]]
+    width: int
+
+
+@lru_cache(maxsize=4)
+def team_index(catalogue: tuple[Team, ...]) -> TeamIndex:
+    names: dict[tuple[str, ...], list[Team]] = {}
+    tags: dict[tuple[str, ...], list[Team]] = {}
+    full_names: dict[tuple[str, ...], list[Team]] = {}
+    for team in sorted(catalogue, key=lambda team: team.last_match_time, reverse=True):
+        for term in dict.fromkeys((team.name, short_name(team.name))):
+            key = tokens(term.casefold())
+            if key:
+                names.setdefault(key, []).append(team)
+        if len(team.tag) >= 2:
+            tags.setdefault(tokens(team.tag), []).append(team)
+        key = tokens(team.name.casefold())
+        if len(key) >= 2:
+            full_names.setdefault(key, []).append(team)
+    return TeamIndex(
+        {key: tuple(value) for key, value in names.items()},
+        {key: tuple(value) for key, value in tags.items()},
+        {key: tuple(value) for key, value in full_names.items()},
+        max((len(key) for key in (*names, *tags)), default=0),
+    )
+
+
 def title_teams(catalogue: tuple[Team, ...], title: str, now: float) -> tuple[Team, ...]:
-    chosen: dict[str, tuple[int, Team]] = {}
-    for team in catalogue:
-        if not 0 <= now - team.last_match_time <= TEAM_RECENCY_S:
-            continue
-        terms = (team.name, short_name(team.name), team.tag)
-        positions = [
-            m.start()
-            for term in terms
-            if term
-            for m in re.finditer(rf"(?<!\w){re.escape(term)}(?!\w)", title, re.I)
-        ]
-        if not positions:
-            continue
-        identity = short_name(team.name).casefold()
-        previous = chosen.get(identity)
-        if previous is None or team.last_match_time > previous[1].last_match_time:
-            chosen[identity] = (min(positions), team)
-    return tuple(team for _, team in sorted(chosen.values(), key=lambda entry: entry[0]))
+    index = team_index(catalogue)
+    spans = tuple(re.finditer(r"\w+", title))
+    words = tuple(match[0] for match in spans)
+    starts = tuple(match.start() for match in spans)
+    folded = tuple(word.casefold() for word in words)
+
+    def active(candidates: tuple[Team, ...]) -> Team | None:
+        return next(
+            (team for team in candidates if 0 <= now - team.last_match_time <= TEAM_RECENCY_S),
+            None,
+        )
+
+    def boundary(side: tuple[str, ...], *, left: bool) -> Team | None:
+        for size in range(min(len(side), index.width), 0, -1):
+            key = side[-size:] if left else side[:size]
+            if len(key) == 1 and key[0].casefold() in TITLE_WORDS:
+                continue
+            # Tags are exact-case and only used beside a matchup separator.
+            candidates = (
+                *index.names.get(tuple(w.casefold() for w in key), ()),
+                *index.tags.get(key, ()),
+            )
+            # A single-word name identical to its tag also obeys tag casing.
+            candidates = tuple(
+                team
+                for team in candidates
+                if not (len(key) == 1 and team.name == team.tag and key[0] != team.tag)
+            )
+            chosen = active(
+                tuple(sorted(candidates, key=lambda t: t.last_match_time, reverse=True))
+            )
+            if chosen is not None:
+                return chosen
+        return None
+
+    def distinct(candidates: list[Team]) -> tuple[Team, ...]:
+        result: list[Team] = []
+        seen_names: set[str] = set()
+        seen_tags: set[str] = set()
+        for team in candidates:
+            name, tag = short_name(team.name).casefold(), team.tag.casefold()
+            if any(
+                other.last_match_time > team.last_match_time
+                and (
+                    short_name(other.name).casefold() == name
+                    or (tag and other.tag.casefold() == tag)
+                )
+                for other in candidates
+            ):
+                continue
+            if name in seen_names or (tag and tag in seen_tags):
+                continue
+            result.append(team)
+            seen_names.add(name)
+            if tag:
+                seen_tags.add(tag)
+            if len(result) == 2:
+                break
+        return tuple(result)
+
+    # Tokenize the title once, then look up only terms touching each separator.
+    separators = list(re.finditer(r"\s+(vs\.?|x|-)\s+", title, re.I))
+    partial: list[Team] = []
+    explicit = False
+    for match in separators:
+        offset = bisect_left(starts, match.start())
+        separator_words = 0 if match[1] == "-" else 1
+        left = boundary(words[:offset], left=True)
+        right = boundary(words[offset + separator_words :], left=False)
+        if left is not None and right is not None:
+            return distinct([left, right])
+        if match[1].casefold() != "-":
+            explicit = True
+            partial.extend(team for team in (left, right) if team is not None)
+    if explicit:
+        return distinct(partial)
+
+    # Without a matchup, require a full multiword name, never a short name/tag.
+    selected: list[Team] = []
+    for start in range(len(words)):
+        for size in range(min(index.width, len(words) - start), 1, -1):
+            if (team := active(index.full_names.get(folded[start : start + size], ()))) is not None:
+                selected.append(team)
+                break
+    return distinct(selected)
 
 
 @dataclass(frozen=True, slots=True)
@@ -137,44 +218,6 @@ def players(data: object) -> tuple[Player, ...]:
     return tuple(result)
 
 
-class DotaData:
+class DotaData(PackData):
     def __init__(self, http: httpx.AsyncClient, data_dir: Path) -> None:
-        self.http = http
-        self.cache_dir = data_dir / "packs" / "dota"
-        self._lock = asyncio.Lock()
-        self._parsed: dict[tuple[str, object], tuple[int, object]] = {}
-
-    async def cached[T](self, name: str, url: str, parse: Callable[[object], T]) -> T:
-        async with self._lock:
-            path = self.cache_dir / f"{name}.json"
-            stale: tuple[T] | None = None
-            memo_key = (name, parse)
-            try:
-                stat = path.stat()
-                memo = self._parsed.get(memo_key)
-                if memo is not None and memo[0] == stat.st_mtime_ns:
-                    parsed = cast(T, memo[1])
-                else:
-                    parsed = parse(json.loads(path.read_text()))
-                    self._parsed[memo_key] = (stat.st_mtime_ns, parsed)
-                stale = (parsed,)
-                if time.time() - stat.st_mtime < DATA_TTL_S:
-                    return parsed
-            except (OSError, ValueError, KeyError, IndexError):
-                pass
-            try:
-                response = await self.http.get(url, timeout=10)
-                response.raise_for_status()
-                body: object = response.json()
-                parsed = parse(body)
-                self.cache_dir.mkdir(parents=True, exist_ok=True)
-                temporary = path.with_suffix(f".{os.getpid()}.tmp")
-                temporary.write_text(json.dumps(body))
-                temporary.replace(path)
-                self._parsed[memo_key] = (path.stat().st_mtime_ns, parsed)
-            except (httpx.HTTPError, OSError, ValueError, KeyError, IndexError) as e:
-                if stale is None:
-                    raise
-                log.warning("Dota %s refresh failed; using stale cache (%s)", name, e)
-                return stale[0]
-            return parsed
+        super().__init__(http, data_dir / "packs" / "dota", retry_s=RETRY_S, memoize=True)

@@ -1481,5 +1481,8 @@
   },
   "diffusal_blade_2": {
     "dname": "Diffusal Blade"
+  },
+  "__whitespace_regression__": {
+    "dname": " "
   }
 }

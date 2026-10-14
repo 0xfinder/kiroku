@@ -514,3 +514,35 @@ limits do not guarantee that bound for arbitrary text. `<data_dir>/packs/dota` c
 validated response for 24 hours, memoizes parsing by mtime and retains stale data after
 failed refreshes without renewing timestamps. Each source can fail independently. Missing
 cold data leaves the remaining terms or title-only Vocabulary, without stopping capture.
+
+
+## D37. Dota title matching and refresh admission supersede D36's broad matching
+
+2026-10-14. The full OpenDota catalogue contains 1,000 rows, with 16 empty names and
+one whitespace-only name. Rejecting the entire response discarded the measured roster
+Vocabulary. Skip invalid individual team rows and unnamed items, but reject wrong top-level
+shapes and catalogues with no valid entries. Preserve API roster membership as in D36.
+
+Prefer the two teams immediately beside an explicit `vs`, `x` or `-` matchup. Tags are
+case-sensitive, at least two characters long, and restricted to matchups. Without a matchup,
+require full multiword team names. De-duplicate selected names/tags, prefer recent candidates,
+retain the 180-day recency limit, and cap roster requests at two. A memoized token index
+replaces per-team regex compilation. This prevents MMR/alt/RE and unrelated title sections
+from crowding out the match's teams. The full recorded catalogue exercises those collisions.
+
+Shared support under `kiroku/packs/common.py` owns JSON validation, the disk cache and
+Vocabulary budgeting. `text` preserves League's original strings by default; Dota opts
+into trimming display names. League formatting, title-dependent roster parsing, refresh
+retry behavior and canonical requests remain unchanged. Dota enables five-minute failure
+backoff, including cold failures; neither Pack renews a failed cache's timestamp. Cached
+fetches have a five-second whole-request deadline. Dota loads teams and stable catalogues
+concurrently, then at most two rosters concurrently, so a fully hung refresh uses at most
+two deadline stages and still returns stale data within the watcher's twenty-second limit.
+
+The offline omission check now rejects accepted spellings left unassigned in a chunk.
+Repeated surviving mentions already assigned to another occurrence are not double-counted:
+chunk 13's second Malady and chunk 19's first Timbersaw remain genuine omissions in their
+respective arms. Recounting keeps all 50 references and totals unchanged (30/15/19 runtime,
+15/16 oracle), with no new paid calls. A blanket name-absence check would incorrectly reuse
+those other occurrences. The current live items response has no whitespace-only name; a
+clearly marked regression sentinel supplements the recorded item projection.

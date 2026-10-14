@@ -27,12 +27,30 @@ def count(path):
     occurrences = 0
     for chunk in audit["chunks"]:
         used = {a: collections.Counter() for a in arms}
+        assigned = {
+            arm: collections.Counter(
+                o["observed"][arm].casefold()
+                for o in chunk["occurrences"] if o["observed"][arm]
+            ) for arm in arms
+        }
         for occurrence in chunk["occurrences"]:
             occurrences += 1
             assert occurrence["group"] in ("player", "hero")
             for arm in arms:
                 observed = occurrence["observed"][arm]
                 text = rows[arm][chunk["chunk"]]["text"]
+                if not observed:
+                    for spelling in {occurrence["name"], *occurrence.get("accepted", [])}:
+                        # Consume surviving repeated names once across the chunk:
+                        # the second Malady in chunk 13 and first Timber in chunk 19
+                        # can be omitted while another reference keeps that spelling.
+                        matches = re.findall(
+                            rf"(?<!\w){re.escape(spelling)}(?!\w)", text, re.I
+                        )
+                        assert len(matches) <= assigned[arm][spelling.casefold()], (
+                            "omission contains unassigned accepted spelling",
+                            chunk["chunk"], arm, spelling,
+                        )
                 if observed:
                     used[arm][observed.casefold()] += 1
                     matches = re.findall(

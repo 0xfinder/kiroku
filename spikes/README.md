@@ -315,6 +315,11 @@ in the title, then the title tail, within 350 characters. Outages retain usable 
 and retry without renewing timestamps; a cold failure leaves title-only Vocabulary.
 `get_live_match` returns None and Notes use `general`. No core interface or Gate body changes.
 
+The omission counter verifies that no accepted spelling remains unassigned in the chunk.
+Repeated names already assigned to another reference are consumed once: the second Malady
+in chunk 13 and first Timbersaw in chunk 19 remain omissions in the affected arms.
+The strengthened recount preserves all totals above.
+
 Recount offline with `uv run python spikes/dota_counts.py spikes/results/2026-10-14-dota-vocabulary`.
 Verify archived PCM and scratch ledger without paid calls with
 `uv run python spikes/dota_vocabulary.py ~/.local/share/kiroku-spikes/gorgc-session-1 spikes/results/2026-10-14-dota-vocabulary --verify-only`.
