@@ -399,3 +399,78 @@ Rejected: retaining a paid operation inside an HTTP request through a proxy time
 using maximum IDs without commit ordering; relying on notifications alone to detect
 Backfill during listener outages. Revisit persisted jobs if process restarts must preserve
 reports or multiple serve workers become necessary.
+
+## D35. Public read-only PWA with owner Google login (issue #24)
+
+2026-10-13. Supersedes D18's private-only exposure and D33's unauthenticated writes.
+
+The notebook is public read-only through a Cloudflare Tunnel at
+`https://kiroku.orulon.com`. Rules can be read publicly; their writes, paid tests,
+test reports and the Review queue require the configured owner's Google login.
+Every write and owner-only read declares a FastAPI owner dependency. A structural
+route test fails when a guard is removed or an unguarded write is added. Loopback
+never grants owner access: the tunnel itself connects from loopback.
+
+Authlib handles Authorization Code with state, nonce and S256 PKCE. RSA signatures
+and OIDC issuer, audience, expiry, nonce and verified email are validated before
+allowlisting `KIROKU_OWNER_EMAIL`. The signed Secure, HttpOnly, SameSite=Lax session
+cookie holds only the email and expires after 12 hours. Browser-bound login flows
+expire after ten minutes, are consumed before token exchange, and are bounded to
+128 pending flows globally and four per IP. Failed exchanges require a fresh login. Missing configuration
+leaves everyone read-only. The same-origin write check uses the configured HTTPS
+origin, without trusting forwarded Host headers. Logout clears the current cookie;
+secret rotation revokes all sessions. No server-side per-session revocation is added.
+
+One serve worker admits 240 API requests per minute per client IP, four SSE streams
+per IP and 32 overall. Rate-limit client state is bounded to 4096 active IPs, after
+which new clients receive 503 until entries expire. Only loopback peers can supply
+`CF-Connecting-IP`; Uvicorn proxy-header rewriting stays disabled. Local processes
+therefore share the tunnel's trusted IP boundary. NAT clients share limits.
+Security headers include a CSP hashing the installed SvelteKit bootstrap scripts.
+Styles retain inline permission for Svelte's dynamic style properties; scripts do not.
+Referrer-Policy is `same-origin`: Chromium's native logout form sends a null Origin
+under `no-referrer`, so that stricter referrer policy breaks the write guard.
+
+The service worker precaches versioned assets and the shell, cleans old shell caches,
+and falls back to the shell for offline navigation. API, auth and SSE requests always
+use the network. Offline UI unmounts data views and owner controls; it shows an offline
+message instead of cached speech. Generated manifest icons come from `assets/icon.svg`.
+Auth and browser acceptance use a local RSA/JWKS provider and disposable TLS material,
+with no Google calls or production credentials.
+
+Rejected: Cloudflare Access, because it cannot distinguish reads from writes on the
+same path and the application needs owner identity anyway; offline transcript storage;
+trusting loopback as owner; a production Node server. Revisit shared rate/flow storage
+if serve needs multiple workers, and session revocation if more owners are introduced.
+
+The review revision below supersedes the original login caps and admission/recovery details.
+
+### D35 review revision: stateless login and recovery
+
+2026-10-13. Supersedes D35's original pending-flow caps, client-table capacity refusal,
+and immediate offline selection on a lone network failure. A global pending-login
+cap allows anonymous visitors to lock out the owner, so state, nonce, PKCE verifier
+and expiry now live in a signed Secure, HttpOnly ten-minute `/auth` cookie. Session
+and flow salts differ. Every callback clears the flow cookie; Google single-use codes
+reject replay. Pending logins survive restart. Google's only accepted issuers are
+`https://accounts.google.com` and `accounts.google.com`. Owner emails are lowercased,
+and the HTTPS origin uses lowercase scheme/host, no default 443 and no trailing slash.
+
+Admission groups IPv6 by /64 and IPv4 by full address. The 4096-client LRU tracks
+last-seen order, expires incrementally and evicts its oldest client on capacity.
+Per-client and total stream counts are separate from request-client eviction.
+Admission expires at most one old client per request and uses a maintained total
+stream count; no full-table scans occur.
+
+Identity remains unknown while either identity read fails, retries with backoff and
+shows an error after repeated failures. A CLOSED EventSource explicitly retries with
+backoff and an unavailable/too-many-streams message. Offline selection requires the
+device to report offline or three consecutive connection failures. A success clears
+it; automatic probes and visibility events recover without manual intervention.
+
+Deployment templates use systemd user units under `~/.config/systemd/user/`, with
+`WantedBy=default.target`, no root/namespace sandboxing and checkout `%h/kiroku`.
+One watch process handles Caedrel and Gorgc, sharing quota and pollers. The cloudflared
+user unit runs `%h/.local/bin/cloudflared` for a remotely managed tunnel with a private
+`%h/.config/kiroku/tunnel-token` file. Lingering keeps the user manager alive. Installing
+or starting services stays with the operator.

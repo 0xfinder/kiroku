@@ -68,3 +68,70 @@ def test_an_unreadable_cap_is_an_error_not_no_cap(value: str) -> None:
     env = {"KIROKU_SECRETS_FILE": "/x", "KIROKU_MONTH_CAP_USD": value}
     with pytest.raises(ConfigError, match="KIROKU_MONTH_CAP_USD"):
         Settings.load(env)
+
+
+def test_oidc_secrets_and_existing_commands(tmp_path: Path) -> None:
+    path = _secrets_file(
+        tmp_path,
+        "GOOGLE_CLIENT_ID=test-id\nGOOGLE_CLIENT_SECRET=test-secret\nKIROKU_SESSION_SECRET="
+        + "s" * 48
+        + "\nJEV_API_KEY=jev\nTELEGRAM_BOT_TOKEN=abc${HOME}\n",
+    )
+    env = {
+        "KIROKU_SECRETS_FILE": str(path),
+        "KIROKU_OWNER_EMAIL": "owner@example.test",
+        "KIROKU_PUBLIC_URL": "https://kiroku.example/",
+    }
+    settings = Settings.load(env)
+    assert settings.oidc is not None
+    assert settings.oidc.client_id.reveal() == "test-id"
+    assert settings.oidc.public_url == "https://kiroku.example"
+    assert settings.secrets.require(SecretName.JEV).reveal() == "jev"
+    assert settings.secrets.require(SecretName.TELEGRAM).reveal() == "abc${HOME}"
+    assert "test-secret" not in repr(settings) and "s" * 48 not in repr(settings)
+    assert Settings.load({"KIROKU_SECRETS_FILE": str(path)}).oidc is None
+    settings = Settings.load(env | {"GOOGLE_CLIENT_SECRET": "override"})
+    assert settings.oidc is not None and settings.oidc.client_secret.reveal() == "override"
+
+
+@pytest.mark.parametrize(
+    "missing",
+    [
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET",
+        "KIROKU_SESSION_SECRET",
+        "KIROKU_OWNER_EMAIL",
+        "KIROKU_PUBLIC_URL",
+    ],
+)
+def test_partial_oidc_is_read_only(missing: str) -> None:
+    env = {
+        "KIROKU_SECRETS_FILE": "/absent",
+        "GOOGLE_CLIENT_ID": "id",
+        "GOOGLE_CLIENT_SECRET": "secret",
+        "KIROKU_SESSION_SECRET": "s" * 48,
+        "KIROKU_OWNER_EMAIL": "owner@example.test",
+        "KIROKU_PUBLIC_URL": "https://kiroku.example",
+    }
+    env.pop(missing)
+    assert Settings.load(env).oidc is None
+
+
+@pytest.mark.parametrize(
+    "url", ["http://kiroku.example", "https://kiroku.example/path", "https://kiroku.example?x=1"]
+)
+def test_oidc_requires_https_origin(url: str) -> None:
+    env = {
+        "KIROKU_SECRETS_FILE": "/absent",
+        "GOOGLE_CLIENT_ID": "id",
+        "GOOGLE_CLIENT_SECRET": "secret",
+        "KIROKU_SESSION_SECRET": "s" * 48,
+        "KIROKU_OWNER_EMAIL": "owner@example.test",
+        "KIROKU_PUBLIC_URL": url,
+    }
+    with pytest.raises(ConfigError, match="HTTPS origin"):
+        Settings.load(env)
+    with pytest.raises(ConfigError, match="32 characters"):
+        Settings.load(
+            env | {"KIROKU_PUBLIC_URL": "https://kiroku.example", "KIROKU_SESSION_SECRET": "short"}
+        )

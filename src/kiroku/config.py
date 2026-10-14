@@ -34,6 +34,9 @@ class SecretName(StrEnum):
     TELEGRAM = "TELEGRAM_BOT_TOKEN"
     TELEGRAM_CHAT = "TELEGRAM_CHAT_ID"
     MUSE = "MUSE_API_KEY"
+    GOOGLE_CLIENT_ID = "GOOGLE_CLIENT_ID"
+    GOOGLE_CLIENT_SECRET = "GOOGLE_CLIENT_SECRET"
+    SESSION_SECRET = "KIROKU_SESSION_SECRET"
 
 
 class ConfigError(KirokuError):
@@ -74,12 +77,23 @@ class Secrets:
 
 
 @dataclass(frozen=True, slots=True)
+class OIDC:
+    client_id: Secret
+    client_secret: Secret
+    session_secret: Secret
+    owner_email: str
+    public_url: str
+
+
+@dataclass(frozen=True, slots=True)
 class Settings:
     database_url: str
     data_dir: Path  # audio archive: <data_dir>/audio/<channel>/<session>/<leg>.opus
     secrets: Secrets
     caps: Caps  # D8 Budget caps, in USD
     lolesports_api_key: str | None = None  # public website key override; not a Secret
+
+    oidc: OIDC | None = None
 
     @classmethod
     def load(cls, env: Mapping[str, str] | None = None) -> Settings:
@@ -89,7 +103,47 @@ class Settings:
         values = read_secrets_file(path) | {
             n.value: env[n.value] for n in SecretName if env.get(n.value)
         }
+        oidc = None
+        names = (
+            SecretName.GOOGLE_CLIENT_ID,
+            SecretName.GOOGLE_CLIENT_SECRET,
+            SecretName.SESSION_SECRET,
+        )
+        owner = env.get("KIROKU_OWNER_EMAIL", "").strip().lower()
+        public_url = env.get("KIROKU_PUBLIC_URL", "").rstrip("/")
+        if owner and public_url and all(values.get(n, "").strip() for n in names):
+            from urllib.parse import urlsplit
+
+            url = urlsplit(public_url)
+            try:
+                port = url.port
+            except ValueError:
+                raise ConfigError("KIROKU_PUBLIC_URL must be an HTTPS origin") from None
+            if (
+                url.scheme != "https"
+                or not url.hostname
+                or url.username
+                or url.password
+                or url.path
+                or url.query
+                or url.fragment
+            ):
+                raise ConfigError("KIROKU_PUBLIC_URL must be an HTTPS origin")
+            host = url.hostname.lower()
+            if ":" in host:
+                host = f"[{host}]"
+            public_url = f"https://{host}" + (f":{port}" if port not in {None, 443} else "")
+            if len(values[SecretName.SESSION_SECRET]) < 32:
+                raise ConfigError("KIROKU_SESSION_SECRET must contain at least 32 characters")
+            oidc = OIDC(
+                Secret(values[SecretName.GOOGLE_CLIENT_ID]),
+                Secret(values[SecretName.GOOGLE_CLIENT_SECRET]),
+                Secret(values[SecretName.SESSION_SECRET]),
+                owner,
+                public_url,
+            )
         return cls(
+            oidc=oidc,
             database_url=env.get("KIROKU_DATABASE_URL", DEFAULT_DATABASE_URL),
             data_dir=Path(env.get("KIROKU_DATA_DIR", DEFAULT_DATA_DIR)).expanduser(),
             secrets=Secrets(values, path),

@@ -27,6 +27,8 @@ from kiroku.db import Pool, open_pool
 from kiroku.notify import Delivery, Tap
 from kiroku.transcriber import Result, Utterance
 from kiroku.web.app import create_app
+from kiroku.web.auth import COOKIE
+from tests.fakes.oidc import config
 from tests.fakes.web import T0, TRANSCRIBER, seed
 
 
@@ -43,8 +45,16 @@ async def notebook(pool: Pool, database_url: str) -> tuple[int, int]:
 
 def settings(database_url: str) -> Settings:
     return Settings(
-        database_url, Path("/tmp/unused-web"), Secrets({}, Path("/tmp/absent-web-key")), Caps()
+        database_url,
+        Path("/tmp/unused-web"),
+        Secrets({}, Path("/tmp/absent-web-key")),
+        Caps(),
+        oidc=config(),
     )
+
+
+def owner_cookie(application: Any) -> dict[str, str]:
+    return {COOKIE: application.state.auth.signer.dumps(config().owner_email)}
 
 
 @pytest.fixture
@@ -53,7 +63,9 @@ async def client(database_url: str) -> AsyncGenerator[httpx.AsyncClient]:
     async with (
         application.router.lifespan_context(application),
         httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=application), base_url="http://testserver"
+            transport=httpx.ASGITransport(app=application),
+            base_url="https://testserver",
+            cookies=owner_cookie(application),
         ) as client,
     ):
         yield client
@@ -311,7 +323,9 @@ async def test_rule_test_recorded_jev_and_month_costs(
     async with (
         application.router.lifespan_context(application),
         httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=application), base_url="http://testserver"
+            transport=httpx.ASGITransport(app=application),
+            base_url="https://testserver",
+            cookies=owner_cookie(application),
         ) as client,
     ):
         sent = replay_jev(monkeypatch)
@@ -474,12 +488,13 @@ def test_non_loopback_bind_warning(
     monkeypatch.setattr("uvicorn.run", run)
     with caplog.at_level(logging.WARNING):
         assert CliRunner().invoke(cli, ["serve", "--host", "0.0.0.0"]).exit_code == 0
-    assert "D18" in caplog.text and "Cloudflare Access" in caplog.text
+    assert "D35" in caplog.text and "owner login" in caplog.text
     assert calls[0]["workers"] == 1
+    assert calls[0]["proxy_headers"] is False
     assert calls[0]["timeout_graceful_shutdown"] == 5
     caplog.clear()
     assert CliRunner().invoke(cli, ["serve"]).exit_code == 0
-    assert "D18" not in caplog.text and calls[1]["host"] == "127.0.0.1"
+    assert "D35" not in caplog.text and calls[1]["host"] == "127.0.0.1"
 
 
 async def test_serve_shutdown_with_open_stream(
@@ -540,7 +555,9 @@ async def test_rule_test_month_cap_reports_refusal_without_dispatch(
     async with (
         application.router.lifespan_context(application),
         httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=application), base_url="http://testserver"
+            transport=httpx.ASGITransport(app=application),
+            base_url="https://testserver",
+            cookies=owner_cookie(application),
         ) as client,
     ):
 
@@ -578,9 +595,9 @@ async def test_session_specific_rule_test_is_bounded(pool: Pool, notebook: tuple
 @pytest.mark.parametrize(
     "origin,forwarded,accepted",
     [
-        ("https://kiroku.example", "kiroku.example", True),
-        ("https://kiroku.example:443", "kiroku.example:443", True),
-        ("http://testserver", "kiroku.example", True),
+        ("https://testserver", "kiroku.example", True),
+        ("https://testserver", "evil.example", True),
+        ("http://testserver", "kiroku.example", False),
         ("https://evil.example", "kiroku.example", False),
         ("https://kiroku.example.evil", "kiroku.example", False),
         ("https://kiroku.example", "kiroku.example:443", False),
@@ -679,7 +696,9 @@ async def test_rule_job_progress_disconnect_errors_and_shutdown(
     monkeypatch.setattr(dry_run, "run", run)
     transport = httpx.ASGITransport(app=application)
     async with application.router.lifespan_context(application):
-        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with httpx.AsyncClient(
+            transport=transport, base_url="https://testserver", cookies=owner_cookie(application)
+        ) as client:
             async with asyncio.timeout(1):
                 response = await client.post("/api/rules/predicts_winner/test", json={"last": 1})
             assert response.status_code == 202
@@ -692,7 +711,9 @@ async def test_rule_job_progress_disconnect_errors_and_shutdown(
             ).status_code == 409
         # Losing the requesting client leaves the paid job and its retrievable report intact.
         release.set()
-        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        async with httpx.AsyncClient(
+            transport=transport, base_url="https://testserver", cookies=owner_cookie(application)
+        ) as client:
             report = await completed_test(client, response)
             assert report["scored"] == 1
             assert (await client.get(f"/api/rule-tests/{job_id}")).json()["report"] == report

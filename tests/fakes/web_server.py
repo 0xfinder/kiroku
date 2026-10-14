@@ -7,21 +7,25 @@ import os
 import signal
 from collections.abc import AsyncGenerator
 from contextlib import aclosing
+from dataclasses import replace
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 
 import psycopg
+import uvicorn
 from psycopg import sql
 
 from kiroku import transcript
-from kiroku.cli import app
 from kiroku.db import connect, open_pool
 from kiroku.db.migrate import migrate
 from kiroku.transcriber import Result, Utterance
 from kiroku.web import app as web_app
 from kiroku.web import stream as web_stream
 from tests.conftest import ADMIN_URL, url_for
+from tests.fakes.oidc import config, provider_server, tls_files
 from tests.fakes.web import TRANSCRIBER, seed
+from tests.test_web import settings
 
 STATE = Path(".web-e2e.json")
 stream_epoch = 0
@@ -137,13 +141,20 @@ def main() -> None:
             web_stream.POLL_S = 0.1
             web_stream.KEEPALIVE_S = 0.2
             web_app.events = disconnectable_events
-            # This is the production CLI, with a test-only database and no API keys.
-            os.environ["KIROKU_DATABASE_URL"] = url_for(name)
-            os.environ["KIROKU_SECRETS_FILE"] = str(Path("tests/absent-web-secrets.env").resolve())
-            os.environ.pop("JEV_API_KEY", None)
-            signal.signal(signal.SIGTERM, lambda _signum, _frame: None)
-            signal.signal(signal.SIGINT, lambda _signum, _frame: None)
-            app(args=["serve", "--port", "8748"], standalone_mode=False)
+            # Real HTTPS cookies and OIDC against a local provider; no production keys.
+            with provider_server() as fake, TemporaryDirectory() as tls_dir:
+                cert, key = tls_files(Path(tls_dir))
+                cfg = replace(settings(url_for(name)), oidc=config("https://127.0.0.1:8748"))
+                uvicorn.run(
+                    web_app.create_app(cfg, provider=fake.provider),
+                    host="127.0.0.1",
+                    port=8748,
+                    ssl_certfile=cert,
+                    ssl_keyfile=key,
+                    proxy_headers=False,
+                    access_log=False,
+                    timeout_graceful_shutdown=5,
+                )
         finally:
             admin.execute(sql.SQL("DROP DATABASE {} WITH (FORCE)").format(sql.Identifier(name)))
             STATE.unlink(missing_ok=True)

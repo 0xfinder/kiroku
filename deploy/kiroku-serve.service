@@ -1,0 +1,17 @@
+[Unit]
+Description=Kiroku public read-only notebook
+
+[Service]
+Type=simple
+WorkingDirectory=%h/kiroku
+Environment=KIROKU_OWNER_EMAIL=ethanoixe@gmail.com
+Environment=KIROKU_PUBLIC_URL=https://kiroku.orulon.com
+ExecStart=%h/kiroku/.venv/bin/kiroku serve
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+NoNewPrivileges=true
+UMask=0077
+
+[Install]
+WantedBy=default.target

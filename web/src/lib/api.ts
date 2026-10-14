@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { connectionFailed, connectionSucceeded } from '#lib/connectivity.ts';
 
 const decimal = z.union([z.number(), z.string()]).pipe(z.coerce.number());
 export const sessionSchema = z.object({
@@ -137,21 +138,39 @@ export async function request(
   path: string,
   options: RequestInit = {},
 ): Promise<unknown> {
-  const response = await fetch(`/api${path}`, {
-    ...options,
-    headers: { 'Content-Type': 'application/json', ...options.headers },
-  });
-  if (!response.ok) {
-    const value: unknown = await response.json().catch(() => null);
-    const parsed = z.object({ detail: z.string() }).safeParse(value);
-    throw new Error(
-      parsed.success
-        ? parsed.data.detail
-        : `Request failed (${response.status})`,
-    );
+  let response: Response | undefined;
+  try {
+    response = await fetch(`/api${path}`, {
+      ...options,
+      headers: { 'Content-Type': 'application/json', ...options.headers },
+    });
+    if (
+      [502, 504].includes(response.status) ||
+      (response.status === 503 &&
+        !response.headers.get('content-type')?.includes('application/json'))
+    ) {
+      connectionFailed();
+    }
+    if (!response.ok) {
+      const value: unknown = await response.json().catch((error: unknown) => {
+        if (error instanceof TypeError) throw error;
+        return null;
+      });
+      const parsed = z.object({ detail: z.string() }).safeParse(value);
+      throw new Error(
+        parsed.success
+          ? parsed.data.detail
+          : `Request failed (${response.status})`,
+      );
+    }
+    const value: unknown =
+      response.status === 204 ? null : await response.json();
+    connectionSucceeded();
+    return value;
+  } catch (error) {
+    if (!response || error instanceof TypeError) connectionFailed();
+    throw error;
   }
-  if (response.status === 204) return null;
-  return response.json();
 }
 export async function read<T>(path: string, schema: z.ZodType<T>): Promise<T> {
   return schema.parse(await request(path));

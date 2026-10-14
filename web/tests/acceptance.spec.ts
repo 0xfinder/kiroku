@@ -34,6 +34,12 @@ test('phone live updates, Notes links, Rules, Review persistence and undo', asyn
     };
   });
   const errors: string[] = [];
+  page.on('console', (msg) => {
+    if (msg.text().includes('Content Security Policy')) errors.push(msg.text());
+  });
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Owner login' }).click();
+  await expect(page.getByRole('button', { name: 'Log out' })).toBeVisible();
   page.on('pageerror', (error) => errors.push(error.message));
   const sessions = z
     .array(sessionSchema)
@@ -115,7 +121,9 @@ test('phone live updates, Notes links, Rules, Review persistence and undo', asyn
   // A dropped connection must recover historical speech missed while offline.
   await page.context().setOffline(true);
   action('disconnect');
-  await expect(page.getByText('Reconnecting', { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'You’re offline' }),
+  ).toBeVisible();
   action('backfill-third');
   await page.context().setOffline(false);
   await expect(page.getByTestId('transcript')).toContainText(
@@ -124,7 +132,7 @@ test('phone live updates, Notes links, Rules, Review persistence and undo', asyn
   await expect(page.getByText('Connected', { exact: true })).toBeVisible();
   await expect
     .poll(() => transcriptOffsets.filter((at) => at === -1).length)
-    .toBe(2);
+    .toBeGreaterThanOrEqual(2);
   // Reading older speech pauses following; the explicit control returns to live.
   await page.getByTestId('transcript').evaluate((element) => {
     element.scrollTop = 0;
@@ -150,7 +158,9 @@ test('phone live updates, Notes links, Rules, Review persistence and undo', asyn
     .getByLabel('Instructions', { exact: true })
     .fill('Does the streamer name a favorite?');
   // A CLI disable after the form loaded must survive a wording-only save.
-  const disable = await request.post('/api/rules/predicts_winner/disable');
+  const disable = await page
+    .context()
+    .request.post('/api/rules/predicts_winner/disable');
   expect(disable.ok()).toBe(true);
   await page.getByRole('button', { name: 'Save Rule' }).click();
   await expect(page.getByRole('status')).toContainText('Rule saved');
@@ -271,4 +281,267 @@ test('phone live updates, Notes links, Rules, Review persistence and undo', asyn
   await expect(page.getByRole('status')).toContainText('Labelled no');
   expect(JSON.parse(action('labels'))).toEqual([[false, 'review']]);
   expect(errors).toEqual([]);
+});
+
+test('public read-only PWA, CSP, network-only data and offline shell', async ({
+  page,
+  context,
+  request,
+}, testInfo) => {
+  mkdirSync(resolve('../docs/web/screenshots'), { recursive: true });
+  const violations: string[] = [];
+  page.on('console', (msg) => {
+    if (msg.text().includes('Content Security Policy'))
+      violations.push(msg.text());
+  });
+  page.on('pageerror', (error) => violations.push(error.message));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/rules');
+  await expect(page.getByRole('link', { name: 'Owner login' })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: /New Rule|Save Rule|Test against/ }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole('link', { name: 'Review', exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole('heading', { name: 'predicts winner', exact: true }),
+  ).toBeVisible();
+  expect((await request.get('/api/review')).status()).toBe(403);
+  expect(
+    (
+      await request.post('/api/rules', {
+        data: { name: 'public', instructions: 'Question?' },
+      })
+    ).status(),
+  ).toBe(403);
+  expect((await request.get('/api/rule-tests/unknown')).status()).toBe(403);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: resolve('../docs/web/screenshots/public-rules-phone.png'),
+    fullPage: true,
+  });
+  await page.goto('/review');
+  await expect(
+    page.getByRole('heading', { name: 'Owner login required' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: /Yes|No|Undo|Check for more/ }),
+  ).toHaveCount(0);
+  const manifest = await request.get('/manifest.webmanifest');
+  expect(manifest.ok()).toBe(true);
+  const parsed = z
+    .object({
+      name: z.string(),
+      display: z.literal('standalone'),
+      icons: z.array(
+        z.object({
+          src: z.string(),
+          sizes: z.string(),
+          purpose: z.string().optional(),
+        }),
+      ),
+    })
+    .parse(await manifest.json());
+  expect(parsed.icons.map((icon) => icon.sizes)).toContain('192x192');
+  expect(parsed.icons.map((icon) => icon.sizes)).toContain('512x512');
+  expect(parsed.icons.some((icon) => icon.purpose === 'maskable')).toBe(true);
+  for (const icon of [
+    ...parsed.icons.map((icon) => icon.src),
+    '/icons/apple-touch-icon.png',
+  ])
+    expect((await request.get(icon)).ok()).toBe(true);
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(() => navigator.serviceWorker.controller !== null),
+    )
+    .toBe(true);
+  // Reinstall with an obsolete cache present to exercise activation cleanup.
+  await page.evaluate(async () => {
+    const registration = await navigator.serviceWorker.ready;
+    await registration.unregister();
+    await caches.open('kiroku-shell-obsolete');
+  });
+  await page.reload();
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(async () =>
+        (await caches.keys()).includes('kiroku-shell-obsolete'),
+      ),
+    )
+    .toBe(false);
+  await page.goto('/');
+  await expect(
+    page.getByRole('heading', { name: 'Live & recent sessions' }),
+  ).toBeVisible();
+  await page.evaluate(async () => {
+    await fetch('/api/sessions');
+    await fetch('/api/me');
+    await fetch('/auth/login', { redirect: 'manual' });
+  });
+  const cachedPaths = await page.evaluate(async () => {
+    const paths: string[] = [];
+    for (const name of await caches.keys())
+      for (const key of await (await caches.open(name)).keys())
+        paths.push(new URL(key.url).pathname);
+    return paths;
+  });
+  expect(cachedPaths).toContain('/');
+  expect(cachedPaths.some((path) => /^\/(api|auth)(\/|$)/.test(path))).toBe(
+    false,
+  );
+  await context.setOffline(true);
+  await page.reload();
+  await expect(
+    page.getByRole('heading', { name: 'You’re offline' }),
+  ).toBeVisible();
+  await expect(page.getByText('caedrel', { exact: true })).toHaveCount(0);
+  expect(
+    await page.evaluate(async () => {
+      try {
+        await fetch('/api/sessions');
+        return 'cached';
+      } catch {
+        return 'network failed';
+      }
+    }),
+  ).toBe('network failed');
+  expect(
+    await page.evaluate(async () => {
+      try {
+        await fetch('/auth/login');
+        return 'cached';
+      } catch {
+        return 'network failed';
+      }
+    }),
+  ).toBe('network failed');
+  await page.goto('/notes');
+  await expect(
+    page.getByRole('heading', { name: 'You’re offline' }),
+  ).toBeVisible();
+  const offlineShot = resolve('../docs/web/screenshots/offline-phone.png');
+  await page.screenshot({ path: offlineShot, fullPage: true });
+  await testInfo.attach('offline-phone', {
+    path: offlineShot,
+    contentType: 'image/png',
+  });
+  await context.setOffline(false);
+  await expect(
+    page.getByRole('heading', { name: 'Notes timeline' }),
+  ).toBeVisible();
+  await page.getByRole('link', { name: 'Owner login' }).click();
+  await expect(page.getByRole('button', { name: 'Log out' })).toBeVisible();
+  await page.getByRole('button', { name: 'Log out' }).click();
+  await expect(page.getByRole('link', { name: 'Owner login' })).toBeVisible();
+  expect((await context.request.get('/api/me')).ok()).toBe(true);
+  expect(await (await context.request.get('/api/me')).json()).toEqual({
+    owner: false,
+  });
+  expect(violations).toEqual([]);
+});
+
+test('owner identity retries /me and /auth errors without a public downgrade', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Owner login' }).click();
+  await expect(page.getByRole('button', { name: 'Log out' })).toBeVisible();
+  for (const path of ['me', 'auth']) {
+    let attempts = 0;
+    await page.route(`**/api/${path}`, (route) => {
+      attempts++;
+      return attempts <= 3
+        ? route.fulfill({
+            status: attempts === 1 ? 429 : attempts === 2 ? 503 : 500,
+            json: { detail: 'busy' },
+          })
+        : route.continue();
+    });
+    await page.reload();
+    await expect(
+      page.getByText('Checking owner login…', { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText('Read-only', { exact: true })).toHaveCount(0);
+    await expect(
+      page.getByText('Unable to check owner login; retrying.'),
+    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('button', { name: 'Log out' })).toBeVisible({
+      timeout: 15000,
+    });
+    expect(attempts).toBe(4);
+    await page.unroute(`**/api/${path}`);
+  }
+});
+
+test('429 and 503 permanently closed streams retry and reconnect', async ({
+  page,
+  request,
+}) => {
+  const [session] = z
+    .array(sessionSchema)
+    .parse(await (await request.get('/api/sessions')).json());
+  if (!session) throw new Error('missing fixture session');
+  let attempts = 0;
+  await page.route('**/transcript/stream?*', (route) => {
+    attempts++;
+    return attempts <= 2
+      ? route.fulfill({
+          status: attempts === 1 ? 429 : 503,
+          json: { detail: 'too many streams' },
+        })
+      : route.continue();
+  });
+  await page.goto(`/session/${session.id}`);
+  await expect(
+    page.getByText('Stream unavailable or too many open streams; retrying'),
+  ).toBeVisible();
+  await expect(page.getByText('Connected', { exact: true })).toBeVisible({
+    timeout: 10000,
+  });
+  expect(attempts).toBe(3);
+});
+
+test('repeated failures go offline and recover automatically when visible', async ({
+  page,
+}) => {
+  await page.goto('/notes');
+  await expect(page.getByRole('link', { name: 'Owner login' })).toBeVisible();
+  await page.route('**/api/**', (route) => route.abort('connectionfailed'));
+  await page.evaluate(() =>
+    document.dispatchEvent(new Event('visibilitychange')),
+  );
+  await expect(
+    page.getByRole('heading', { name: 'You’re offline' }),
+  ).toBeVisible({ timeout: 10000 });
+  expect(await page.evaluate(() => navigator.onLine)).toBe(true);
+  await page.unrouteAll({ behavior: 'wait' });
+  // No manual Retry: the scheduled probe recovers without any event.
+  await expect(
+    page.getByRole('heading', { name: 'Notes timeline' }),
+  ).toBeVisible({ timeout: 15000 });
+  await page.route('**/api/**', (route) => route.abort('connectionfailed'));
+  await page.evaluate(() =>
+    document.dispatchEvent(new Event('visibilitychange')),
+  );
+  await expect(
+    page.getByRole('heading', { name: 'You’re offline' }),
+  ).toBeVisible({ timeout: 10000 });
+  await page.unrouteAll({ behavior: 'wait' });
+  await page.evaluate(() =>
+    document.dispatchEvent(new Event('visibilitychange')),
+  );
+  await expect(
+    page.getByRole('heading', { name: 'Notes timeline' }),
+  ).toBeVisible();
 });

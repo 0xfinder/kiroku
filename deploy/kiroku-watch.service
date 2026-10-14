@@ -1,0 +1,15 @@
+[Unit]
+Description=Kiroku Twitch capture
+
+[Service]
+Type=simple
+WorkingDirectory=%h/kiroku
+ExecStart=%h/kiroku/.venv/bin/kiroku watch caedrel gorgc
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=180
+NoNewPrivileges=true
+UMask=0077
+
+[Install]
+WantedBy=default.target
