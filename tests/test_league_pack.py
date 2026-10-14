@@ -25,6 +25,7 @@ from kiroku.packs.league import LeaguePack, vocabulary
 from kiroku.packs.league.data import (
     DATA_TTL_S,
     DataError,
+    LeagueData,
     match_context,
     names,
     roster_terms,
@@ -260,7 +261,7 @@ async def test_match_uses_real_teams_picks_game_and_feed_clock(
         assert "Infinity Edge" not in words  # no unrelated item catalogue
         feed = next(r for r in replay.calls if "/window/" in r.url.path)
         at = datetime.fromisoformat(feed.url.params["startingTime"])
-        assert at <= now - timedelta(seconds=90)
+        assert now - timedelta(seconds=110) <= at <= now - timedelta(seconds=90)
         assert at.second % 10 == 0 and at.microsecond == 0
         prompt = build_prompt(words, "Some earlier speech. " * 80)
         assert prompt.startswith(words)
@@ -480,6 +481,79 @@ async def test_feed_without_context_retries_and_preserves_vocabulary(
             assert warnings == []
         replay.fail = None
         assert await pack.get_live_match(TITLE) is not None
+        if fail == "window_bad_query":
+            replay.fail = fail
+            assert await pack.get_live_match(TITLE) is None
+            warnings = [r for r in caplog.records if r.levelno >= logging.WARNING]
+            assert len(warnings) == 2
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"errorCode": "BAD_QUERY_PARAMETER", "message": "invalid startingTime format"},
+        {"errorCode": "BAD_QUERY_PARAMETER"},
+        {"errorCode": "OTHER", "message": "ahead of broadcast"},
+        {"errorCode": "BAD_QUERY_PARAMETER", "message": 80},
+        [],
+        "non-JSON error",
+    ],
+)
+async def test_feed_other_bad_queries_raise(tmp_path: Path, body: object) -> None:
+    replay = LeagueReplay()
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        if "/window/" in request.url.path:
+            if isinstance(body, str):
+                return httpx.Response(400, text=body)
+            return httpx.Response(400, json=body)
+        return replay(request)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as http:
+        pack = LeaguePack(http, tmp_path, "public-test-key")
+        with pytest.raises(httpx.HTTPStatusError) as exc:
+            await pack.get_live_match(TITLE)
+        assert exc.value.response.status_code == 400
+
+
+@pytest.mark.parametrize("success", [None, "window_204", "window_empty"])
+async def test_feed_ahead_of_broadcast_warning_resets_after_success(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, success: str | None
+) -> None:
+    replay = LeagueReplay()
+    rejected = True
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        if rejected and "/window/" in request.url.path:
+            return httpx.Response(
+                400,
+                json={"errorCode": "BAD_QUERY_PARAMETER", "message": "ahead of broadcast"},
+            )
+        return replay(request)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as http:
+        pack = LeaguePack(http, tmp_path, "public-test-key")
+        for _ in range(2):
+            assert await pack.get_live_match(TITLE) is None
+        assert len(caplog.records) == 1
+        rejected = False
+        replay.fail = success
+        live = await pack.get_live_match(TITLE)
+        assert (live is not None) == (success is None)
+        rejected = True
+        assert await pack.get_live_match(TITLE) is None
+        assert len(caplog.records) == 2
+        assert all("BAD_QUERY_PARAMETER" in r.getMessage() for r in caplog.records)
+
+
+@pytest.mark.parametrize("status", [200, 204])
+async def test_league_shared_get_still_rejects_empty_bodies(tmp_path: Path, status: int) -> None:
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda request: httpx.Response(status))
+    ) as http:
+        data = LeagueData(http, tmp_path, "public-test-key")
+        with pytest.raises(ValueError):
+            await data.get("https://example.test/catalogue")
 
 
 @pytest.mark.parametrize(

@@ -1,6 +1,7 @@
 """League Vocabulary and live match context from Data Dragon and lolesports."""
 
 import logging
+from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -25,10 +26,29 @@ from kiroku.packs.league.data import (
 from kiroku.packs.league.notes import notes_schema
 
 VOCABULARY_CHARS = 350
-# The feed requires each ten-second window to end at least 80 seconds ago;
-# 120 seconds leaves margin for clock skew as well as the window's duration.
-FEED_DELAY_S = 120
+FEED_MIN_AGE_S = 80
+FEED_WINDOW_S = 10
+FEED_SKEW_MARGIN_S = 10
+# The window's end must be at least 80 seconds old. This tolerates a local clock
+# up to 10 seconds ahead of the feed; rounding down adds less than 10 seconds.
+FEED_DELAY_S = FEED_MIN_AGE_S + FEED_WINDOW_S + FEED_SKEW_MARGIN_S
 log = logging.getLogger(__name__)
+
+
+def _feed_too_recent(response: httpx.Response) -> bool:
+    if response.status_code == 400:
+        with suppress(ValueError):
+            body = obj(response.json())
+            message = body.get("message")
+            return (
+                body.get("errorCode") == "BAD_QUERY_PARAMETER"
+                and isinstance(message, str)
+                and any(
+                    phrase in message.lower()
+                    for phrase in ("less than 80 sec old", "ahead of broadcast")
+                )
+            )
+    return False
 
 
 def vocabulary(
@@ -105,19 +125,15 @@ class LeaguePack:
         if len(games) != 1:
             return None  # between games, not a stale previous game's picks
         at = datetime.now(UTC) - timedelta(seconds=FEED_DELAY_S)
-        at = at.replace(second=at.second // 10 * 10, microsecond=0)
+        at = at.replace(second=at.second // FEED_WINDOW_S * FEED_WINDOW_S, microsecond=0)
         try:
             window = await self.data.get(
-                f"{FEED}/window/{text(games[0]['id'])}", params={"startingTime": at.isoformat()}
+                f"{FEED}/window/{text(games[0]['id'])}",
+                params={"startingTime": at.isoformat()},
+                allow_empty=True,
             )
         except httpx.HTTPStatusError as e:
-            if e.response.status_code != 400:
-                raise
-            try:
-                bad_query = obj(e.response.json()).get("errorCode") == "BAD_QUERY_PARAMETER"
-            except ValueError:
-                raise e from None
-            if not bad_query:
+            if not _feed_too_recent(e.response):
                 raise
             if not self._feed_query_warned:
                 log.warning(
@@ -125,6 +141,7 @@ class LeaguePack:
                 )
                 self._feed_query_warned = True
             return None
+        self._feed_query_warned = False
         if window is None:
             return None  # draft/loading: no frames yet
         champions, _ = await self._catalogue()

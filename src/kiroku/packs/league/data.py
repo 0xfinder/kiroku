@@ -60,7 +60,12 @@ class LeagueData:
         self._parsed: dict[tuple[str, object], tuple[int, object]] = {}
 
     async def get(
-        self, url: str, *, params: Mapping[str, str] | None = None, website: bool = False
+        self,
+        url: str,
+        *,
+        params: Mapping[str, str] | None = None,
+        website: bool = False,
+        allow_empty: bool = False,
     ) -> object:
         response = await self.http.get(
             url,
@@ -69,7 +74,7 @@ class LeagueData:
             timeout=10,
         )
         response.raise_for_status()
-        if response.status_code == 204 or not response.content:
+        if allow_empty and (response.status_code == 204 or not response.content):
             return None
         body: object = response.json()
         return body
