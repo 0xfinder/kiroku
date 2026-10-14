@@ -1,9 +1,14 @@
 import { test, expect } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import { sessionSchema } from '../src/lib/api';
+import {
+  sessionSchema,
+  passSchema,
+  utteranceSchema,
+  reviewSchema,
+} from '../src/lib/api';
 
 // Use the acceptance harness's disposable database and real transcript commit/SSE path.
 function appendSpeech(text: string) {
@@ -68,29 +73,46 @@ for (const [label, viewport, reducedMotion] of [
       await page.goto('/');
       await page.getByRole('link', { name: 'Owner login' }).click();
       await expect(page.getByRole('button', { name: 'Log out' })).toBeVisible();
+      // Restore the fixture verdict left by acceptance.spec.ts so both cards are available.
+      const fixture = z
+        .object({ decision: z.number() })
+        .parse(JSON.parse(readFileSync(resolve('../.web-e2e.json'), 'utf8')));
+      const restored = await context.request.delete(
+        `/api/review/${fixture.decision}`,
+        { headers: { Origin: 'https://127.0.0.1:8748' } },
+      );
+      expect(restored.ok()).toBe(true);
       await page.goto(`/session/${session.id}`);
       await expect(page.getByText('Connected', { exact: true })).toBeVisible();
-      await expect(page.locator('.utterance[data-entering]')).toHaveCount(0);
-      // Record the application's enter state synchronously, without relying on polling inside 300 ms.
+      expect(
+        await page
+          .locator('.utterance')
+          .evaluateAll(
+            (nodes) => nodes.flatMap((node) => node.getAnimations()).length,
+          ),
+      ).toBe(0);
+      // Observe WAAPI transitions in the browser; production needs no test-only hooks.
       await page.evaluate(() => {
-        document.addEventListener(
-          'introstart',
-          (event) => {
-            const node = event.target;
-            queueMicrotask(() => {
-              if (
-                node instanceof HTMLElement &&
-                node.matches('.utterance[data-entering]')
-              ) {
-                node.dataset.enterCount = String(
-                  Number(node.dataset.enterCount ?? 0) + 1,
-                );
-              }
-            });
-          },
-          { capture: true },
-        );
+        const seen = new WeakSet<Animation>();
+        const observe = () => {
+          for (const node of document.querySelectorAll('.utterance')) {
+            for (const animation of node.getAnimations()) {
+              if (seen.has(animation)) continue;
+              seen.add(animation);
+              node.setAttribute(
+                'data-enter-count',
+                String(Number(node.getAttribute('data-enter-count') ?? 0) + 1),
+              );
+            }
+          }
+          requestAnimationFrame(observe);
+        };
+        requestAnimationFrame(observe);
       });
+      const status = await page
+        .locator('.connection-status[role="status"]')
+        .elementHandle();
+      if (!status) throw new Error('missing persistent connection status');
       const text = `A new ${label} Utterance: Blue takes the next objective.`;
       appendSpeech(text);
       const arrival = page.locator('.utterance').filter({ hasText: text });
@@ -101,7 +123,11 @@ for (const [label, viewport, reducedMotion] of [
           await arrival.evaluate((element) => element.getAnimations().length),
         ).toBe(0);
       } else await expect(arrival).toHaveAttribute('data-enter-count', '1');
-      await expect(page.locator('.utterance[data-entering]')).toHaveCount(0);
+      await expect
+        .poll(() =>
+          arrival.evaluate((element) => element.getAnimations().length),
+        )
+        .toBe(0);
       await expect(
         page.getByRole('button', { name: 'Jump to live' }),
       ).toHaveCount(0);
@@ -136,9 +162,36 @@ for (const [label, viewport, reducedMotion] of [
       await expect.poll(() => scans).toBeGreaterThan(0);
       await expect(page.getByText('Connected', { exact: true })).toBeVisible();
       await expect(arrival).toHaveAttribute('data-before-reconnect', 'true');
+      expect(
+        await status.evaluate(
+          (node) =>
+            node ===
+            document.querySelector('.connection-status[role="status"]'),
+        ),
+      ).toBe(true);
       if (reducedMotion !== 'reduce')
         await expect(arrival).toHaveAttribute('data-enter-count', '1');
-      await expect(page.locator('.utterance[data-entering]')).toHaveCount(0);
+      await expect
+        .poll(() =>
+          arrival.evaluate((element) => element.getAnimations().length),
+        )
+        .toBe(0);
+      await page.getByTestId('transcript').hover();
+      for (let i = 0; i < 3; i++) await page.mouse.wheel(0, -200);
+      await expect
+        .poll(() =>
+          page
+            .getByTestId('transcript')
+            .evaluate(
+              (element) =>
+                element.scrollHeight - element.clientHeight - element.scrollTop,
+            ),
+        )
+        .toBeGreaterThan(80);
+      await expect(
+        page.getByRole('button', { name: 'Jump to live' }),
+      ).toBeVisible();
+      // Finish scrolling to the start, then prove a later arrival preserves the reader's position.
       await page.getByTestId('transcript').evaluate((element) => {
         element.scrollTop = 0;
       });
@@ -156,6 +209,16 @@ for (const [label, viewport, reducedMotion] of [
           .getByTestId('transcript')
           .evaluate((element) => element.scrollTop),
       ).toBe(0);
+      // Exercise the target/timeout fallback even when the browser never delivers scrollend.
+      await page
+        .getByTestId('transcript')
+        .evaluate((node) =>
+          node.addEventListener(
+            'scrollend',
+            (event) => event.stopImmediatePropagation(),
+            { capture: true },
+          ),
+        );
       await page.getByRole('button', { name: 'Jump to live' }).click();
       await expect
         .poll(() =>
@@ -176,15 +239,27 @@ for (const [label, viewport, reducedMotion] of [
       await expect(
         page.locator('[data-testid="review-card"]:not([inert])'),
       ).toBeVisible();
-      const cardText = await page
-        .locator('[data-testid="review-card"]:not([inert])')
-        .innerText();
-      await page.getByRole('button', { name: 'Yes, it applies' }).click();
+      const [first, next] = z
+        .array(reviewSchema)
+        .parse(
+          await (await context.request.get('/api/review?limit=100')).json(),
+        );
+      if (!first || !next)
+        throw new Error('keyboard Review needs two fixture cards');
+      const card = page.locator(`[data-review-id="${first.id}"]`);
+      const cardText = await card.innerText();
+      const yes = card.getByRole('button', { name: 'Yes, it applies' });
+      await yes.focus();
+      await yes.press('Enter');
       await expect(page.getByRole('status')).toContainText('Labelled yes');
-      await page.getByRole('button', { name: 'Undo', exact: true }).click();
       await expect(
-        page.locator('[data-testid="review-card"]:not([inert])'),
-      ).toHaveText(cardText, { useInnerText: true });
+        page
+          .locator(`[data-review-id="${next.id}"]`)
+          .getByRole('button', { name: 'Yes, it applies' }),
+      ).toBeFocused();
+      await page.getByRole('button', { name: 'Undo', exact: true }).click();
+      await expect(card).toHaveText(cardText, { useInnerText: true });
+      await expect(yes).toBeFocused();
       await page.screenshot({
         path: `${artifacts}/review-${label}.png`,
         fullPage: true,
@@ -213,7 +288,145 @@ for (const [label, viewport, reducedMotion] of [
     } finally {
       const video = page.video();
       await context.close();
-      if (video) await video.saveAs(`${artifacts}/motion-${label}.webm`);
+      if (video) await video.saveAs(`${artifacts}/r2-${label}.webm`);
     }
   });
 }
+
+test('cursor and snapshot failures settle loading; Retry recovers an empty session', async ({
+  page,
+  request,
+}) => {
+  const [session] = z
+    .array(sessionSchema)
+    .parse(await (await request.get('/api/sessions')).json());
+  if (!session) throw new Error('missing fixture session');
+  let failCursor = true;
+  let failSnapshot = true;
+  await page.route(`**/api/sessions/${session.id}/transcript/cursor`, (route) =>
+    route.fulfill({
+      status: failCursor ? 500 : 200,
+      json: failCursor ? { detail: 'Cursor unavailable' } : { id: 0 },
+    }),
+  );
+  await page.route(`**/api/sessions/${session.id}/transcript?**`, (route) =>
+    route.fulfill({
+      status: failSnapshot ? 500 : 200,
+      json: failSnapshot ? { detail: 'Snapshot unavailable' } : [],
+    }),
+  );
+  await page.route(
+    `**/api/sessions/${session.id}/transcript/stream?**`,
+    (route) =>
+      route.fulfill({
+        contentType: 'text/event-stream',
+        body: ': empty session\n\n',
+      }),
+  );
+  await page.goto(`/session/${session.id}`);
+  await expect(page.getByRole('alert')).toContainText('Cursor unavailable');
+  await expect(
+    page.getByRole('status', { name: 'Loading transcript…' }),
+  ).toHaveCount(0);
+  await expect(page.getByText('Waiting for speech…')).toBeVisible();
+  failCursor = false;
+  await page.getByRole('button', { name: 'Retry', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Snapshot unavailable');
+  await expect(
+    page.getByRole('status', { name: 'Loading transcript…' }),
+  ).toHaveCount(0);
+  failSnapshot = false;
+  await page.getByRole('button', { name: 'Retry', exact: true }).click();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(page.getByText('Waiting for speech…')).toBeVisible();
+  await expect(
+    page.getByRole('status', { name: 'Loading transcript…' }),
+  ).toHaveCount(0);
+});
+
+test('a live trailing event stays pinned and keeps its node before new speech', async ({
+  page,
+  request,
+}) => {
+  const [session] = z
+    .array(sessionSchema)
+    .parse(await (await request.get('/api/sessions')).json());
+  if (!session) throw new Error('missing fixture session');
+  const speech = z
+    .array(utteranceSchema)
+    .parse(
+      await (
+        await request.get(
+          `/api/sessions/${session.id}/transcript?after_ms=-1&limit=500`,
+        )
+      ).json(),
+    );
+  const passes = z
+    .array(passSchema)
+    .parse(
+      await (await request.get(`/api/sessions/${session.id}/passes`)).json(),
+    );
+  let published = false;
+  await page.route(`**/api/sessions/${session.id}/passes`, (route) =>
+    route.fulfill({
+      json: published
+        ? [
+            ...passes,
+            {
+              id: 987654,
+              rule: 'live_event_identity',
+              question: 'Fixture event',
+              probability: 0.9,
+              threshold: 0.6,
+              start_ms: (speech.at(-1)?.audio_start_ms ?? 0) + 500,
+            },
+          ]
+        : passes,
+    }),
+  );
+  await page.clock.install();
+  await page.goto(`/session/${session.id}`);
+  await expect(page.getByText('Connected', { exact: true })).toBeVisible();
+  published = true;
+  await page.clock.fastForward(30000);
+  const event = page
+    .locator('.inline-event')
+    .filter({ hasText: 'live_event_identity' });
+  await expect(event).toHaveCount(1);
+  await expect(event).toBeVisible();
+  await expect
+    .poll(() =>
+      page
+        .getByTestId('transcript')
+        .evaluate(
+          (element) =>
+            element.scrollHeight - element.clientHeight - element.scrollTop,
+        ),
+    )
+    .toBeLessThan(2);
+  const original = await event.elementHandle();
+  if (!original) throw new Error('missing live inline event');
+  appendSpeech('Speech after the trailing inline event.');
+  const arrival = page
+    .locator('.utterance')
+    .filter({ hasText: 'Speech after the trailing inline event.' });
+  await expect(arrival).toBeAttached();
+  await page.clock.runFor(650);
+  await expect(event).toHaveCount(1);
+  expect(
+    await original.evaluate(
+      (node) =>
+        node ===
+        [...document.querySelectorAll('.inline-event')].find((element) =>
+          element.textContent?.includes('live_event_identity'),
+        ),
+    ),
+  ).toBe(true);
+  expect(
+    await original.evaluate((node) =>
+      node.nextElementSibling?.textContent?.includes(
+        'Speech after the trailing inline event.',
+      ),
+    ),
+  ).toBe(true);
+});

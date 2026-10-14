@@ -1,9 +1,8 @@
 <script lang="ts">
-  import { enter } from '#lib/motion.ts';
+  import { enter, fadeOptions } from '#lib/motion.ts';
   import { fade } from 'svelte/transition';
-  import { fadeOptions } from '#lib/motion.ts';
   import Skeleton from '#lib/Skeleton.svelte';
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { z } from 'zod';
   import {
     read,
@@ -17,6 +16,7 @@
     | { kind: 'idle' }
     | { kind: 'saving' | 'saved' | 'undoing'; card: Review; applies: boolean };
   let queue = $state<Review[]>([]);
+  let wrap: HTMLDivElement;
   let loading = $state(true);
   let error = $state('');
   let vote = $state<Vote>({ kind: 'idle' });
@@ -33,6 +33,18 @@
       loading = false;
     }
   }
+  async function focusVote() {
+    await tick();
+    const next = queue[0];
+    const control = next
+      ? wrap.querySelector<HTMLButtonElement>(
+          `[data-review-id="${next.id}"] .yes`,
+        )
+      : wrap.querySelector<HTMLElement>(
+          'button.undo:not(:disabled), .empty h2',
+        );
+    control?.focus({ preventScroll: true });
+  }
   async function label(card: Review, applies: boolean) {
     queue = removeCard(queue, card.id);
     vote = { kind: 'saving', card, applies };
@@ -48,6 +60,8 @@
       queue = restoreCard(queue, card);
       vote = { kind: 'idle' };
       error = message(e);
+    } finally {
+      await focusVote();
     }
   }
   async function undo() {
@@ -62,6 +76,8 @@
     } catch (e) {
       vote = { kind: 'saved', card, applies };
       error = message(e);
+    } finally {
+      await focusVote();
     }
   }
   onMount(() => {
@@ -69,7 +85,7 @@
   });
 </script>
 
-<div class="review-wrap">
+<div class="review-wrap" bind:this={wrap}>
   <div class="page-heading">
     <span class="eyebrow">Teach it what matters</span>
     <h1>A second look</h1>
@@ -95,14 +111,18 @@
           : vote.kind === 'undoing'
             ? 'Undoing…'
             : `Labelled ${vote.applies ? 'yes' : 'no'}.`}</span
-      ><button onclick={undo} disabled={vote.kind !== 'saved'}>Undo</button>
+      ><button class="undo" onclick={undo} disabled={vote.kind !== 'saved'}
+        >Undo</button
+      >
     </div>{/if}
   {#if loading}<Skeleton
       label="Loading Review queue…"
     />{:else if shown.length}<div class="review-stage">
       {#each shown as current (current.id)}<article
           class="card"
-          transition:enter
+          in:enter
+          out:fade={fadeOptions()}
+          data-review-id={current.id}
           data-testid="review-card"
         >
           <div class="row between">
@@ -164,7 +184,7 @@
         </article>{/each}
     </div>{:else}<div class="empty" in:enter>
       <span style="font-size:30px;color:var(--accent)">✓</span>
-      <h2 style="margin-top:14px">You’re all caught up</h2>
+      <h2 tabindex="-1" style="margin-top:14px">You’re all caught up</h2>
       <p>No unreviewed decisions in this batch.</p>
       <button onclick={refresh} disabled={busy}>Check for more</button>
     </div>{/if}

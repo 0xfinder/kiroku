@@ -680,8 +680,6 @@ footer {
 
 :root {
   --motion-fast: 150ms;
-  --motion-enter: 300ms;
-  --motion-reorder: 220ms;
   --motion-ease: cubic-bezier(0.215, 0.61, 0.355, 1);
 }
 button,
@@ -770,8 +768,6 @@ main {
 @media (prefers-reduced-motion: reduce) {
   :root {
     --motion-fast: 0ms;
-    --motion-enter: 0ms;
-    --motion-reorder: 0ms;
   }
   *,
   *::before,

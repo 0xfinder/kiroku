@@ -1,5 +1,5 @@
 import { cubicOut } from 'svelte/easing';
-import { fly } from 'svelte/transition';
+import { fade, fly } from 'svelte/transition';
 import type { Utterance } from './api';
 
 export function reducedMotion(): boolean {
@@ -9,7 +9,7 @@ export function reducedMotion(): boolean {
   );
 }
 
-// Durations mirror the CSS tokens; read the preference at use time so changes apply live.
+// Read the preference at use time so changes apply live.
 export function motionDuration(
   duration = 300,
   reduced = reducedMotion(),
@@ -28,8 +28,13 @@ export function enter(node: Element, enabled = true) {
   });
 }
 
-export function fadeOptions() {
-  return { duration: motionDuration(150), easing: cubicOut };
+export function fadeIn(node: Element, enabled = true) {
+  const options = fadeOptions(enabled);
+  return options.duration === 0 ? { duration: 0 } : fade(node, options);
+}
+
+export function fadeOptions(enabled = true) {
+  return { duration: enabled ? motionDuration(150) : 0, easing: cubicOut };
 }
 
 export function flipOptions() {
