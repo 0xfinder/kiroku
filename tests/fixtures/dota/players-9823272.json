@@ -1,0 +1,93 @@
+[
+  {
+    "account_id": 312436974,
+    "name": "CHIRA_JUNIOR",
+    "games_played": 358,
+    "wins": 219,
+    "is_current_team_member": true
+  },
+  {
+    "account_id": 171262902,
+    "name": "\u533b\u8005watson`",
+    "games_played": 320,
+    "wins": 204,
+    "is_current_team_member": true
+  },
+  {
+    "account_id": 93817671,
+    "name": "Maladych",
+    "games_played": 320,
+    "wins": 204,
+    "is_current_team_member": true
+  },
+  {
+    "account_id": 103735745,
+    "name": "Saksa",
+    "games_played": 291,
+    "wins": 187,
+    "is_current_team_member": true
+  },
+  {
+    "account_id": 195108598,
+    "name": "Noticed",
+    "games_played": 208,
+    "wins": 120,
+    "is_current_team_member": false
+  },
+  {
+    "account_id": 56351509,
+    "name": "DM",
+    "games_played": 98,
+    "wins": 62,
+    "is_current_team_member": true
+  },
+  {
+    "account_id": 417235485,
+    "name": "prblms",
+    "games_played": 67,
+    "wins": 32,
+    "is_current_team_member": false
+  },
+  {
+    "account_id": 96183976,
+    "name": "naive-",
+    "games_played": 38,
+    "wins": 15,
+    "is_current_team_member": false
+  },
+  {
+    "account_id": 183719386,
+    "name": "AMMAR_THE_F",
+    "games_played": 36,
+    "wins": 29,
+    "is_current_team_member": true
+  },
+  {
+    "account_id": 134556694,
+    "name": "Solo",
+    "games_played": 31,
+    "wins": 12,
+    "is_current_team_member": false
+  },
+  {
+    "account_id": 203351055,
+    "name": "Malik",
+    "games_played": 9,
+    "wins": 5,
+    "is_current_team_member": false
+  },
+  {
+    "account_id": 1202267677,
+    "name": "aik",
+    "games_played": 7,
+    "wins": 3,
+    "is_current_team_member": false
+  },
+  {
+    "account_id": 392006194,
+    "name": null,
+    "games_played": 7,
+    "wins": 3,
+    "is_current_team_member": null
+  }
+]

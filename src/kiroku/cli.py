@@ -35,6 +35,7 @@ from kiroku.gate.llm import LLMGate
 from kiroku.llm.groq import GroqLLM
 from kiroku.notify.telegram import TelegramNotifier
 from kiroku.pack import Pack, pack_selector
+from kiroku.packs.dota import DotaPack
 from kiroku.packs.league import LeaguePack
 from kiroku.packs.league.data import PUBLIC_WEBSITE_KEY
 from kiroku.rules import Rule
@@ -54,6 +55,7 @@ notes_app = typer.Typer(no_args_is_help=True, help="Rolling Notes timeline and d
 app.add_typer(notes_app, name="notes")
 
 PACK_FACTORIES: dict[str, Callable[[httpx.AsyncClient, Settings], Pack]] = {
+    DotaPack.name: lambda http, settings: DotaPack(http, settings.data_dir),
     LeaguePack.name: lambda http, settings: LeaguePack(
         http, settings.data_dir, settings.lolesports_api_key or PUBLIC_WEBSITE_KEY
     ),

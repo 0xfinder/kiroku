@@ -474,3 +474,43 @@ One watch process handles Caedrel and Gorgc, sharing quota and pollers. The clou
 user unit runs `%h/.local/bin/cloudflared` for a remotely managed tunnel with a private
 `%h/.config/kiroku/tunnel-token` file. Lingering keeps the user manager alive. Installing
 or starting services stays with the operator.
+
+## D36. Dota Vocabulary uses title rosters without live data (issue #28)
+
+2026-10-14. D12's second Pack needs no core interface change. Category `Dota 2` selects
+`DotaPack` from the CLI factory registry. The Pack supplies Vocabulary only; `get_live_match`
+returns None and Notes use the core `general` schema. Gate state and canonical recordings
+stay unchanged. Steam live-match APIs and a Dota Notes schema remain later work.
+
+Hero/item names come from OpenDota's dotaconstants. Title teams and current rosters come
+from OpenDota `/teams` and `/teams/{id}/players`, without keys. Whole-word matching accepts
+team names, tags and the name without a conventional `Team ` or `Team. ` prefix. A team
+must have played within 180 days; the newest duplicate name wins. This avoids the stale
+Team. Spirit and unrelated earthspirit found during discovery. Team order follows the title.
+Every named current member is included, including all six Yandex members reported by the API.
+Roster membership does not establish the five players in a match.
+
+The runtime-realistic R1 arm has 15 audited player/hero errors versus 30 with title-only.
+R2's extra Ammar/ATF, watson and Malady aliases has 19, including three lost Satanic mentions.
+Production therefore preserves raw handles, including `AMMAR_THE_F`, and ships no identity
+table, real-name enrichment or handle normalization. The earlier handle/alias arms used
+hindsight heroes/items and are relabelled oracle upper bounds. Their results cannot decide
+this slice. The [spike](../spikes/README.md#2026-10-14-dota-vocabulary-issue-28) records costs,
+all arms, annotations and the limits of one reading-based name audit.
+
+Rejected sources: `proPlayers` has noisy duplicates/stale teams and no real-name field.
+Liquipedia API extracts established identities for the experimental alias table, with a
+contact User-Agent, gzip, requests at least two seconds apart and no parse calls. The
+[retained extracts and attribution](../spikes/results/2026-10-14-dota-vocabulary/sources/README.md)
+are credited to Liquipedia contributors under CC BY-SA 3.0. Production makes no Liquipedia
+calls. R2 provides no measured benefit to justify that dependency or alias maintenance.
+Revisit aliases with more audio and an audio-grounded reference rather than assuming the
+longer prompt helps. A future live-data spike may test actual picks against these oracle arms.
+
+Vocabulary prioritizes the selected rosters, then hero/item names explicitly present in
+the title, then the title tail. There is no fixed hero set. The 350-character budget leaves
+room for continuity; R1's measured prompts use 86–159 of Whisper's 224 tokens. Character
+limits do not guarantee that bound for arbitrary text. `<data_dir>/packs/dota` caches each
+validated response for 24 hours, memoizes parsing by mtime and retains stale data after
+failed refreshes without renewing timestamps. Each source can fail independently. Missing
+cold data leaves the remaining terms or title-only Vocabulary, without stopping capture.

@@ -1,0 +1,233 @@
+[
+  {
+    "account_id": 321580662,
+    "name": "Yatoro",
+    "games_played": 1329,
+    "wins": 831,
+    "is_current_team_member": true
+  },
+  {
+    "account_id": 302214028,
+    "name": "Collapse",
+    "games_played": 1286,
+    "wins": 811,
+    "is_current_team_member": false
+  },
+  {
+    "account_id": 113331514,
+    "name": "Miposhka",
+    "games_played": 1138,
+    "wins": 713,
+    "is_current_team_member": false
+  },
+  {
+    "account_id": 106305042,
+    "name": "Larl",
+    "games_played": 1026,
+    "wins": 632,
+    "is_current_team_member": true
+  },
+  {
+    "account_id": 256156323,
+    "name": "Mira",
+    "games_played": 800,
+    "wins": 503,
+    "is_current_team_member": false
+  },
+  {
+    "account_id": 847565596,
+    "name": "rue",
+    "games_played": 590,
+    "wins": 360,
+    "is_current_team_member": true
+  },
+  {
+    "account_id": 431770905,
+    "name": "TORONTOTOKYO",
+    "games_played": 352,
+    "wins": 227,
+    "is_current_team_member": false
+  },
+  {
+    "account_id": 108958769,
+    "name": "panto",
+    "games_played": 183,
+    "wins": 104,
+    "is_current_team_member": false
+  },
+  {
+    "account_id": 90125566,
+    "name": null,
+    "games_played": 148,
+    "wins": 62,
+    "is_current_team_member": null
+  },
+  {
+    "account_id": 295697470,
+    "name": "Immersion",
+    "games_played": 140,
+    "wins": 60,
+    "is_current_team_member": false
+  },
+  {
+    "account_id": 876110702,
+    "name": null,
+    "games_played": 138,
+    "wins": 58,
+    "is_current_team_member": null
+  },
+  {
+    "account_id": 203351055,
+    "name": "Malik",
+    "games_played": 112,
+    "wins": 59,
+    "is_current_team_member": false
+  },
+  {
+    "account_id": 218231587,
+    "name": "not_me",
+    "games_played": 112,
+    "wins": 71,
+    "is_current_team_member": true
+  },
+  {
+    "account_id": 1044002267,
+    "name": "Satanic",
+    "games_played": 104,
+    "wins": 57,
+    "is_current_team_member": false
+  },
+  {
+    "account_id": 113995822,
+    "name": null,
+    "games_played": 78,
+    "wins": 33,
+    "is_current_team_member": null
+  },
+  {
+    "account_id": 116934015,
+    "name": "dyrachyo",
+    "games_played": 70,
+    "wins": 29,
+    "is_current_team_member": false
+  },
+  {
+    "account_id": 86785083,
+    "name": null,
+    "games_played": 59,
+    "wins": 26,
+    "is_current_team_member": null
+  },
+  {
+    "account_id": 116865891,
+    "name": "Mirele`",
+    "games_played": 55,
+    "wins": 29,
+    "is_current_team_member": false
+  },
+  {
+    "account_id": 92847434,
+    "name": null,
+    "games_played": 48,
+    "wins": 23,
+    "is_current_team_member": null
+  },
+  {
+    "account_id": 140835095,
+    "name": "Batyuk",
+    "games_played": 43,
+    "wins": 20,
+    "is_current_team_member": true
+  },
+  {
+    "account_id": 130801103,
+    "name": null,
+    "games_played": 32,
+    "wins": 11,
+    "is_current_team_member": null
+  },
+  {
+    "account_id": 11550182,
+    "name": null,
+    "games_played": 19,
+    "wins": 4,
+    "is_current_team_member": null
+  },
+  {
+    "account_id": 26316691,
+    "name": null,
+    "games_played": 19,
+    "wins": 4,
+    "is_current_team_member": null
+  },
+  {
+    "account_id": 82305765,
+    "name": null,
+    "games_played": 19,
+    "wins": 4,
+    "is_current_team_member": null
+  },
+  {
+    "account_id": 87586992,
+    "name": null,
+    "games_played": 19,
+    "wins": 4,
+    "is_current_team_member": null
+  },
+  {
+    "account_id": 96196828,
+    "name": null,
+    "games_played": 19,
+    "wins": 4,
+    "is_current_team_member": null
+  },
+  {
+    "account_id": 107023378,
+    "name": null,
+    "games_played": 17,
+    "wins": 10,
+    "is_current_team_member": null
+  },
+  {
+    "account_id": 1239507092,
+    "name": null,
+    "games_played": 14,
+    "wins": 9,
+    "is_current_team_member": null
+  },
+  {
+    "account_id": 159020918,
+    "name": null,
+    "games_played": 11,
+    "wins": 6,
+    "is_current_team_member": null
+  },
+  {
+    "account_id": 480412663,
+    "name": "gpk~",
+    "games_played": 10,
+    "wins": 4,
+    "is_current_team_member": false
+  },
+  {
+    "account_id": 9403474,
+    "name": "yamich",
+    "games_played": 8,
+    "wins": 2,
+    "is_current_team_member": false
+  },
+  {
+    "account_id": 5150808,
+    "name": null,
+    "games_played": 1,
+    "wins": 0,
+    "is_current_team_member": null
+  },
+  {
+    "account_id": 36162063,
+    "name": null,
+    "games_played": 1,
+    "wins": 0,
+    "is_current_team_member": null
+  }
+]

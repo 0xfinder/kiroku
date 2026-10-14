@@ -1,0 +1,1485 @@
+{
+  "blink": {
+    "dname": "Blink Dagger"
+  },
+  "overwhelming_blink": {
+    "dname": "Overwhelming Blink"
+  },
+  "swift_blink": {
+    "dname": "Swift Blink"
+  },
+  "arcane_blink": {
+    "dname": "Arcane Blink"
+  },
+  "recipe_arcane_blink": {
+    "dname": "Arcane Blink Recipe"
+  },
+  "recipe_swift_blink": {
+    "dname": "Swift Blink Recipe"
+  },
+  "recipe_overwhelming_blink": {
+    "dname": "Overwhelming Blink Recipe"
+  },
+  "blades_of_attack": {
+    "dname": "Blades of Attack"
+  },
+  "broadsword": {
+    "dname": "Broadsword"
+  },
+  "chainmail": {
+    "dname": "Chainmail"
+  },
+  "splintmail": {
+    "dname": "Splintmail"
+  },
+  "claymore": {
+    "dname": "Claymore"
+  },
+  "helm_of_iron_will": {
+    "dname": "Helm of Iron Will"
+  },
+  "javelin": {
+    "dname": "Javelin"
+  },
+  "mithril_hammer": {
+    "dname": "Mithril Hammer"
+  },
+  "platemail": {
+    "dname": "Platemail"
+  },
+  "quarterstaff": {
+    "dname": "Quarterstaff"
+  },
+  "quelling_blade": {
+    "dname": "Quelling Blade"
+  },
+  "faerie_fire": {
+    "dname": "Faerie Fire"
+  },
+  "infused_raindrop": {
+    "dname": "Infused Raindrops"
+  },
+  "wind_lace": {
+    "dname": "Wind Lace"
+  },
+  "ring_of_protection": {
+    "dname": "Ring of Protection"
+  },
+  "stout_shield": {
+    "dname": "Stout Shield"
+  },
+  "moon_shard": {
+    "dname": "Moon Shard"
+  },
+  "gauntlets": {
+    "dname": "Gauntlets of Strength"
+  },
+  "slippers": {
+    "dname": "Slippers of Agility"
+  },
+  "mantle": {
+    "dname": "Mantle of Intelligence"
+  },
+  "branches": {
+    "dname": "Iron Branch"
+  },
+  "belt_of_strength": {
+    "dname": "Belt of Strength"
+  },
+  "boots_of_elves": {
+    "dname": "Band of Elvenskin"
+  },
+  "robe": {
+    "dname": "Robe of the Magi"
+  },
+  "circlet": {
+    "dname": "Circlet"
+  },
+  "crown": {
+    "dname": "Crown"
+  },
+  "diadem": {
+    "dname": "Diadem"
+  },
+  "ogre_axe": {
+    "dname": "Ogre Axe"
+  },
+  "blade_of_alacrity": {
+    "dname": "Blade of Alacrity"
+  },
+  "staff_of_wizardry": {
+    "dname": "Staff of Wizardry"
+  },
+  "ultimate_orb": {
+    "dname": "Ultimate Orb"
+  },
+  "gloves": {
+    "dname": "Gloves of Haste"
+  },
+  "blitz_knuckles": {
+    "dname": "Blitz Knuckles"
+  },
+  "lifesteal": {
+    "dname": "Morbid Mask"
+  },
+  "voodoo_mask": {
+    "dname": "Voodoo Mask"
+  },
+  "ring_of_regen": {
+    "dname": "Ring of Regen"
+  },
+  "sobi_mask": {
+    "dname": "Sage's Mask"
+  },
+  "boots": {
+    "dname": "Boots of Speed"
+  },
+  "gem": {
+    "dname": "Gem of True Sight"
+  },
+  "shawl": {
+    "dname": "Shawl"
+  },
+  "cloak": {
+    "dname": "Cloak"
+  },
+  "talisman_of_evasion": {
+    "dname": "Talisman of Evasion"
+  },
+  "cheese": {
+    "dname": "Cheese"
+  },
+  "magic_stick": {
+    "dname": "Magic Stick"
+  },
+  "recipe_magic_wand": {
+    "dname": "Magic Wand Recipe"
+  },
+  "magic_wand": {
+    "dname": "Magic Wand"
+  },
+  "ghost": {
+    "dname": "Ghost Scepter"
+  },
+  "clarity": {
+    "dname": "Clarity"
+  },
+  "enchanted_mango": {
+    "dname": "Enchanted Mango"
+  },
+  "famango": {
+    "dname": "Healing Lotus"
+  },
+  "great_famango": {
+    "dname": "Great Healing Lotus"
+  },
+  "greater_famango": {
+    "dname": "Greater Healing Lotus"
+  },
+  "blood_grenade": {
+    "dname": "Blood Grenade"
+  },
+  "royale_with_cheese": {
+    "dname": "Block of Cheese"
+  },
+  "flask": {
+    "dname": "Healing Salve"
+  },
+  "dust": {
+    "dname": "Dust of Appearance"
+  },
+  "bottle": {
+    "dname": "Bottle"
+  },
+  "ward_observer": {
+    "dname": "Observer Ward"
+  },
+  "ward_sentry": {
+    "dname": "Sentry Ward"
+  },
+  "ward_dispenser": {
+    "dname": "Observer and Sentry Wards"
+  },
+  "tango": {
+    "dname": "Tango"
+  },
+  "tango_single": {
+    "dname": "Tango (Shared)"
+  },
+  "courier": {
+    "dname": "Animal Courier"
+  },
+  "flying_courier": {
+    "dname": "Flying Courier"
+  },
+  "tpscroll": {
+    "dname": "Town Portal Scroll"
+  },
+  "recipe_travel_boots": {
+    "dname": "Boots of Travel Recipe"
+  },
+  "travel_boots": {
+    "dname": "Boots of Travel"
+  },
+  "travel_boots_2": {
+    "dname": "Boots of Travel 2"
+  },
+  "phase_boots": {
+    "dname": "Phase Boots"
+  },
+  "demon_edge": {
+    "dname": "Demon Edge"
+  },
+  "eagle": {
+    "dname": "Eaglesong"
+  },
+  "reaver": {
+    "dname": "Reaver"
+  },
+  "relic": {
+    "dname": "Sacred Relic"
+  },
+  "hyperstone": {
+    "dname": "Hyperstone"
+  },
+  "ring_of_health": {
+    "dname": "Ring of Health"
+  },
+  "ring_of_tarrasque": {
+    "dname": "Ring of Tarrasque"
+  },
+  "void_stone": {
+    "dname": "Void Stone"
+  },
+  "tiara_of_selemene": {
+    "dname": "Tiara of Selemene"
+  },
+  "mystic_staff": {
+    "dname": "Mystic Staff"
+  },
+  "energy_booster": {
+    "dname": "Energy Booster"
+  },
+  "point_booster": {
+    "dname": "Point Booster"
+  },
+  "vitality_booster": {
+    "dname": "Vitality Booster"
+  },
+  "fluffy_hat": {
+    "dname": "Fluffy Hat"
+  },
+  "wizard_hat": {
+    "dname": "Wizard Hat"
+  },
+  "power_treads": {
+    "dname": "Power Treads"
+  },
+  "recipe_phylactery": {
+    "dname": "Phylactery Recipe"
+  },
+  "phylactery": {
+    "dname": "Phylactery"
+  },
+  "angels_demise": {
+    "dname": "Khanda"
+  },
+  "recipe_hand_of_midas": {
+    "dname": "Hand of Midas Recipe"
+  },
+  "hand_of_midas": {
+    "dname": "Hand of Midas"
+  },
+  "oblivion_staff": {
+    "dname": "Oblivion Staff"
+  },
+  "recipe_witch_blade": {
+    "dname": "Witch Blade Recipe"
+  },
+  "witch_blade": {
+    "dname": "Witch Blade"
+  },
+  "pers": {
+    "dname": "Perseverance"
+  },
+  "cornucopia": {
+    "dname": "Cornucopia"
+  },
+  "poor_mans_shield": {
+    "dname": "Poor Man's Shield"
+  },
+  "recipe_bracer": {
+    "dname": "Bracer Recipe"
+  },
+  "bracer": {
+    "dname": "Bracer"
+  },
+  "recipe_wraith_band": {
+    "dname": "Wraith Band Recipe"
+  },
+  "wraith_band": {
+    "dname": "Wraith Band"
+  },
+  "recipe_null_talisman": {
+    "dname": "Null Talisman Recipe"
+  },
+  "null_talisman": {
+    "dname": "Null Talisman"
+  },
+  "recipe_mekansm": {
+    "dname": "Mekansm Recipe"
+  },
+  "mekansm": {
+    "dname": "Mekansm"
+  },
+  "vladmir": {
+    "dname": "Vladmir's Offering"
+  },
+  "recipe_wraith_pact": {},
+  "wraith_pact": {
+    "dname": "Wraith Pact"
+  },
+  "recipe_buckler": {
+    "dname": "Buckler Recipe"
+  },
+  "buckler": {
+    "dname": "Buckler"
+  },
+  "recipe_ring_of_basilius": {
+    "dname": "Ring of Basilius Recipe"
+  },
+  "ring_of_basilius": {
+    "dname": "Ring of Basilius"
+  },
+  "recipe_holy_locket": {
+    "dname": "Holy Locket Recipe"
+  },
+  "holy_locket": {
+    "dname": "Holy Locket"
+  },
+  "recipe_pipe": {
+    "dname": "Pipe of Insight Recipe"
+  },
+  "pipe": {
+    "dname": "Pipe of Insight"
+  },
+  "recipe_urn_of_shadows": {
+    "dname": "Urn of Shadows Recipe"
+  },
+  "urn_of_shadows": {
+    "dname": "Urn of Shadows"
+  },
+  "recipe_headdress": {
+    "dname": "Headdress Recipe"
+  },
+  "headdress": {
+    "dname": "Headdress"
+  },
+  "recipe_sheepstick": {
+    "dname": "Scythe of Vyse Recipe"
+  },
+  "sheepstick": {
+    "dname": "Scythe of Vyse"
+  },
+  "caster_rapier": {},
+  "recipe_orchid": {
+    "dname": "Orchid Malevolence Recipe"
+  },
+  "orchid": {
+    "dname": "Orchid Malevolence"
+  },
+  "recipe_bloodthorn": {
+    "dname": "Bloodthorn Recipe"
+  },
+  "bloodthorn": {
+    "dname": "Bloodthorn"
+  },
+  "echo_sabre": {
+    "dname": "Echo Sabre"
+  },
+  "recipe_cyclone": {
+    "dname": "Eul's Scepter Recipe"
+  },
+  "cyclone": {
+    "dname": "Eul's Scepter of Divinity"
+  },
+  "recipe_wind_waker": {
+    "dname": "Wind Waker Recipe"
+  },
+  "wind_waker": {
+    "dname": "Wind Waker"
+  },
+  "recipe_aether_lens": {
+    "dname": "Aether Lens Recipe"
+  },
+  "aether_lens": {
+    "dname": "Aether Lens"
+  },
+  "recipe_force_staff": {
+    "dname": "Force Staff Recipe"
+  },
+  "force_staff": {
+    "dname": "Force Staff"
+  },
+  "recipe_hurricane_pike": {
+    "dname": "Hurricane Pike Recipe"
+  },
+  "hurricane_pike": {
+    "dname": "Hurricane Pike"
+  },
+  "recipe_dagon": {
+    "dname": "Dagon Recipe"
+  },
+  "dagon": {
+    "dname": "Dagon"
+  },
+  "dagon_2": {
+    "dname": "Dagon"
+  },
+  "dagon_3": {
+    "dname": "Dagon"
+  },
+  "dagon_4": {
+    "dname": "Dagon"
+  },
+  "dagon_5": {
+    "dname": "Dagon"
+  },
+  "recipe_necronomicon": {
+    "dname": "Necronomicon Recipe"
+  },
+  "necronomicon": {
+    "dname": "Necronomicon"
+  },
+  "necronomicon_2": {
+    "dname": "Necronomicon"
+  },
+  "necronomicon_3": {
+    "dname": "Necronomicon"
+  },
+  "ultimate_scepter": {
+    "dname": "Aghanim's Scepter"
+  },
+  "recipe_ultimate_scepter_2": {
+    "dname": "Aghanim's Blessing Recipe"
+  },
+  "ultimate_scepter_2": {
+    "dname": "Aghanim's Blessing"
+  },
+  "ultimate_scepter_roshan": {
+    "dname": "Aghanim's Blessing - Roshan"
+  },
+  "aghanims_shard": {
+    "dname": "Aghanim's Shard"
+  },
+  "aghanims_shard_roshan": {
+    "dname": "Aghanim's Shard - Consumable"
+  },
+  "eldwurms_edda": {
+    "dname": "Eldwurm's Edda"
+  },
+  "recipe_refresher": {
+    "dname": "Refresher Orb Recipe"
+  },
+  "refresher": {
+    "dname": "Refresher Orb"
+  },
+  "recipe_assault": {
+    "dname": "Assault Cuirass Recipe"
+  },
+  "assault": {
+    "dname": "Assault Cuirass"
+  },
+  "recipe_heart": {
+    "dname": "Heart of Tarrasque Recipe"
+  },
+  "heart": {
+    "dname": "Heart of Tarrasque"
+  },
+  "recipe_black_king_bar": {
+    "dname": "Black King Bar Recipe"
+  },
+  "black_king_bar": {
+    "dname": "Black King Bar"
+  },
+  "aegis": {
+    "dname": "Aegis of the Immortal"
+  },
+  "recipe_shivas_guard": {
+    "dname": "Shiva's Guard Recipe"
+  },
+  "shivas_guard": {
+    "dname": "Shiva's Guard"
+  },
+  "bloodstone": {
+    "dname": "Bloodstone"
+  },
+  "recipe_sphere": {
+    "dname": "Linken's Sphere Recipe"
+  },
+  "sphere": {
+    "dname": "Linken's Sphere"
+  },
+  "recipe_lotus_orb": {
+    "dname": "Lotus Orb Recipe"
+  },
+  "lotus_orb": {
+    "dname": "Lotus Orb"
+  },
+  "recipe_meteor_hammer": {
+    "dname": "Meteor Hammer Recipe"
+  },
+  "meteor_hammer": {
+    "dname": "Meteor Hammer"
+  },
+  "nullifier": {
+    "dname": "Nullifier"
+  },
+  "recipe_aeon_disk": {
+    "dname": "Aeon Disk Recipe"
+  },
+  "aeon_disk": {
+    "dname": "Aeon Disk"
+  },
+  "recipe_kaya": {
+    "dname": "Kaya Recipe"
+  },
+  "kaya": {
+    "dname": "Kaya"
+  },
+  "trident": {
+    "dname": "Trident"
+  },
+  "refresher_shard": {
+    "dname": "Refresher Shard"
+  },
+  "recipe_spirit_vessel": {
+    "dname": "Spirit Vessel Recipe"
+  },
+  "spirit_vessel": {
+    "dname": "Spirit Vessel"
+  },
+  "recipe_essence_distiller": {
+    "dname": "Essence Distiller Recipe"
+  },
+  "essence_distiller": {
+    "dname": "Essence Distiller"
+  },
+  "vanguard": {
+    "dname": "Vanguard"
+  },
+  "recipe_crimson_guard": {
+    "dname": "Crimson Guard Recipe"
+  },
+  "crimson_guard": {
+    "dname": "Crimson Guard"
+  },
+  "recipe_blade_mail": {
+    "dname": "Blade Mail Recipe"
+  },
+  "blade_mail": {
+    "dname": "Blade Mail"
+  },
+  "soul_booster": {
+    "dname": "Soul Booster"
+  },
+  "hood_of_defiance": {
+    "dname": "Hood of Defiance"
+  },
+  "recipe_eternal_shroud": {
+    "dname": "Eternal Shroud Recipe"
+  },
+  "eternal_shroud": {
+    "dname": "Eternal Shroud"
+  },
+  "recipe_consecrated_wraps": {
+    "dname": "Consecrated Wraps Recipe"
+  },
+  "consecrated_wraps": {
+    "dname": "Consecrated Wraps"
+  },
+  "recipe_crellas_crozier": {
+    "dname": "Crella's Crozier Recipe"
+  },
+  "crellas_crozier": {
+    "dname": "Crella's Crozier"
+  },
+  "rapier": {
+    "dname": "Divine Rapier"
+  },
+  "recipe_monkey_king_bar": {
+    "dname": "Monkey King Bar Recipe"
+  },
+  "monkey_king_bar": {
+    "dname": "Monkey King Bar"
+  },
+  "radiance": {
+    "dname": "Radiance"
+  },
+  "butterfly": {
+    "dname": "Butterfly"
+  },
+  "recipe_greater_crit": {
+    "dname": "Daedalus Recipe"
+  },
+  "greater_crit": {
+    "dname": "Daedalus"
+  },
+  "recipe_basher": {
+    "dname": "Skull Basher Recipe"
+  },
+  "basher": {
+    "dname": "Skull Basher"
+  },
+  "recipe_bfury": {
+    "dname": "Battle Fury Recipe"
+  },
+  "bfury": {
+    "dname": "Battle Fury"
+  },
+  "recipe_manta": {
+    "dname": "Manta Style Recipe"
+  },
+  "manta": {
+    "dname": "Manta Style"
+  },
+  "recipe_lesser_crit": {
+    "dname": "Crystalys Recipe"
+  },
+  "lesser_crit": {
+    "dname": "Crystalys"
+  },
+  "recipe_dragon_lance": {
+    "dname": "Dragon Lance Recipe"
+  },
+  "dragon_lance": {
+    "dname": "Dragon Lance"
+  },
+  "recipe_armlet": {
+    "dname": "Armlet of Mordiggian Recipe"
+  },
+  "armlet": {
+    "dname": "Armlet of Mordiggian"
+  },
+  "invis_sword": {
+    "dname": "Shadow Blade"
+  },
+  "recipe_silver_edge": {
+    "dname": "Silver Edge Recipe"
+  },
+  "silver_edge": {
+    "dname": "Silver Edge"
+  },
+  "sange_and_yasha": {
+    "dname": "Sange and Yasha"
+  },
+  "kaya_and_sange": {
+    "dname": "Kaya and Sange"
+  },
+  "yasha_and_kaya": {
+    "dname": "Yasha and Kaya"
+  },
+  "satanic": {
+    "dname": "Satanic"
+  },
+  "recipe_mjollnir": {
+    "dname": "Mjollnir Recipe"
+  },
+  "mjollnir": {
+    "dname": "Mjollnir"
+  },
+  "skadi": {
+    "dname": "Eye of Skadi"
+  },
+  "recipe_sange": {
+    "dname": "Sange Recipe"
+  },
+  "sange": {
+    "dname": "Sange"
+  },
+  "recipe_helm_of_the_dominator": {
+    "dname": "Helm of the Dominator Recipe"
+  },
+  "helm_of_the_dominator": {
+    "dname": "Helm of the Dominator"
+  },
+  "recipe_helm_of_the_overlord": {
+    "dname": "Helm of the Overlord Recipe"
+  },
+  "helm_of_the_overlord": {
+    "dname": "Helm of the Overlord"
+  },
+  "maelstrom": {
+    "dname": "Maelstrom"
+  },
+  "recipe_gungir": {
+    "dname": "Gleipnir Recipe"
+  },
+  "gungir": {
+    "dname": "Gleipnir"
+  },
+  "desolator": {
+    "dname": "Desolator"
+  },
+  "recipe_yasha": {
+    "dname": "Yasha Recipe"
+  },
+  "yasha": {
+    "dname": "Yasha"
+  },
+  "mask_of_madness": {
+    "dname": "Mask of Madness"
+  },
+  "recipe_diffusal_blade": {
+    "dname": "Diffusal Blade Recipe"
+  },
+  "diffusal_blade": {
+    "dname": "Diffusal Blade"
+  },
+  "recipe_disperser": {
+    "dname": "Disperser Recipe"
+  },
+  "disperser": {
+    "dname": "Disperser"
+  },
+  "recipe_ethereal_blade": {
+    "dname": "Ethereal Blade Recipe"
+  },
+  "ethereal_blade": {
+    "dname": "Ethereal Blade"
+  },
+  "recipe_soul_ring": {
+    "dname": "Soul Ring Recipe"
+  },
+  "soul_ring": {
+    "dname": "Soul Ring"
+  },
+  "recipe_arcane_boots": {
+    "dname": "Arcane Boots Recipe"
+  },
+  "arcane_boots": {
+    "dname": "Arcane Boots"
+  },
+  "recipe_octarine_core": {
+    "dname": "Octarine Core Recipe"
+  },
+  "octarine_core": {
+    "dname": "Octarine Core"
+  },
+  "orb_of_venom": {
+    "dname": "Orb of Venom"
+  },
+  "blight_stone": {
+    "dname": "Orb of Blight"
+  },
+  "orb_of_corrosion": {
+    "dname": "Orb of Corrosion"
+  },
+  "orb_of_frost": {
+    "dname": "Orb of Frost"
+  },
+  "recipe_falcon_blade": {
+    "dname": "Falcon Blade Recipe"
+  },
+  "falcon_blade": {
+    "dname": "Falcon Blade"
+  },
+  "mage_slayer": {
+    "dname": "Mage Slayer"
+  },
+  "recipe_ancient_janggo": {
+    "dname": "Drum of Endurance Recipe"
+  },
+  "ancient_janggo": {
+    "dname": "Drum of Endurance"
+  },
+  "boots_of_bearing": {
+    "dname": "Boots of Bearing"
+  },
+  "medallion_of_courage": {
+    "dname": "Medallion of Courage"
+  },
+  "recipe_solar_crest": {
+    "dname": "Solar Crest Recipe"
+  },
+  "solar_crest": {
+    "dname": "Solar Crest"
+  },
+  "recipe_pavise": {
+    "dname": "Pavise Recipe"
+  },
+  "pavise": {
+    "dname": "Pavise"
+  },
+  "smoke_of_deceit": {
+    "dname": "Smoke of Deceit"
+  },
+  "tome_of_knowledge": {
+    "dname": "Tome of Knowledge"
+  },
+  "recipe_veil_of_discord": {
+    "dname": "Veil of Discord Recipe"
+  },
+  "veil_of_discord": {
+    "dname": "Veil of Discord"
+  },
+  "recipe_revenants_brooch": {
+    "dname": "Revenant's Brooch Recipe"
+  },
+  "revenants_brooch": {
+    "dname": "Revenant's Brooch"
+  },
+  "recipe_devastator": {
+    "dname": "Parasma Recipe"
+  },
+  "devastator": {
+    "dname": "Parasma"
+  },
+  "recipe_guardian_greaves": {
+    "dname": "Guardian Greaves Recipe"
+  },
+  "guardian_greaves": {
+    "dname": "Guardian Greaves"
+  },
+  "recipe_rod_of_atos": {
+    "dname": "Rod of Atos Recipe"
+  },
+  "rod_of_atos": {
+    "dname": "Rod of Atos"
+  },
+  "recipe_iron_talon": {
+    "dname": "Iron Talon Recipe"
+  },
+  "iron_talon": {
+    "dname": "Iron Talon"
+  },
+  "recipe_abyssal_blade": {
+    "dname": "Abyssal Blade Recipe"
+  },
+  "abyssal_blade": {
+    "dname": "Abyssal Blade"
+  },
+  "recipe_heavens_halberd": {
+    "dname": "Heaven's Halberd Recipe"
+  },
+  "heavens_halberd": {
+    "dname": "Heaven's Halberd"
+  },
+  "ring_of_aquila": {
+    "dname": "Ring of Aquila"
+  },
+  "tranquil_boots": {
+    "dname": "Tranquil Boots"
+  },
+  "shadow_amulet": {
+    "dname": "Shadow Amulet"
+  },
+  "recipe_glimmer_cape": {
+    "dname": "Glimmer Cape Recipe"
+  },
+  "glimmer_cape": {
+    "dname": "Glimmer Cape"
+  },
+  "river_painter": {
+    "dname": "River Vial: Chrome"
+  },
+  "river_painter2": {
+    "dname": "River Vial: Dry"
+  },
+  "river_painter3": {
+    "dname": "River Vial: Slime"
+  },
+  "river_painter4": {
+    "dname": "River Vial: Oil"
+  },
+  "river_painter5": {
+    "dname": "River Vial: Electrified"
+  },
+  "river_painter6": {
+    "dname": "River Vial: Potion"
+  },
+  "river_painter7": {
+    "dname": "River Vial: Blood"
+  },
+  "mutation_tombstone": {
+    "dname": "Tombstone"
+  },
+  "super_blink": {},
+  "pocket_tower": {
+    "dname": "Pocket Tower"
+  },
+  "pocket_roshan": {
+    "dname": "Pocket Roshan"
+  },
+  "keen_optic": {
+    "dname": "Keen Optic"
+  },
+  "grove_bow": {
+    "dname": "Grove Bow"
+  },
+  "quickening_charm": {
+    "dname": "Quickening Charm"
+  },
+  "philosophers_stone": {
+    "dname": "Philosopher's Stone"
+  },
+  "force_boots": {
+    "dname": "Force Boots"
+  },
+  "desolator_2": {
+    "dname": "Stygian Desolator"
+  },
+  "phoenix_ash": {
+    "dname": "Phoenix Ash"
+  },
+  "seer_stone": {
+    "dname": "Seer Stone"
+  },
+  "greater_mango": {},
+  "elixer": {
+    "dname": "Elixir"
+  },
+  "vampire_fangs": {
+    "dname": "Vampire Fangs"
+  },
+  "force_field": {
+    "dname": "Arcanist's Armor"
+  },
+  "black_powder_bag": {
+    "dname": "Blast Rig"
+  },
+  "mechanical_arm": {},
+  "craggy_coat": {
+    "dname": "Craggy Coat"
+  },
+  "greater_faerie_fire": {
+    "dname": "Greater Faerie Fire"
+  },
+  "timeless_relic": {
+    "dname": "Timeless Relic"
+  },
+  "mirror_shield": {
+    "dname": "Mirror Shield"
+  },
+  "ironwood_tree": {
+    "dname": "Ironwood Tree"
+  },
+  "mango_tree": {
+    "dname": "Mango Tree"
+  },
+  "royal_jelly": {
+    "dname": "Royal Jelly"
+  },
+  "pupils_gift": {
+    "dname": "Pupil's Gift"
+  },
+  "tome_of_aghanim": {
+    "dname": "Tome of Aghanim"
+  },
+  "repair_kit": {
+    "dname": "Repair Kit"
+  },
+  "mind_breaker": {
+    "dname": "Mind Breaker"
+  },
+  "third_eye": {
+    "dname": "Third Eye"
+  },
+  "spell_prism": {
+    "dname": "Spell Prism"
+  },
+  "princes_knife": {
+    "dname": "Prince's Knife"
+  },
+  "witless_shako": {
+    "dname": "Witless Shako"
+  },
+  "imp_claw": {
+    "dname": "Imp Claw"
+  },
+  "flicker": {
+    "dname": "Flicker"
+  },
+  "spy_gadget": {
+    "dname": "Telescope"
+  },
+  "spider_legs": {
+    "dname": "Spider Legs"
+  },
+  "helm_of_the_undying": {
+    "dname": "Helm of the Undying"
+  },
+  "vambrace": {
+    "dname": "Vambrace"
+  },
+  "horizon": {},
+  "fusion_rune": {
+    "dname": "Fusion Rune"
+  },
+  "ocean_heart": {
+    "dname": "Ocean Heart"
+  },
+  "spark_of_courage": {
+    "dname": "Spark of Courage"
+  },
+  "broom_handle": {
+    "dname": "Broom Handle"
+  },
+  "trusty_shovel": {
+    "dname": "Trusty Shovel"
+  },
+  "nether_shawl": {
+    "dname": "Nether Shawl"
+  },
+  "dragon_scale": {
+    "dname": "Dragon Scale"
+  },
+  "essence_ring": {
+    "dname": "Essence Ring"
+  },
+  "clumsy_net": {
+    "dname": "Clumsy Net"
+  },
+  "enchanted_quiver": {
+    "dname": "Enchanted Quiver"
+  },
+  "ninja_gear": {
+    "dname": "Ninja Gear"
+  },
+  "illusionsts_cape": {
+    "dname": "Illusionist's Cape"
+  },
+  "havoc_hammer": {
+    "dname": "Havoc Hammer"
+  },
+  "panic_button": {
+    "dname": "Magic Lamp"
+  },
+  "apex": {
+    "dname": "Apex"
+  },
+  "ballista": {
+    "dname": "Ballista"
+  },
+  "woodland_striders": {
+    "dname": "Woodland Striders"
+  },
+  "recipe_trident": {
+    "dname": "Trident Recipe"
+  },
+  "demonicon": {
+    "dname": "Book of the Dead"
+  },
+  "fallen_sky": {
+    "dname": "Fallen Sky"
+  },
+  "pirate_hat": {
+    "dname": "Pirate Hat"
+  },
+  "ex_machina": {
+    "dname": "Ex Machina"
+  },
+  "faded_broach": {
+    "dname": "Faded Broach"
+  },
+  "paladin_sword": {
+    "dname": "Paladin Sword"
+  },
+  "minotaur_horn": {
+    "dname": "Minotaur Horn"
+  },
+  "orb_of_destruction": {
+    "dname": "Orb of Destruction"
+  },
+  "the_leveller": {
+    "dname": "The Leveller"
+  },
+  "arcane_ring": {
+    "dname": "Arcane Ring"
+  },
+  "titan_sliver": {
+    "dname": "Titan Sliver"
+  },
+  "chipped_vest": {
+    "dname": "Chipped Vest"
+  },
+  "elven_tunic": {
+    "dname": "Elven Tunic"
+  },
+  "cloak_of_flames": {
+    "dname": "Cloak of Flames"
+  },
+  "trickster_cloak": {
+    "dname": "Trickster Cloak"
+  },
+  "possessed_mask": {
+    "dname": "Possessed Mask"
+  },
+  "penta_edged_sword": {
+    "dname": "Penta-Edged Sword"
+  },
+  "bullwhip": {
+    "dname": "Bullwhip"
+  },
+  "psychic_headband": {
+    "dname": "Psychic Headband"
+  },
+  "ceremonial_robe": {
+    "dname": "Ceremonial Robe"
+  },
+  "quicksilver_amulet": {
+    "dname": "Quicksilver Amulet"
+  },
+  "book_of_shadows": {
+    "dname": "Book of Shadows"
+  },
+  "giants_ring": {
+    "dname": "Giant's Ring"
+  },
+  "stormcrafter": {
+    "dname": "Stormcrafter"
+  },
+  "mysterious_hat": {
+    "dname": "Fairy's Trinket"
+  },
+  "ascetic_cap": {
+    "dname": "Ascetic's Cap"
+  },
+  "misericorde": {
+    "dname": "Brigand's Blade"
+  },
+  "heavy_blade": {
+    "dname": "Witchbane"
+  },
+  "unstable_wand": {
+    "dname": "Pig Pole"
+  },
+  "pogo_stick": {
+    "dname": "Tumbler's Toy"
+  },
+  "paintball": {
+    "dname": "Fae Grenade"
+  },
+  "seeds_of_serenity": {
+    "dname": "Seeds of Serenity"
+  },
+  "lance_of_pursuit": {
+    "dname": "Lance of Pursuit"
+  },
+  "occult_bracelet": {
+    "dname": "Occult Bracelet"
+  },
+  "ogre_seal_totem": {
+    "dname": "Ogre Seal Totem"
+  },
+  "recipe_harpoon": {
+    "dname": "Harpoon Recipe"
+  },
+  "harpoon": {
+    "dname": "Harpoon"
+  },
+  "defiant_shell": {
+    "dname": "Defiant Shell"
+  },
+  "eye_of_the_vizier": {
+    "dname": "Eye of the Vizier"
+  },
+  "bottomless_chalice": {},
+  "dagger_of_ristul": {
+    "dname": "Dagger of Ristul"
+  },
+  "ofrenda": {
+    "dname": "Beloved Memory"
+  },
+  "ofrenda_shovel": {
+    "dname": "Scrying Shovel"
+  },
+  "ofrenda_pledge": {
+    "dname": "Forebearer's Fortune"
+  },
+  "muertas_gun": {
+    "dname": "Mercy & Grace"
+  },
+  "tier1_token": {
+    "dname": "Tier 1 Token"
+  },
+  "tier2_token": {
+    "dname": "Tier 2 Token"
+  },
+  "tier3_token": {
+    "dname": "Tier 3 Token"
+  },
+  "tier4_token": {
+    "dname": "Tier 4 Token"
+  },
+  "tier5_token": {
+    "dname": "Tier 5 Token"
+  },
+  "vindicators_axe": {
+    "dname": "Vindicator's Axe"
+  },
+  "duelist_gloves": {
+    "dname": "Duelist Gloves"
+  },
+  "ancient_guardian": {
+    "dname": "Ancient Guardian"
+  },
+  "safety_bubble": {
+    "dname": "Safety Bubble"
+  },
+  "whisper_of_the_dread": {
+    "dname": "Whisper of the Dread"
+  },
+  "nemesis_curse": {
+    "dname": "Nemesis Curse"
+  },
+  "avianas_feather": {
+    "dname": "Aviana's Feather"
+  },
+  "unwavering_condition": {
+    "dname": "Unwavering Condition"
+  },
+  "dandelion_amulet": {
+    "dname": "Dandelion Amulet"
+  },
+  "martyrs_plate": {
+    "dname": "Martyr's Plate"
+  },
+  "gossamer_cape": {
+    "dname": "Gossamer Cape"
+  },
+  "light_collector": {
+    "dname": "Light Collector"
+  },
+  "rattlecage": {
+    "dname": "Rattlecage"
+  },
+  "doubloon": {
+    "dname": "Doubloon"
+  },
+  "roshans_banner": {
+    "dname": "Roshan's Banner"
+  },
+  "black_grimoire": {
+    "dname": "Black Grimoire\\n(Warlock)"
+  },
+  "grisgris": {
+    "dname": "Gris-Gris"
+  },
+  "enhancement_vast": {
+    "dname": "Vast"
+  },
+  "enhancement_quickened": {
+    "dname": "Quickened"
+  },
+  "enhancement_audacious": {
+    "dname": "Audacious"
+  },
+  "enhancement_mystical": {
+    "dname": "Mystical"
+  },
+  "enhancement_alert": {
+    "dname": "Alert"
+  },
+  "enhancement_brawny": {
+    "dname": "Brawny"
+  },
+  "enhancement_tough": {
+    "dname": "Tough"
+  },
+  "enhancement_feverish": {
+    "dname": "Feverish"
+  },
+  "enhancement_fleetfooted": {
+    "dname": "Fleetfooted"
+  },
+  "enhancement_crude": {
+    "dname": "Crude"
+  },
+  "enhancement_boundless": {
+    "dname": "Boundless"
+  },
+  "enhancement_wise": {
+    "dname": "Wise"
+  },
+  "enhancement_timeless": {
+    "dname": "Timeless"
+  },
+  "enhancement_greedy": {
+    "dname": "Greedy"
+  },
+  "enhancement_vampiric": {
+    "dname": "Vampiric"
+  },
+  "enhancement_keen_eyed": {
+    "dname": "Keen-eyed"
+  },
+  "enhancement_evolved": {
+    "dname": "Evolved"
+  },
+  "enhancement_titanic": {
+    "dname": "Titanic"
+  },
+  "unrelenting_eye": {
+    "dname": "Unrelenting Eye"
+  },
+  "mana_draught": {
+    "dname": "Mana Draught"
+  },
+  "rippers_lash": {
+    "dname": "Ripper's Lash"
+  },
+  "crippling_crossbow": {
+    "dname": "Crippling Crossbow"
+  },
+  "gale_guard": {
+    "dname": "Gale Guard"
+  },
+  "gunpowder_gauntlets": {
+    "dname": "Gunpowder Gauntlet"
+  },
+  "searing_signet": {
+    "dname": "Searing Signet"
+  },
+  "serrated_shiv": {
+    "dname": "Serrated Shiv"
+  },
+  "polliwog_charm": {
+    "dname": "Pollywog Charm"
+  },
+  "magnifying_monocle": {
+    "dname": "Magnifying Monocle"
+  },
+  "pyrrhic_cloak": {
+    "dname": "Pyrrhic Cloak"
+  },
+  "madstone_bundle": {
+    "dname": "Madstone Bundle"
+  },
+  "miniboss_minion_summoner": {},
+  "kobold_cup": {
+    "dname": "Kobold Cup"
+  },
+  "dormant_curio": {
+    "dname": "Dormant Curio"
+  },
+  "sisters_shroud": {
+    "dname": "Sister's Shroud"
+  },
+  "jidi_pollen_bag": {
+    "dname": "Jidi Pollen Bag"
+  },
+  "outworld_staff": {
+    "dname": "Outworld Staff"
+  },
+  "dezun_bloodrite": {
+    "dname": "Dezun Bloodrite"
+  },
+  "giant_maul": {
+    "dname": "Giant's Maul"
+  },
+  "divine_regalia": {
+    "dname": "Divine Regalia"
+  },
+  "divine_regalia_broken": {
+    "dname": "Disgraced Regalia"
+  },
+  "enhancement_fierce": {
+    "dname": "Fierce"
+  },
+  "enhancement_dominant": {
+    "dname": "Dominant"
+  },
+  "enhancement_restorative": {
+    "dname": "Restorative"
+  },
+  "enhancement_thick": {
+    "dname": "Thick"
+  },
+  "enhancement_curious": {
+    "dname": "Unleashed"
+  },
+  "furion_gold_bag": {
+    "dname": "Bag of Gold"
+  },
+  "recipe_specialists_array": {},
+  "specialists_array": {
+    "dname": "Specialist's Array"
+  },
+  "recipe_hydras_breath": {},
+  "hydras_breath": {
+    "dname": "Hydra's Breath"
+  },
+  "weighted_dice": {
+    "dname": "Weighted Dice"
+  },
+  "ash_legion_shield": {
+    "dname": "Ash Legion Shield"
+  },
+  "riftshadow_prism": {
+    "dname": "Riftshadow Prism"
+  },
+  "metamorphic_mandible": {
+    "dname": "Metamorphic Mandible"
+  },
+  "idol_of_screeauk": {
+    "dname": "Idol of Scree'auk"
+  },
+  "flayers_bota": {
+    "dname": "Flayer's Bota"
+  },
+  "spellslinger": {
+    "dname": "Spellslinger"
+  },
+  "prophets_pendulum": {
+    "dname": "Prophet's Pendulum"
+  },
+  "stonefeather_satchel": {
+    "dname": "Stonefeather Satchel"
+  },
+  "enchanters_bauble": {
+    "dname": "Enchanter's Bauble"
+  },
+  "harmonizer": {
+    "dname": "Harmonizer"
+  },
+  "conjurers_catalyst": {
+    "dname": "Conjurer's Catalyst"
+  },
+  "enhancement_vital": {
+    "dname": "Vital"
+  },
+  "enhancement_hulking": {
+    "dname": "Hulking"
+  },
+  "enhancement_manic": {
+    "dname": "Manic"
+  },
+  "foragers_kit": {
+    "dname": "Forager's Kit"
+  },
+  "foragers_health": {
+    "dname": "Vital Toadstool"
+  },
+  "foragers_stats": {
+    "dname": "Ironwood Nut"
+  },
+  "foragers_mana": {
+    "dname": "Tomo'kan Ringcap"
+  },
+  "chasm_stone": {
+    "dname": "Chasm Stone"
+  },
+  "partisans_brand": {
+    "dname": "Partisan's Brand"
+  },
+  "enhancement_nimble": {
+    "dname": "Nimble"
+  },
+  "tidehunter_fish": {
+    "dname": "Leviathan's Fish"
+  },
+  "diffusal_blade_2": {
+    "dname": "Diffusal Blade"
+  }
+}

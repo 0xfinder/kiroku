@@ -71,9 +71,10 @@ Each phase ends with something that can be observed working.
 
 ### Phase 3 — Dota Pack (Gorgc)
 
-- Dota Pack: Vocabulary from OpenDota constants, Notes schemas.
+- Dota Vocabulary is implemented in issue #28, using cached dotaconstants and title-team OpenDota rosters. The runtime name audit has 15 errors versus 30 with title-only; extra aliases have 19 and are not shipped. No live data in this slice.
+- Dota Notes schemas remain to implement; Dota currently uses core `general` Notes.
 - Dota live-data spike (time-boxed): find Gorgc's game with `GetTopLiveGame`, then check what `GetRealtimeStats` returns. Pro games via `GetLiveLeagueGames`.
-- Extract the Pack interface, and record in decisions.md which core changes Dota forced.
+- The Pack interface was extracted in issue #6. Dota Vocabulary needs no core change; D36 records the source and scope decisions.
 
 ### Phase 4 — Q&A agent
 
