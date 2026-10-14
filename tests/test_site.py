@@ -65,6 +65,7 @@ def test_publish_flips_current_and_keeps_previous_release(site_repo: Path, tmp_p
     assert (release / "index.html").read_bytes() == (SITE / "index.html").read_bytes()
     assert (release / "404.html").is_file()
     assert (release / "favicon.svg").is_file()
+    assert (release / "assets/motion.js").read_bytes() == (SITE / "assets/motion.js").read_bytes()
     assert not (release / "tools").exists()
     for entry in [root, root / "releases", release, *release.rglob("*")]:
         expected = 0o755 if entry.is_dir() else 0o644
@@ -179,3 +180,13 @@ def test_static_payload_is_under_400_kb_and_icon_matches() -> None:
     ]
     assert sum(entry.stat().st_size for entry in payload) < 400_000
     assert (SITE / "favicon.svg").read_bytes() == (PROJECT / "assets/icon.svg").read_bytes()
+
+
+def test_motion_asset_size_and_cache_versions() -> None:
+    assert (SITE / "assets/motion.js").stat().st_size <= 2048
+    for page in SITE.glob("*.html"):
+        parsed = PageLinks()
+        parsed.feed(page.read_text())
+        assets = [urlsplit(link) for link in parsed.links if link.startswith("/assets/")]
+        assert {asset.path for asset in assets} == {"/assets/style.css", "/assets/motion.js"}
+        assert {asset.query for asset in assets} == {"v=2"}
