@@ -255,7 +255,9 @@ test('phone live updates, Notes links, Rules, Review persistence and undo', asyn
       if (view === 'rules')
         await page.getByRole('button', { name: 'predicts winner' }).click();
       if (view === 'review')
-        await expect(page.getByTestId('review-card')).toBeVisible();
+        await expect(
+          page.locator('[data-testid="review-card"]:not([inert])'),
+        ).toBeVisible();
       expect(
         await page.evaluate(
           () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -275,7 +277,9 @@ test('phone live updates, Notes links, Rules, Review persistence and undo', asyn
   await expect(page.getByRole('status')).toContainText('Labelled yes');
   expect(JSON.parse(action('labels'))).toEqual([[true, 'review']]);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await expect(page.getByTestId('review-card')).toContainText('70%');
+  await expect(
+    page.locator('[data-testid="review-card"]:not([inert])'),
+  ).toContainText('70%');
   expect(JSON.parse(action('labels'))).toEqual([]);
   await page.getByRole('button', { name: 'No, it doesn’t' }).click();
   await expect(page.getByRole('status')).toContainText('Labelled no');

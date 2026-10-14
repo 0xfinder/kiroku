@@ -1,5 +1,14 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
+  import { fade } from 'svelte/transition';
+  import {
+    enter,
+    fadeOptions,
+    fadeIn,
+    scrollBehavior,
+    transcriptArrivals,
+  } from '#lib/motion.ts';
+  import Skeleton from '#lib/Skeleton.svelte';
   import { transcriptStream } from '#lib/stream.ts';
   import { page } from '$app/state';
   import { z } from 'zod';
@@ -31,12 +40,24 @@
   let notes = $state<Note[]>([]);
   let alerts = $state<Alert[]>([]);
   let passes = $state<GatePass[]>([]);
-  let error = $state('');
+  let transcriptError = $state('');
+  let refreshError = $state('');
+  let error = $derived(transcriptError || refreshError);
   let connection = $state('Connecting');
   let box = $state<HTMLDivElement>();
   let follow = $state(true);
   let destroyed = false;
+  let loading = $state(true);
+  let scrolling = false;
+  let scrollTimer: ReturnType<typeof setTimeout> | undefined;
+  let stream: ReturnType<typeof transcriptStream> | undefined;
+  let starting = false;
+  let liveReady = false;
+  const arrivals = transcriptArrivals();
+  let enterIds = $state(new Set<number>());
   let reconciling: Promise<void> | null = null;
+  const seenEvents = new Set<string>();
+  let enterEventKeys = $state(new Set<string>());
   let latest = $derived(notes.filter((n) => n.status === 'ok').at(-1));
   const id = Number(page.params.id);
   const at = Number(page.url.searchParams.get('at') ?? -1);
@@ -54,9 +75,73 @@
       })),
     ].sort((a, b) => a.at - b.at),
   );
-  async function scrollLive() {
+  type TranscriptItem =
+    | { kind: 'utterance'; key: string; row: Utterance }
+    | { kind: 'event'; key: string; event: (typeof inline)[number] };
+  let items = $derived.by(() => {
+    const result: TranscriptItem[] = [];
+    let eventIndex = 0;
+    for (const row of rows) {
+      while (
+        eventIndex < inline.length &&
+        inline[eventIndex].at <= row.audio_start_ms
+      ) {
+        const event = inline[eventIndex++];
+        result.push({ kind: 'event', key: `e${event.key}`, event });
+      }
+      result.push({ kind: 'utterance', key: `u${row.id}`, row });
+    }
+    for (; eventIndex < inline.length; eventIndex++) {
+      const event = inline[eventIndex];
+      result.push({ kind: 'event', key: `e${event.key}`, event });
+    }
+    return result;
+  });
+  function stopScrolling() {
+    clearTimeout(scrollTimer);
+    scrolling = false;
+  }
+  function updateFollow() {
+    if (box)
+      follow = atBottom(box.scrollTop, box.clientHeight, box.scrollHeight);
+  }
+  function scrolled() {
+    if (box && atBottom(box.scrollTop, box.clientHeight, box.scrollHeight))
+      stopScrolling();
+    if (!scrolling) updateFollow();
+  }
+  async function scrollLive(smooth = false) {
     await tick();
-    if (box && follow) box.scrollTop = box.scrollHeight;
+    if (box && follow && !destroyed) {
+      stopScrolling();
+      const behavior = scrollBehavior(smooth);
+      scrolling =
+        behavior === 'smooth' &&
+        box.scrollHeight - box.clientHeight > box.scrollTop + 1;
+      if (scrolling)
+        scrollTimer = setTimeout(() => {
+          stopScrolling();
+          updateFollow();
+        }, 600);
+      box.scrollTo({ top: box.scrollHeight, behavior });
+    }
+  }
+  function readerIntent(node: HTMLDivElement) {
+    node.tabIndex = 0;
+    const events = ['wheel', 'touchstart', 'pointerdown', 'keydown'];
+    const interrupt = () => {
+      if (!scrolling) return;
+      stopScrolling();
+      node.scrollTo({ top: node.scrollTop, behavior: 'instant' });
+      updateFollow();
+    };
+    for (const event of events)
+      node.addEventListener(event, interrupt, { passive: true });
+    return {
+      destroy() {
+        for (const event of events) node.removeEventListener(event, interrupt);
+      },
+    };
   }
   let pendingAfter: number | null = null;
   async function reconcile(afterMs = -1, throughId: number | null = null) {
@@ -79,11 +164,16 @@
             after = transcriptCursor(chunk);
           }
           if (!destroyed) {
+            arrivals.accept(
+              incoming,
+              throughId === null ? 'reconcile' : 'snapshot',
+            );
             rows = mergeTranscript(rows, incoming);
+            transcriptError = '';
             await scrollLive();
           }
         } catch (e) {
-          if (!destroyed) error = message(e);
+          if (!destroyed) transcriptError = message(e);
         }
       }
     })();
@@ -103,20 +193,34 @@
       ]);
       if (!destroyed) {
         [session, notes, alerts, passes] = result;
-        error = '';
+        enterEventKeys = new Set(
+          inline
+            .filter((event) => {
+              const unseen = !seenEvents.has(event.key);
+              seenEvents.add(event.key);
+              return unseen && !loading && liveReady;
+            })
+            .map((event) => event.key),
+        );
+        refreshError = '';
         await scrollLive();
       }
     } catch (e) {
-      if (!destroyed) error = message(e);
+      if (!destroyed) refreshError = message(e);
     }
   }
   async function start() {
     follow = at < 0;
-    const cursor = await read(
-      `/sessions/${id}/transcript/cursor`,
-      transcriptCursorSchema,
-    );
-    await Promise.all([reconcile(-1, cursor.id), refresh()]);
+    let cursor: z.infer<typeof transcriptCursorSchema>;
+    try {
+      cursor = await read(
+        `/sessions/${id}/transcript/cursor`,
+        transcriptCursorSchema,
+      );
+      await Promise.all([reconcile(-1, cursor.id), refresh()]);
+    } finally {
+      if (!destroyed) loading = false;
+    }
     if (destroyed) return;
     if (at >= 0) {
       await tick();
@@ -128,13 +232,19 @@
     }
     const after = transcriptCursor(rows);
     let opened = false;
-    const stream = transcriptStream({
+    const openedStream = transcriptStream({
       url: `/api/sessions/${id}/transcript/stream?after_ms=${after}&after_id=${cursor.id}`,
       status: (value) => {
         connection = value;
+        if (value !== 'Connected') liveReady = false;
       },
       opened: () => {
-        if (opened) void reconcile();
+        if (opened) {
+          liveReady = false;
+          void reconcile().then(() => {
+            liveReady = connection === 'Connected' && !destroyed;
+          });
+        } else liveReady = true;
         opened = true;
       },
       failed: () => {
@@ -145,10 +255,14 @@
           const incoming = z
             .array(utteranceSchema)
             .parse(JSON.parse(event.data));
+          enterIds = arrivals.accept(
+            incoming,
+            liveReady ? 'live' : 'reconcile',
+          );
           rows = mergeTranscript(rows, incoming);
-          void scrollLive();
+          void scrollLive(true);
         } catch (e) {
-          error = message(e);
+          transcriptError = message(e);
         }
       },
       reconcile: (event) => {
@@ -156,27 +270,39 @@
           const hint = reconcileSchema.parse(JSON.parse(event.data));
           void reconcile(hint.after_ms);
         } catch (e) {
-          error = message(e);
+          transcriptError = message(e);
         }
       },
     });
-    return stream;
+    return openedStream;
   }
-  onMount(() => {
-    let stream: ReturnType<typeof transcriptStream> | undefined;
-    void start()
+  async function retry() {
+    if (starting) return;
+    if (stream) {
+      await Promise.all([refresh(), reconcile()]);
+      return;
+    }
+    starting = true;
+    await start()
       .then((value) => {
         if (destroyed) value?.close();
         else stream = value;
       })
       .catch((e) => {
-        if (!destroyed) error = message(e);
+        if (!destroyed) transcriptError = message(e);
+      })
+      .finally(() => {
+        starting = false;
       });
+  }
+  onMount(() => {
+    void retry();
     const timer = setInterval(refresh, 30000);
     return () => {
       destroyed = true;
       stream?.close();
       clearInterval(timer);
+      stopScrolling();
     };
   });
 </script>
@@ -198,18 +324,15 @@
 </div>
 {#if error}<p class="error" role="alert">
     {error}
-    <button
-      onclick={() => {
-        void refresh();
-        void reconcile();
-      }}>Retry</button
-    >
+    <button onclick={retry}>Retry</button>
   </p>{/if}
 <div class="session-grid">
   <section>
     <div class="section-head">
       <h2>Transcript</h2>
-      <span class="muted" style="font-size:11px">{connection}</span>
+      <span class="muted connection-status" role="status">
+        {#key connection}<span in:fade={fadeOptions()}>{connection}</span>{/key}
+      </span>
     </div>
     <div class="card transcript-card">
       <div class="transcript-header row between">
@@ -221,41 +344,48 @@
       <div
         class="transcript"
         bind:this={box}
-        onscroll={() => {
-          if (box)
-            follow = atBottom(
-              box.scrollTop,
-              box.clientHeight,
-              box.scrollHeight,
-            );
+        onscroll={scrolled}
+        onscrollend={() => {
+          stopScrolling();
+          updateFollow();
         }}
+        use:readerIntent
+        role="region"
+        aria-label="Live transcript"
         data-testid="transcript"
       >
-        {#if rows.length === 0}<div class="empty" style="border:0">
+        {#if loading && rows.length === 0}<Skeleton
+            label="Loading transcript…"
+          />{:else if rows.length === 0}<div class="empty" style="border:0">
             Waiting for speech…
           </div>{/if}
-        {#each rows as row, i (row.id)}
-          {#each inline.filter((event) => event.at <= row.audio_start_ms && (i === 0 || event.at > rows[i - 1].audio_start_ms)) as event (event.key)}<div
+        {#each items as item (item.key)}
+          {#if item.kind === 'event'}
+            <div
               class="inline-event"
+              in:fadeIn|global={enterEventKeys.has(item.event.key)}
             >
-              {clock(event.at)} · {event.text}
-            </div>{/each}
-          <article class="utterance" id={`u${row.id}`}>
-            <time datetime={row.spoken_at}>{clock(row.audio_start_ms)}</time>
-            <p>{row.text}</p>
-          </article>
+              {clock(item.event.at)} · {item.event.text}
+            </div>
+          {:else}
+            <article
+              class="utterance"
+              id={item.key}
+              in:enter|global={enterIds.has(item.row.id)}
+            >
+              <time datetime={item.row.spoken_at}
+                >{clock(item.row.audio_start_ms)}</time
+              >
+              <p>{item.row.text}</p>
+            </article>
+          {/if}
         {/each}
-        {#each inline.filter((event) => event.at > (rows.at(-1)?.audio_start_ms ?? -1)) as event (event.key)}<div
-            class="inline-event"
-          >
-            {clock(event.at)} · {event.text}
-          </div>{/each}
       </div>
       {#if !follow}<button
           class="jump-live"
           onclick={() => {
             follow = true;
-            void scrollLive();
+            void scrollLive(true);
           }}>↓ Jump to live</button
         >{/if}
     </div>
@@ -265,21 +395,25 @@
       <h2>Latest Notes</h2>
       <a class="muted" href={`/notes?session=${id}`}>View timeline ↗</a>
     </div>
-    {#if latest}<article class="card note-card">
-        <div class="row between">
-          <span class="eyebrow"
-            >{clock(latest.start_ms)} — {clock(latest.end_ms)}</span
-          ><span class="chip"
-            >{latest.mode?.replaceAll('_', ' ') ?? 'unknown'}</span
+    {#if latest}{#key latest.id}<article class="card note-card" in:enter>
+          <div class="row between">
+            <span class="eyebrow"
+              >{clock(latest.start_ms)} — {clock(latest.end_ms)}</span
+            ><span class="chip"
+              >{latest.mode?.replaceAll('_', ' ') ?? 'unknown'}</span
+            >
+          </div>
+          <p style="margin-top:16px">
+            {typeof latest.body?.summary === 'string'
+              ? latest.body.summary
+              : ''}
+          </p>
+          <a href={`/notes?session=${id}`} class="muted"
+            >Read timestamped items ↗</a
           >
-        </div>
-        <p style="margin-top:16px">
-          {typeof latest.body?.summary === 'string' ? latest.body.summary : ''}
-        </p>
-        <a href={`/notes?session=${id}`} class="muted"
-          >Read timestamped items ↗</a
-        >
-      </article>{:else}<div class="empty">Notes will appear here.</div>{/if}
+        </article>{/key}{:else}<div class="empty">
+        Notes will appear here.
+      </div>{/if}
     <div class="notice">
       The transcript follows live while you’re at the bottom. Scroll up to
       pause.

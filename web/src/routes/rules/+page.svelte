@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { flip } from 'svelte/animate';
+  import { enter, flipOptions } from '#lib/motion.ts';
+  import Skeleton from '#lib/Skeleton.svelte';
   import { access } from '#lib/access.ts';
   import { onMount } from 'svelte';
   import { z } from 'zod';
@@ -167,39 +170,44 @@
   >{/if}
 <div class="rule-layout">
   <section class="stack" aria-label="Rules">
-    {#if loading}<div class="empty">
-        Loading Rules…
-      </div>{:else if rules.length === 0}<div class="empty">
+    {#if loading}<Skeleton
+        label="Loading Rules…"
+      />{:else if rules.length === 0}<div class="empty">
         No Rules yet. Start with a concrete event you care about.
-      </div>{/if}{#each rules as rule}{#if !$access.owner}<article class="card">
-          <h2>{rule.name.replaceAll('_', ' ')}</h2>
-          <p>{rule.instructions}</p>
-          <p class="muted">
-            {Math.round(rule.threshold * 100)}% threshold · {rule.cooldown_s}s
-            Cooldown · {rule.pack ?? 'Any Pack'} · {rule.enabled
-              ? 'Enabled'
-              : 'Disabled'}
-          </p>
-        </article>{:else}<button
-          class="rule-button"
-          class:selected={selected === rule.name}
-          disabled={busy || testing}
-          onclick={() => choose(rule)}
-          ><div class="row between">
-            <strong>{rule.name.replaceAll('_', ' ')}</strong><span
-              class="chip"
-              class:live={rule.enabled}
-              >{rule.enabled ? 'Enabled' : 'Disabled'}</span
-            >
-          </div>
-          <small
-            >{Math.round(rule.threshold * 100)}% threshold · {rule.pack ??
-              'Any Pack'}</small
-          ></button
-        >{/if}{/each}
+      </div>{/if}{#each rules as rule (rule.name)}<div
+        transition:enter
+        animate:flip={flipOptions()}
+      >
+        {#if !$access.owner}<article class="card">
+            <h2>{rule.name.replaceAll('_', ' ')}</h2>
+            <p>{rule.instructions}</p>
+            <p class="muted">
+              {Math.round(rule.threshold * 100)}% threshold · {rule.cooldown_s}s
+              Cooldown · {rule.pack ?? 'Any Pack'} · {rule.enabled
+                ? 'Enabled'
+                : 'Disabled'}
+            </p>
+          </article>{:else}<button
+            class="rule-button"
+            class:selected={selected === rule.name}
+            disabled={busy || testing}
+            onclick={() => choose(rule)}
+            ><div class="row between">
+              <strong>{rule.name.replaceAll('_', ' ')}</strong><span
+                class="chip"
+                class:live={rule.enabled}
+                >{rule.enabled ? 'Enabled' : 'Disabled'}</span
+              >
+            </div>
+            <small
+              >{Math.round(rule.threshold * 100)}% threshold · {rule.pack ??
+                'Any Pack'}</small
+            ></button
+          >{/if}
+      </div>{/each}
   </section>
   {#if $access.owner}<section>
-      {#if editing}<div class="card">
+      {#if editing}<div class="card" in:enter>
           <h2>{selected ? 'Edit Rule' : 'New Rule'}</h2>
           <form onsubmit={save}>
             <label for="name">Name</label><input
@@ -317,7 +325,11 @@
           <h2>What are you listening for?</h2>
           <p>Choose a Rule to adjust its wording, or create a new one.</p>
         </div>{/if}
-      {#if report}<article class="card" style="margin-top:18px">
+      {#if report}<article
+          transition:enter
+          class="card"
+          style="margin-top:18px"
+        >
           <span class="eyebrow">Test results</span>
           <h2 style="margin-top:10px">
             {report.passed} of {report.scored} Windows pass

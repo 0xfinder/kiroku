@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { onNavigate } from '$app/navigation';
+  import { reducedMotion, fadeOptions } from '#lib/motion.ts';
+  import { fade } from 'svelte/transition';
   import { onMount } from 'svelte';
   import { serverAvailable } from '#lib/connectivity.ts';
   import {
@@ -16,6 +19,17 @@
     const monitor = monitorAccess();
     retry = monitor.retry;
     return monitor.stop;
+  });
+  onNavigate((navigation) => {
+    if (reducedMotion() || !document.startViewTransition) return;
+    return new Promise<void>((resolve) => {
+      const transition = document.startViewTransition(async () => {
+        resolve();
+        await navigation.complete;
+      });
+      // A skipped transition must never hold navigation or lifecycle cleanup.
+      void transition.updateCallbackDone.catch(() => resolve());
+    });
   });
   const tabs = [
     { href: '/', label: 'Live', symbol: '◉' },
@@ -54,7 +68,7 @@
 </nav>
 <main>
   {#if $identityError}<p role="status">{$identityError}</p>{/if}
-  {#if offline}<section class="empty" role="status">
+  {#if offline}<section class="empty" role="status" in:fade={fadeOptions()}>
       <h1>You’re offline</h1>
       <p>Connect to read the latest transcript, Notes and alerts.</p>
       <button onclick={() => retry()}>Retry connection</button>

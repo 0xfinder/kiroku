@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Skeleton from '#lib/Skeleton.svelte';
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { z } from 'zod';
@@ -77,7 +78,7 @@
 {#if error}<p class="error" role="alert">
     {error}<button onclick={load}>Retry</button>
   </p>{/if}
-{#if loading}<div class="empty">Loading Notes…</div>{:else if !selected}<div
+{#if loading}<Skeleton label="Loading Notes…" />{:else if !selected}<div
     class="empty"
   >
     Choose a session when Kiroku starts listening.
