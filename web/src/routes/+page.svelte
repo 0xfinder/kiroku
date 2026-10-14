@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { flip } from 'svelte/animate';
+  import { enter, flipOptions } from '#lib/motion.ts';
+  import Skeleton from '#lib/Skeleton.svelte';
   import { onMount } from 'svelte';
   import { z } from 'zod';
   import { read, sessionSchema, message, type Session } from '#lib/api.ts';
@@ -50,9 +53,9 @@
 {#if error}<p class="error" role="alert">
     {error} <button onclick={refresh}>Retry</button>
   </p>{/if}
-{#if loading}<div class="empty">
-    Loading sessions…
-  </div>{:else if shown.length === 0}<div class="empty">
+{#if loading}<Skeleton
+    label="Loading sessions…"
+  />{:else if shown.length === 0}<div class="empty">
     <h2>
       {filter === 'live'
         ? 'No one is live right now'
@@ -60,7 +63,9 @@
     </h2>
     <p>Sessions appear here when Kiroku starts listening.</p>
   </div>{:else}<div class="grid">
-    {#each shown as session}<a
+    {#each shown as session (session.id)}<a
+        transition:enter
+        animate:flip={flipOptions()}
         class="card card-link"
         href={`/session/${session.id}`}
         ><div class="row between">

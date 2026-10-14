@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { flip } from 'svelte/animate';
+  import { enter, flipOptions } from './motion';
   import type { Note } from './api';
   import { clock, noteItems } from './helpers';
   let { notes, sessionId }: { notes: Note[]; sessionId: number } = $props();
@@ -8,7 +10,11 @@
     <h2>No Notes yet</h2>
     <p>Notes collect the conversation in three-minute spans.</p>
   </div>{:else}<div class="stack">
-    {#each notes as note}<article class="card note-card">
+    {#each notes as note (note.id)}<article
+        transition:enter
+        animate:flip={flipOptions()}
+        class="card note-card"
+      >
         <div class="row between">
           <span class="span">{clock(note.start_ms)} — {clock(note.end_ms)}</span
           ><span class="chip"

@@ -677,3 +677,119 @@ footer {
     align-items: start;
   }
 }
+
+:root {
+  --motion-fast: 150ms;
+  --motion-enter: 300ms;
+  --motion-reorder: 220ms;
+  --motion-ease: cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+button,
+.button,
+.card-link {
+  transition:
+    transform var(--motion-fast) var(--motion-ease),
+    opacity var(--motion-fast) var(--motion-ease);
+}
+@media (hover: hover) {
+  .card-link:hover {
+    transform: translateY(-2px);
+  }
+}
+button:active:not(:disabled),
+.button:active,
+.card-link:active {
+  transform: scale(0.98);
+}
+.jump-live:active:not(:disabled) {
+  transform: translateX(-50%) scale(0.98);
+}
+.connection-status {
+  font-size: 11px;
+}
+.review-stage {
+  display: grid;
+}
+.review-stage > article {
+  grid-area: 1 / 1;
+}
+.skeleton {
+  padding: 24px;
+}
+.skeleton-line {
+  display: block;
+  height: 12px;
+  margin: 12px 0;
+  border-radius: 6px;
+  background: var(--line);
+  animation: skeleton-breathe 1.4s ease-in-out infinite alternate;
+}
+.skeleton-line.short {
+  width: 40%;
+}
+@keyframes skeleton-breathe {
+  to {
+    opacity: 0.45;
+  }
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+main {
+  view-transition-name: content;
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+::view-transition-old(content) {
+  animation: route-out var(--motion-fast) var(--motion-ease) both;
+}
+::view-transition-new(content) {
+  animation: route-in var(--motion-fast) var(--motion-ease) both;
+}
+::view-transition-group(content) {
+  animation-duration: 0s;
+}
+@keyframes route-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes route-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-enter: 0ms;
+    --motion-reorder: 0ms;
+  }
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+  .card-link:hover,
+  button:active:not(:disabled),
+  .button:active,
+  .card-link:active {
+    transform: none;
+  }
+  .jump-live:active:not(:disabled) {
+    transform: translateX(-50%);
+  }
+}
+::view-transition {
+  pointer-events: none;
+}
