@@ -69,6 +69,8 @@ class LeagueData:
             timeout=10,
         )
         response.raise_for_status()
+        if response.status_code == 204 or not response.content:
+            return None
         body: object = response.json()
         return body
 

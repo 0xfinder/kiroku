@@ -1,5 +1,6 @@
 """League Vocabulary and live match context from Data Dragon and lolesports."""
 
+import logging
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -24,6 +25,10 @@ from kiroku.packs.league.data import (
 from kiroku.packs.league.notes import notes_schema
 
 VOCABULARY_CHARS = 350
+# The feed requires each ten-second window to end at least 80 seconds ago;
+# 120 seconds leaves margin for clock skew as well as the window's duration.
+FEED_DELAY_S = 120
+log = logging.getLogger(__name__)
 
 
 def vocabulary(
@@ -58,6 +63,7 @@ class LeaguePack:
 
     def __init__(self, http: httpx.AsyncClient, data_dir: Path, key: str) -> None:
         self.data = LeagueData(http, data_dir, key)
+        self._feed_query_warned = False
 
     async def _catalogue(self) -> tuple[dict[str, str], dict[str, str]]:
         available = await self.data.cached(
@@ -98,12 +104,29 @@ class LeaguePack:
         ]
         if len(games) != 1:
             return None  # between games, not a stale previous game's picks
-        # Same delayed, ten-second aligned feed clock as live-lol-esports.
-        at = datetime.now(UTC) - timedelta(seconds=60)
+        at = datetime.now(UTC) - timedelta(seconds=FEED_DELAY_S)
         at = at.replace(second=at.second // 10 * 10, microsecond=0)
-        window = await self.data.get(
-            f"{FEED}/window/{text(games[0]['id'])}", params={"startingTime": at.isoformat()}
-        )
+        try:
+            window = await self.data.get(
+                f"{FEED}/window/{text(games[0]['id'])}", params={"startingTime": at.isoformat()}
+            )
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code != 400:
+                raise
+            try:
+                bad_query = obj(e.response.json()).get("errorCode") == "BAD_QUERY_PARAMETER"
+            except ValueError:
+                raise e from None
+            if not bad_query:
+                raise
+            if not self._feed_query_warned:
+                log.warning(
+                    "League live feed unavailable: BAD_QUERY_PARAMETER; retrying next refresh"
+                )
+                self._feed_query_warned = True
+            return None
+        if window is None:
+            return None  # draft/loading: no frames yet
         champions, _ = await self._catalogue()
         summary, key, terms = match_context(event, window, champions)
         return LiveContext(summary, key, terms)

@@ -37,6 +37,7 @@ uv run ruff check && uv run ruff format --check && uv run pyright && uv run pyte
 - Try a Rule's wording with `kiroku rule test <name> [--session ID | --last N] [--instructions "..."]` before relying on it. It makes real Jev calls against stored Windows (about $0.00003 each, counted against the monthly cap) and stores no decisions. Naming concrete events beats abstract categories (spikes/README.md, 2026-10-12).
 - If `docker` says permission denied right after Docker was installed, the session predates the `docker` group. Run commands as `sg docker -c "docker compose up -d --wait"`.
 - League uses a 24-hour cache at `<data_dir>/packs/league`. The lolesports website key is public; override it with `KIROKU_LOLESPORTS_API_KEY`, not secrets.env. Data Dragon includes unnamed internal items; skip those names, and validate API shapes before caching them.
+- League livestats windows must end at least 80 seconds in the past; HTTP 204 means no frames yet.
 - Expired League cache data remains usable after a failed refresh; warn and retry without renewing its timestamp. Parsed catalogue data is memoized by file mtime. Live context and Vocabulary refresh independently, so a draft-feed outage clears the Game key but preserves catalogue and roster Vocabulary.
 - League Gate requests with `context.live` are held to `spikes/results/2026-10-12-league-gate.jsonl`. Re-record with `spikes/league_gate.py` after changing that layout. Live metadata can affect Mode and Rule scores; see the measured limits in spikes/README.md.
 
