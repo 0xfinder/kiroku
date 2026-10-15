@@ -27,7 +27,6 @@ from kiroku.packs.league.data import (
 )
 from kiroku.packs.league.notes import notes_schema
 
-VOCABULARY_CHARS = 350
 FEED_MIN_AGE_S = 80
 FEED_WINDOW_S = 10
 FEED_SKEW_MARGIN_S = 10

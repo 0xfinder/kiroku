@@ -19,7 +19,7 @@ const mark = await sharp(source, { density: 600 })
   .png()
   .toBuffer();
 await sharp({
-  create: { width: 512, height: 512, channels: 4, background: '#ea580c' },
+  create: { width: 512, height: 512, channels: 4, background: '#a1c9a5' },
 })
   .composite([{ input: mark, left: 96, top: 96 }])
   .png()
