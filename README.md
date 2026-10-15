@@ -4,6 +4,8 @@
 
 kiroku listens to esports streams live, writes down what was said, and messages me when something I care about happens.
 
+[Live notebook](https://kiroku.orulon.com) · [More esports projects on Orulon](https://orulon.com)
+
 ## Why I built this
 
 I follow a lot of esports: League of Legends, Valorant, CS2 and Dota 2. On a big weekend several of them are live at once, often as co-streams where someone like Caedrel or Gorgc talks over the official broadcast. I can't watch all of them, and the highlights and summaries I find afterwards miss the part I watch co-streams for: the streamer's own reads, predictions and opinions.

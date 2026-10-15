@@ -548,6 +548,10 @@ details p {
   margin-top: 12px;
 }
 footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
   max-width: 1044px;
   margin: 0 auto;
   padding: 20px 0;
@@ -619,7 +623,7 @@ footer {
   main {
     padding-top: 14px;
     margin: 0 20px;
-    padding-bottom: 90px;
+    padding-bottom: 32px;
   }
   .grid,
   .session-grid,
@@ -651,7 +655,8 @@ footer {
     font-size: 13px;
   }
   footer {
-    display: none;
+    margin-inline: 20px;
+    padding-bottom: calc(90px + env(safe-area-inset-bottom));
   }
   .review-question {
     font-size: 15px;
