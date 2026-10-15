@@ -1,0 +1,111 @@
+{
+  "database": "kiroku_spike_28",
+  "title": "(EN) Spirit vs Yandex - GRAND FINALS! - Blast Slam VIII - Official co-stream w/ PLD",
+  "model": "whisper-large-v3-turbo",
+  "temperature": 0,
+  "vocabulary": {
+    "title": "Dota 2 stream. (EN) Spirit vs Yandex - GRAND FINALS! - Blast Slam VIII - Official co-stream w/ PLD",
+    "handles": "Dota 2. Yatoro, Larl, rue, not_me, Batyuk, CHIRA_JUNIOR, \u533b\u8005watson`, Maladych, Saksa, DM, AMMAR_THE_F, Bane, Windranger, Winter Wyvern, Earth Spirit, Kez, Ember Spirit, Brewmaster, Rubick, Timbersaw, Nyx Assassin, Black King Bar, Nullifier, Wind Waker, Octarine Core, Clarity, Hydra's Breath, Hurricane Pike, (EN) Spirit vs Yandex - GRAND FINALS! -",
+    "aliases": "Dota 2. Yatoro, Larl, rue, not_me, Batyuk, CHIRA_JUNIOR, \u533b\u8005watson`, Maladych, Saksa, DM, AMMAR_THE_F, watson, Malady, Ammar, ATF, Bane, Windranger, Winter Wyvern, Earth Spirit, Kez, Ember Spirit, Brewmaster, Rubick, Timbersaw, Nyx Assassin, Black King Bar, Nullifier, Wind Waker, Octarine Core, Clarity, Hydra's Breath, Hurricane Pike, (EN) Spirit vs",
+    "rosters": "Dota 2. Yatoro, Larl, rue, not_me, Batyuk, CHIRA_JUNIOR, \u533b\u8005watson`, Maladych, Saksa, DM, AMMAR_THE_F, (EN) Spirit vs Yandex - GRAND FINALS! - Blast Slam VIII - Official co-stream w/ PLD",
+    "runtime_aliases": "Dota 2. Yatoro, Larl, rue, not_me, Batyuk, CHIRA_JUNIOR, \u533b\u8005watson`, Maladych, Saksa, DM, AMMAR_THE_F, watson, Malady, Ammar, ATF, (EN) Spirit vs Yandex - GRAND FINALS! - Blast Slam VIII - Official co-stream w/ PLD"
+  },
+  "heroes": [
+    "Bane",
+    "Windranger",
+    "Winter Wyvern",
+    "Earth Spirit",
+    "Kez",
+    "Ember Spirit",
+    "Brewmaster",
+    "Rubick",
+    "Timbersaw",
+    "Nyx Assassin"
+  ],
+  "items": [
+    "Black King Bar",
+    "Nullifier",
+    "Wind Waker",
+    "Octarine Core",
+    "Clarity",
+    "Hydra's Breath",
+    "Hurricane Pike"
+  ],
+  "aliases": {
+    "183719386": [
+      "Ammar",
+      "ATF"
+    ],
+    "171262902": [
+      "watson"
+    ],
+    "93817671": [
+      "Malady"
+    ]
+  },
+  "legs": [
+    {
+      "name": "001.opus",
+      "ms": 131989,
+      "samples": 2111829,
+      "pcm_sha256": "dd600d53a5db28f919612ef0428ff85df8c727a2ffd92574bc2167a6cf1dfff6"
+    },
+    {
+      "name": "002.opus",
+      "ms": 59861,
+      "samples": 957781,
+      "pcm_sha256": "6ecebfec6615dc7ccf4c2e322d8745e6f748ad48aba1da4f8e76b64ccee3222a"
+    },
+    {
+      "name": "003.opus",
+      "ms": 95914,
+      "samples": 1534635,
+      "pcm_sha256": "08d58ae37d67bd5acf1ec0020f672c77fc881c072fd13fb921dd40d4a41b321b"
+    },
+    {
+      "name": "004.opus",
+      "ms": 42005,
+      "samples": 672085,
+      "pcm_sha256": "a0ad9ef77eca182a60e33f39d6ed24ea739a18e33000ac760032baad00892eb5"
+    },
+    {
+      "name": "005.opus",
+      "ms": 41920,
+      "samples": 670720,
+      "pcm_sha256": "0ee6c557d322a3220227ff14dab9ebcffd7e468c9a6cb7d85837227f08b6f882"
+    },
+    {
+      "name": "006.opus",
+      "ms": 41877,
+      "samples": 670037,
+      "pcm_sha256": "a92d097ca5d64d94d1f8585da51dd9799ab1911ee292c4049acdc232181b5e0a"
+    },
+    {
+      "name": "007.opus",
+      "ms": 47914,
+      "samples": 766635,
+      "pcm_sha256": "f4cf0b7962416506c3f28125955847909df1ac20db889a4e62c3b4a8de68cadf"
+    }
+  ],
+  "arm_scope": {
+    "title": "Runtime control: category + title",
+    "handles": "Oracle upper bound: roster handles + hindsight heroes/items",
+    "aliases": "Oracle upper bound: handles + aliases + hindsight heroes/items",
+    "rosters": "R1 runtime: title teams current roster handles only",
+    "runtime_aliases": "R2 runtime: R1 + committed account-ID aliases; no heroes/items unless in title"
+  },
+  "pacing_s": {
+    "title": 4,
+    "handles": 4,
+    "aliases": 4,
+    "rosters": 7,
+    "runtime_aliases": 7
+  },
+  "pacing_note": "Original arms slept in the result consumer; R1/R2 pace HTTP dispatch.",
+  "runtime_selection_time": "2026-10-14T00:00:00Z",
+  "runtime_team_ids": [
+    7119388,
+    9823272
+  ],
+  "runtime_selection": "No fixed hero/item set; no live match data"
+}

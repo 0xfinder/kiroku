@@ -1,63 +1,25 @@
 """Free League HTTP data, with a disk TTL cache and typed JSON parsing."""
 
-import asyncio
-import json
-import logging
-import os
-import re
-import time
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from pathlib import Path
-from typing import cast
 
 import httpx
 
 from kiroku.gate.windows import JSON
+from kiroku.packs.common import DATA_TTL_S as DATA_TTL_S
+from kiroku.packs.common import DataError, PackData, array, contains_term, integer, obj, text
 
 DDRAGON = "https://ddragon.leagueoflegends.com"
 PERSISTED = "https://esports-api.lolesports.com/persisted/gw"
 FEED = "https://feed.lolesports.com/livestats/v1"
 # lolesports.com's public website key, shipped to every browser.
 PUBLIC_WEBSITE_KEY = "0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z"
-DATA_TTL_S = 24 * 3600
-log = logging.getLogger(__name__)
 
 
-class DataError(ValueError):
-    pass
-
-
-def obj(value: object) -> dict[str, object]:
-    if not isinstance(value, dict):
-        raise DataError("expected an object")
-    return cast(dict[str, object], value)
-
-
-def array(value: object) -> list[object]:
-    if not isinstance(value, list):
-        raise DataError("expected an array")
-    return cast(list[object], value)
-
-
-def text(value: object) -> str:
-    if not isinstance(value, str) or not value:
-        raise DataError("expected a nonempty string")
-    return value
-
-
-def integer(value: object) -> int:
-    if not isinstance(value, int) or isinstance(value, bool):
-        raise DataError("expected an integer")
-    return value
-
-
-class LeagueData:
+class LeagueData(PackData):
     def __init__(self, http: httpx.AsyncClient, data_dir: Path, key: str) -> None:
-        self.http = http
-        self.cache_dir = data_dir / "packs" / "league"
+        super().__init__(http, data_dir / "packs" / "league")
         self.key = key
-        self._lock = asyncio.Lock()
-        self._parsed: dict[tuple[str, object], tuple[int, object]] = {}
 
     async def get(
         self,
@@ -88,51 +50,6 @@ class LeagueData:
             )["data"]
         )
 
-    async def cached[T](
-        self,
-        name: str,
-        url: str,
-        parse: Callable[[object], T],
-        *,
-        website: bool = False,
-        memoize: bool = False,
-    ) -> T:
-        async with self._lock:
-            path = self.cache_dir / f"{name}.json"
-            stale: tuple[T] | None = None
-            memo_key = (name, parse)
-            try:
-                stat = path.stat()
-                memo = self._parsed.get(memo_key) if memoize else None
-                if memo is not None and memo[0] == stat.st_mtime_ns:
-                    parsed = cast(T, memo[1])
-                else:
-                    cached: object = json.loads(path.read_text())
-                    parsed = parse(cached)
-                    if memoize:
-                        self._parsed[memo_key] = (stat.st_mtime_ns, parsed)
-                stale = (parsed,)
-                if time.time() - stat.st_mtime < DATA_TTL_S:
-                    return parsed
-            except (OSError, ValueError, KeyError, IndexError):
-                pass
-            try:
-                body = await self.get(url, website=website)
-                parsed = parse(body)
-                # Atomic replace also protects another watcher reading the same cache.
-                self.cache_dir.mkdir(parents=True, exist_ok=True)
-                temporary = path.with_suffix(f".{os.getpid()}.tmp")
-                temporary.write_text(json.dumps(body))
-                temporary.replace(path)
-                if memoize:
-                    self._parsed[memo_key] = (path.stat().st_mtime_ns, parsed)
-            except (httpx.HTTPError, OSError, ValueError, KeyError, IndexError) as e:
-                if stale is None:
-                    raise
-                log.warning("League %s refresh failed; using stale cache (%s)", name, e)
-                return stale[0]
-            return parsed
-
 
 def versions(data: object) -> tuple[str, ...]:
     values = tuple(text(v) for v in array(data))
@@ -160,10 +77,6 @@ def roster_terms(data: object, title: str) -> tuple[str, ...]:
         if obj(player).get("role") != "coach"
         if isinstance(name := obj(player).get("summonerName"), str) and name.strip()
     )
-
-
-def contains_term(term: str, title: str) -> bool:
-    return bool(term and re.search(rf"(?<!\w){re.escape(term)}(?!\w)", title, re.I))
 
 
 def mentioned(team: dict[str, object], title: str) -> bool:

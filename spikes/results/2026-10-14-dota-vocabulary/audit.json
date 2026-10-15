@@ -1,0 +1,774 @@
+{
+  "method": "Reading aligned grammatical clauses in all arms and the stored transcript; not listening and not WER. Reference misses names absent from all outputs. Case-insensitive canonical spelling. Known spoken short forms are accepted explicitly. Each row is one occurrence, in transcript order. The original fixed-occurrence reference is frozen for R1/R2; include R2 omissions, and do not treat its unaligned chunk-4 Malady repetitions as new references. Prefutora in R1/R2 chunk 21 is the garbled player portion of the aligned Hydra item-on-Yatoro clause; count it as a misspelling.",
+  "exclusions": [
+    {
+      "chunks": [
+        1
+      ],
+      "reason": "Martin/Mark and Solus, poor Saiyan and Pandit, Kael/Kale: ambiguous caster garble; cannot establish a player/hero referent."
+    },
+    {
+      "chunks": [
+        1,
+        7,
+        9,
+        14,
+        21,
+        22
+      ],
+      "reason": "Abilities, item names (including Rosh/Roshan, Nightfall, Aghs misheard as Axe), pronouns and team names are outside the player/hero audit. Windrun is an ability; Wyvern is a spoken hero short form."
+    },
+    {
+      "chunks": [
+        8,
+        9
+      ],
+      "reason": "Dainax/Daynax/bags and the middle sentence become-a-hit: ambiguous compound Bane-Aghs talk. Exclude these; include only the explicit final Bane Hags/Bainax clause with an identifiable hero referent."
+    },
+    {
+      "chunks": [
+        10
+      ],
+      "reason": "Handle/alias arms repeat Kez from the previous chunk, twice, around not me. Treated as carried-context repetition, not new reference occurrences."
+    },
+    {
+      "chunks": [
+        11
+      ],
+      "reason": "Isolated Toro roar appears only in handles and stored output; cannot establish an extra spoken Yatoro mention from aligned clauses."
+    },
+    {
+      "chunks": [
+        13
+      ],
+      "reason": "Mardies/Mardus and garbled brew-splice-fear: no reliable proper-name referent; include the clear Level 25 brew clause."
+    },
+    {
+      "chunks": [
+        15
+      ],
+      "reason": "Alias-only leading Malady, Hrm, Kurs is unaligned with both other arms and stored transcript, likely hallucinated; not used to inflate reference count."
+    },
+    {
+      "chunks": [
+        18
+      ],
+      "reason": "having so much fun on Yatora/Yatoro/Yathara disagrees with stored Amar; referent uncertain. Exclude this first name, include the later queued item on Yatoro clause."
+    },
+    {
+      "chunks": [
+        24
+      ],
+      "reason": "Shadow Peoples could be a chat name, ban instruction or hero garble; not reliably a player/hero. Ember is counted."
+    }
+  ],
+  "chunks": [
+    {
+      "chunk": 0,
+      "occurrences": [
+        {
+          "name": "Bane",
+          "group": "hero",
+          "observed": {
+            "title": "Bane",
+            "handles": "Bane",
+            "aliases": "Bane",
+            "rosters": "Bane",
+            "runtime_aliases": "Bane"
+          }
+        }
+      ]
+    },
+    {
+      "chunk": 1,
+      "occurrences": [
+        {
+          "name": "Wyvern",
+          "group": "hero",
+          "observed": {
+            "title": "Wyvern",
+            "handles": "Wyvern",
+            "aliases": "Wyvern",
+            "rosters": "Wyvern",
+            "runtime_aliases": "Wyvern"
+          }
+        }
+      ]
+    },
+    {
+      "chunk": 2,
+      "occurrences": [
+        {
+          "name": "not_me",
+          "group": "player",
+          "observed": {
+            "title": "Nottmi",
+            "handles": "Nottami",
+            "aliases": "Nottami",
+            "rosters": "Nottmi",
+            "runtime_aliases": "Nottmi"
+          },
+          "accepted": [
+            "not_me",
+            "not me"
+          ]
+        },
+        {
+          "name": "Larl",
+          "group": "player",
+          "observed": {
+            "title": "Laurel",
+            "handles": "Laurel",
+            "aliases": "Laurel",
+            "rosters": "Laurel",
+            "runtime_aliases": "Laurel"
+          }
+        }
+      ]
+    },
+    {
+      "chunk": 3,
+      "occurrences": [
+        {
+          "name": "watson",
+          "group": "player",
+          "observed": {
+            "title": "",
+            "handles": "Watson",
+            "aliases": "Watson",
+            "rosters": "Watson",
+            "runtime_aliases": "Watson"
+          }
+        },
+        {
+          "name": "Windranger",
+          "group": "hero",
+          "observed": {
+            "title": "",
+            "handles": "Windranger",
+            "aliases": "Windranger",
+            "rosters": "Windranger",
+            "runtime_aliases": "Windranger"
+          }
+        },
+        {
+          "name": "Kez",
+          "group": "hero",
+          "observed": {
+            "title": "KS",
+            "handles": "Kez",
+            "aliases": "Kez",
+            "rosters": "KS",
+            "runtime_aliases": "KS"
+          }
+        }
+      ]
+    },
+    {
+      "chunk": 4,
+      "occurrences": [
+        {
+          "name": "Satanic",
+          "group": "player",
+          "observed": {
+            "title": "Satanic",
+            "handles": "Satanic",
+            "aliases": "Satanic",
+            "rosters": "satanic",
+            "runtime_aliases": ""
+          }
+        },
+        {
+          "name": "Satanic",
+          "group": "player",
+          "observed": {
+            "title": "Satanic",
+            "handles": "Satanic",
+            "aliases": "Satanic",
+            "rosters": "satanic",
+            "runtime_aliases": ""
+          }
+        },
+        {
+          "name": "Satanic",
+          "group": "player",
+          "observed": {
+            "title": "Satanic",
+            "handles": "Satanic",
+            "aliases": "Satanic",
+            "rosters": "satanic",
+            "runtime_aliases": ""
+          }
+        }
+      ]
+    },
+    {
+      "chunk": 5,
+      "occurrences": [
+        {
+          "name": "watson",
+          "group": "player",
+          "observed": {
+            "title": "Watson",
+            "handles": "Watson",
+            "aliases": "Watson",
+            "rosters": "Watson",
+            "runtime_aliases": "Watsun"
+          }
+        },
+        {
+          "name": "Malady",
+          "group": "player",
+          "observed": {
+            "title": "Maladie",
+            "handles": "Malady",
+            "aliases": "Malady",
+            "rosters": "Malady",
+            "runtime_aliases": "Malady"
+          }
+        }
+      ]
+    },
+    {
+      "chunk": 6,
+      "occurrences": [
+        {
+          "name": "Rubick",
+          "group": "hero",
+          "observed": {
+            "title": "rubik",
+            "handles": "Rubick",
+            "aliases": "",
+            "rosters": "Rubik",
+            "runtime_aliases": "Rubik"
+          }
+        }
+      ]
+    },
+    {
+      "chunk": 7,
+      "occurrences": [
+        {
+          "name": "Nyx",
+          "group": "hero",
+          "observed": {
+            "title": "Nyx",
+            "handles": "Nyx",
+            "aliases": "Nyx",
+            "rosters": "Nyx",
+            "runtime_aliases": "Nyx"
+          }
+        }
+      ]
+    },
+    {
+      "chunk": 8,
+      "occurrences": [
+        {
+          "name": "Ember",
+          "group": "hero",
+          "observed": {
+            "title": "Ember",
+            "handles": "Ember",
+            "aliases": "Ember",
+            "rosters": "Ember",
+            "runtime_aliases": "Ember"
+          }
+        },
+        {
+          "name": "Wyvern",
+          "group": "hero",
+          "observed": {
+            "title": "Wyvern",
+            "handles": "Wyvern",
+            "aliases": "Wyvern",
+            "rosters": "Wyvern",
+            "runtime_aliases": "Wyvern"
+          }
+        },
+        {
+          "name": "Windrunner",
+          "group": "hero",
+          "observed": {
+            "title": "Windrunner",
+            "handles": "Windrunner",
+            "aliases": "Windrunner",
+            "rosters": "Windrunner",
+            "runtime_aliases": "Windrunner"
+          }
+        }
+      ]
+    },
+    {
+      "chunk": 9,
+      "occurrences": [
+        {
+          "name": "Bane",
+          "group": "hero",
+          "observed": {
+            "title": "Bainax",
+            "handles": "Bane",
+            "aliases": "Bane",
+            "rosters": "Banex",
+            "runtime_aliases": "BaneHags"
+          }
+        },
+        {
+          "name": "Kez",
+          "group": "hero",
+          "observed": {
+            "title": "Kez",
+            "handles": "Kez",
+            "aliases": "Kez",
+            "rosters": "Kez",
+            "runtime_aliases": "Kez"
+          }
+        }
+      ]
+    },
+    {
+      "chunk": 10,
+      "occurrences": [
+        {
+          "name": "not_me",
+          "group": "player",
+          "observed": {
+            "title": "not me",
+            "handles": "not me",
+            "aliases": "not me",
+            "rosters": "Not me",
+            "runtime_aliases": "Not me"
+          },
+          "accepted": [
+            "not_me",
+            "not me"
+          ]
+        }
+      ]
+    },
+    {
+      "chunk": 11,
+      "occurrences": [
+        {
+          "name": "Yatoro",
+          "group": "player",
+          "observed": {
+            "title": "Yadaro",
+            "handles": "Yatoro",
+            "aliases": "Yatoro",
+            "rosters": "Yatoro",
+            "runtime_aliases": "Yatoro"
+          }
+        }
+      ]
+    },
+    {
+      "chunk": 12,
+      "occurrences": [
+        {
+          "name": "Ammar",
+          "group": "player",
+          "observed": {
+            "title": "Amar",
+            "handles": "Amar",
+            "aliases": "Amar",
+            "rosters": "Amar",
+            "runtime_aliases": "Amar"
+          }
+        }
+      ]
+    },
+    {
+      "chunk": 13,
+      "occurrences": [
+        {
+          "name": "Malady",
+          "group": "player",
+          "observed": {
+            "title": "Maladie",
+            "handles": "Malady",
+            "aliases": "Malady",
+            "rosters": "Malady",
+            "runtime_aliases": "Malady"
+          }
+        },
+        {
+          "name": "Saksa",
+          "group": "player",
+          "observed": {
+            "title": "Soxa",
+            "handles": "Soxa",
+            "aliases": "Soxa",
+            "rosters": "Soxa",
+            "runtime_aliases": "Soxa"
+          }
+        },
+        {
+          "name": "Saksa",
+          "group": "player",
+          "observed": {
+            "title": "Soxa",
+            "handles": "Soxa",
+            "aliases": "Soxa",
+            "rosters": "Soxa",
+            "runtime_aliases": "Soxa"
+          }
+        },
+        {
+          "name": "Malady",
+          "group": "player",
+          "observed": {
+            "title": "Maladie",
+            "handles": "Malady",
+            "aliases": "",
+            "rosters": "Malady",
+            "runtime_aliases": "Malady"
+          }
+        },
+        {
+          "name": "Brew",
+          "group": "hero",
+          "observed": {
+            "title": "brew",
+            "handles": "brew",
+            "aliases": "brew",
+            "rosters": "brew",
+            "runtime_aliases": "brew"
+          }
+        }
+      ]
+    },
+    {
+      "chunk": 14,
+      "occurrences": [
+        {
+          "name": "Rubick",
+          "group": "hero",
+          "observed": {
+            "title": "Rubik",
+            "handles": "Rubik",
+            "aliases": "Rubik",
+            "rosters": "Rubik",
+            "runtime_aliases": "Rubik"
+          }
+        }
+      ]
+    },
+    {
+      "chunk": 15,
+      "occurrences": [
+        {
+          "name": "Bane",
+          "group": "hero",
+          "observed": {
+            "title": "Bane",
+            "handles": "Bane",
+            "aliases": "Bane",
+            "rosters": "Bane",
+            "runtime_aliases": "Bane"
+          }
+        },
+        {
+          "name": "Yatoro",
+          "group": "player",
+          "observed": {
+            "title": "Yatora",
+            "handles": "Yatora",
+            "aliases": "Yatora",
+            "rosters": "Yatoro",
+            "runtime_aliases": "Yatoro"
+          }
+        },
+        {
+          "name": "Rubick",
+          "group": "hero",
+          "observed": {
+            "title": "Ruvik",
+            "handles": "Rubik",
+            "aliases": "Ruvik",
+            "rosters": "Ruvik",
+            "runtime_aliases": "Ruvik"
+          }
+        },
+        {
+          "name": "Yatoro",
+          "group": "player",
+          "observed": {
+            "title": "Yatora",
+            "handles": "Yatora",
+            "aliases": "Yatora",
+            "rosters": "Yatoro",
+            "runtime_aliases": "Yatoro"
+          }
+        }
+      ]
+    },
+    {
+      "chunk": 16,
+      "occurrences": [
+        {
+          "name": "CHIRA_JUNIOR",
+          "group": "player",
+          "observed": {
+            "title": "Chirr Jr.",
+            "handles": "Chirr Jr.",
+            "aliases": "Chira Jr.",
+            "rosters": "Chira Jr.",
+            "runtime_aliases": "Chira Jr."
+          },
+          "accepted": [
+            "CHIRA_JUNIOR",
+            "Chira Junior",
+            "Chira Jr."
+          ]
+        },
+        {
+          "name": "watson",
+          "group": "player",
+          "observed": {
+            "title": "Wassen",
+            "handles": "Waston",
+            "aliases": "Wassen",
+            "rosters": "Wassen",
+            "runtime_aliases": "Wassen"
+          }
+        },
+        {
+          "name": "Yatoro",
+          "group": "player",
+          "observed": {
+            "title": "Yatora",
+            "handles": "Yatora",
+            "aliases": "Yatora",
+            "rosters": "Yatoro",
+            "runtime_aliases": "Yatoro"
+          }
+        },
+        {
+          "name": "Ammar",
+          "group": "player",
+          "observed": {
+            "title": "Amar",
+            "handles": "Ammar",
+            "aliases": "Ammar",
+            "rosters": "Ammar",
+            "runtime_aliases": "Ammar"
+          }
+        },
+        {
+          "name": "Rubick",
+          "group": "hero",
+          "observed": {
+            "title": "ruby",
+            "handles": "rubik",
+            "aliases": "ruby",
+            "rosters": "ruby",
+            "runtime_aliases": "ruby"
+          }
+        },
+        {
+          "name": "Kez",
+          "group": "hero",
+          "observed": {
+            "title": "Kez",
+            "handles": "Kez",
+            "aliases": "Kez",
+            "rosters": "Kez",
+            "runtime_aliases": "Kez"
+          }
+        },
+        {
+          "name": "Ammar",
+          "group": "player",
+          "observed": {
+            "title": "Amar",
+            "handles": "Ammar",
+            "aliases": "Ammar",
+            "rosters": "Ammar",
+            "runtime_aliases": "Ammar"
+          }
+        }
+      ]
+    },
+    {
+      "chunk": 17,
+      "occurrences": [
+        {
+          "name": "not_me",
+          "group": "player",
+          "observed": {
+            "title": "not me",
+            "handles": "not me",
+            "aliases": "not me",
+            "rosters": "not me",
+            "runtime_aliases": "not me"
+          },
+          "accepted": [
+            "not_me",
+            "not me"
+          ]
+        },
+        {
+          "name": "Kez",
+          "group": "hero",
+          "observed": {
+            "title": "Kez",
+            "handles": "Kez",
+            "aliases": "Kez",
+            "rosters": "Kez",
+            "runtime_aliases": "Kez"
+          }
+        },
+        {
+          "name": "Rubick",
+          "group": "hero",
+          "observed": {
+            "title": "Rubik",
+            "handles": "Rubik",
+            "aliases": "Rubick",
+            "rosters": "Rubik",
+            "runtime_aliases": "Rubik"
+          }
+        },
+        {
+          "name": "Yatoro",
+          "group": "player",
+          "observed": {
+            "title": "Yatora",
+            "handles": "Yathara",
+            "aliases": "Yathara",
+            "rosters": "Yatoro",
+            "runtime_aliases": "Yatoro"
+          }
+        }
+      ]
+    },
+    {
+      "chunk": 18,
+      "occurrences": [
+        {
+          "name": "Yatoro",
+          "group": "player",
+          "observed": {
+            "title": "Yatora",
+            "handles": "Yatoro",
+            "aliases": "Yathara",
+            "rosters": "Yatoro",
+            "runtime_aliases": "Yatoro"
+          }
+        }
+      ]
+    },
+    {
+      "chunk": 19,
+      "occurrences": [
+        {
+          "name": "Timbersaw",
+          "group": "hero",
+          "observed": {
+            "title": "",
+            "handles": "Timbersaw",
+            "aliases": "Timbersaw",
+            "rosters": "",
+            "runtime_aliases": ""
+          },
+          "accepted": [
+            "Timbersaw",
+            "timber"
+          ]
+        },
+        {
+          "name": "Timbersaw",
+          "group": "hero",
+          "observed": {
+            "title": "timber",
+            "handles": "Timbersaw",
+            "aliases": "Timber",
+            "rosters": "timber",
+            "runtime_aliases": "timber"
+          },
+          "accepted": [
+            "Timbersaw",
+            "timber"
+          ]
+        }
+      ]
+    },
+    {
+      "chunk": 21,
+      "occurrences": [
+        {
+          "name": "Yatoro",
+          "group": "player",
+          "observed": {
+            "title": "Yatora",
+            "handles": "Yatoro",
+            "aliases": "Yatoro",
+            "rosters": "Prefutora",
+            "runtime_aliases": "Prefutora"
+          }
+        }
+      ]
+    },
+    {
+      "chunk": 22,
+      "occurrences": [
+        {
+          "name": "Ammar",
+          "group": "player",
+          "observed": {
+            "title": "Amar",
+            "handles": "Ammar",
+            "aliases": "Ammar",
+            "rosters": "Ammar",
+            "runtime_aliases": "Ammar"
+          }
+        },
+        {
+          "name": "Timbersaw",
+          "group": "hero",
+          "observed": {
+            "title": "Timbersaw",
+            "handles": "Timbersaw",
+            "aliases": "Timbersaw",
+            "rosters": "Timbersaw",
+            "runtime_aliases": "Timbersaw"
+          }
+        }
+      ]
+    },
+    {
+      "chunk": 24,
+      "occurrences": [
+        {
+          "name": "Ember",
+          "group": "hero",
+          "observed": {
+            "title": "Ember",
+            "handles": "Ember",
+            "aliases": "Ember",
+            "rosters": "Ember",
+            "runtime_aliases": "Ember"
+          }
+        }
+      ]
+    }
+  ],
+  "arms": [
+    "title",
+    "rosters",
+    "runtime_aliases",
+    "handles",
+    "aliases"
+  ],
+  "arm_scope": {
+    "title": "runtime control",
+    "rosters": "runtime R1",
+    "runtime_aliases": "runtime R2",
+    "handles": "oracle heroes/items upper bound",
+    "aliases": "oracle heroes/items + aliases upper bound"
+  },
+  "corrections": [
+    "The resumed counter found the second oracle-aliases chunk-19 occurrence is Timber, not Timbersaw; both are accepted short forms. Original recordings remain unchanged."
+  ]
+}

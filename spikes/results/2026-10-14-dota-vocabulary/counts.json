@@ -1,0 +1,62 @@
+{
+  "reference_occurrences": 50,
+  "scope": {
+    "title": "runtime control",
+    "rosters": "runtime R1",
+    "runtime_aliases": "runtime R2",
+    "handles": "oracle heroes/items upper bound",
+    "aliases": "oracle heroes/items + aliases upper bound"
+  },
+  "arms": {
+    "title": {
+      "reference": 50,
+      "player": 21,
+      "misspelling": 27,
+      "errors": 30,
+      "omission": 3,
+      "hero": 9,
+      "usd": "0.005333",
+      "calls": 26
+    },
+    "rosters": {
+      "reference": 50,
+      "player": 7,
+      "misspelling": 14,
+      "errors": 15,
+      "hero": 8,
+      "omission": 1,
+      "usd": "0.005333",
+      "calls": 26
+    },
+    "runtime_aliases": {
+      "reference": 50,
+      "player": 11,
+      "misspelling": 15,
+      "errors": 19,
+      "hero": 8,
+      "omission": 4,
+      "usd": "0.005333",
+      "calls": 26
+    },
+    "handles": {
+      "reference": 50,
+      "player": 11,
+      "misspelling": 15,
+      "errors": 15,
+      "hero": 4,
+      "usd": "0.005333",
+      "calls": 26
+    },
+    "aliases": {
+      "reference": 50,
+      "player": 12,
+      "misspelling": 14,
+      "errors": 16,
+      "hero": 4,
+      "omission": 2,
+      "usd": "0.005333",
+      "calls": 26
+    }
+  },
+  "usd": "0.026665"
+}

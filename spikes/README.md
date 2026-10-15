@@ -241,3 +241,96 @@ input/system are stored once; rare changed-request attempts carry overrides. Quo
 without attempts or costs add no receipt UUID. A lost-ack regression proves pending writes
 store each paid attempt once, and completion clears their receipt UUIDs. Raw literal NUL
 outputs use reversible JSON-string encoding because PostgreSQL jsonb cannot store NUL text.
+
+## 2026-10-14: Dota Vocabulary (issue #28)
+
+Seven read-only archived Gorgc Capture legs from `~/.local/share/kiroku-spikes/gorgc-session-1`
+contain 461.482 seconds of Spirit vs Yandex co-stream audio, about 7.7 minutes. The title is
+`(EN) Spirit vs Yandex - GRAND FINALS! - Blast Slam VIII - Official co-stream w/ PLD`.
+`spikes/dota_vocabulary.py` decodes each leg with real ffmpeg and sends identical audio
+through the production SilenceChunker and Groq adapter, pinned to `whisper-large-v3-turbo`
+at temperature 0. Each arm carries its own previous text. All five arms have the same
+26 contiguous boundaries, including reconnects. [method.json](results/2026-10-14-dota-vocabulary/method.json)
+records PCM hashes, sample counts, prompts and source choices. Sum samples before converting
+multiple legs to milliseconds; adding rounded leg lengths loses two milliseconds here.
+
+The existing `title`, `handles` and `aliases` recordings were reused after the interrupted
+first attempt. `handles` and `aliases` include ten hindsight-selected heroes and seven items.
+They are **oracle upper bounds** for a future live-data slice, not production candidates.
+The new runtime arms use only the title and cached team rosters. R1 (`rosters`) includes
+current handles. R2 (`runtime_aliases`) adds Ammar/ATF, watson and Malady by account ID.
+Neither runtime arm includes heroes or items because none appears in this title. No fixed
+hero set was tested or selected. R1/R2 pace HTTP dispatch at seven seconds; the original
+runner's four-second delay was in its result consumer and did not bound HTTP dispatch.
+
+The [audit](results/2026-10-14-dota-vocabulary/audit.json) fixes 50 reference player/hero
+occurrences from reading aligned clauses in the original outputs and stored transcript.
+R1/R2 use that same reference, including their visible omissions. Case does not matter;
+accepted short forms are explicit. Ambiguous garble, item/ability/team names, carried-text
+repetitions and unaligned hallucinations are excluded with reasons. The resumed counter
+corrected one annotation from `Timbersaw` to the actual `Timber`; both spellings are accepted.
+
+| Scope | Arm | Player errors | Hero errors | Misspellings | Omissions | Total errors |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Runtime control | Title only | 21 | 9 | 27 | 3 | 30 |
+| Runtime R1, selected | Title teams' roster handles | 7 | 8 | 14 | 1 | 15 |
+| Runtime R2 | R1 + aliases | 11 | 8 | 15 | 4 | 19 |
+| Oracle heroes/items | Handles + actual heroes/items | 11 | 4 | 15 | 0 | 15 |
+| Oracle heroes/items | Handles + aliases + actual heroes/items | 12 | 4 | 14 | 2 | 16 |
+
+R1 halves the audited errors relative to title-only. It fixes the three previously garbled
+chunk-15/16 Yatoro mentions, but `Amar`, `Laurel`, `Soxa` and several Rubick spellings remain.
+R2 loses three correct `Satanic` mentions in chunk 4 and changes chunk 5's correct `Watson`
+to `Watsun`. Adding Ammar does not fix chunk 12's `Amar`; the later Ammar spellings already
+succeed in R1. This comparison supports shipping handles without extra aliases, not a claim
+that aliases always hurt. The oracle arms improve hero spelling but have more player errors
+than R1. Whisper's continuity makes individual phrases sensitive to earlier output.
+
+The [scratch ledger](results/2026-10-14-dota-vocabulary/ledger.json) has **130 billed calls,
+$0.026665 total (2.6665 cents)** in `kiroku_spike_28`, including the three reused arms.
+Each arm costs $0.005333. No dev database was migrated or written. A final verification
+assertion originally failed because it added rounded leg milliseconds. The corrected
+sample-based check validates all stored boundaries and costs without repeating paid calls.
+[Token counts](results/2026-10-14-dota-vocabulary/prompt-tokens.json) use OpenAI Whisper's
+multilingual ranks: title 36–154, R1 86–159, R2 98–171, oracle handles 134–209, oracle aliases
+135–210. All measured prompts fit 224 tokens. The 350-character Vocabulary bound remains
+a heuristic for arbitrary titles and player names.
+
+Production uses [dotaconstants](https://github.com/odota/dotaconstants) hero/item names and
+[OpenDota teams](https://api.opendota.com/api/teams) plus `/teams/{id}/players`, with a
+24-hour cache and stale-on-failure. The source research and Liquipedia attribution are in
+[sources/README.md](results/2026-10-14-dota-vocabulary/sources/README.md). OpenDota `proPlayers`
+was rejected because it has noisy profiles and no real names. Liquipedia's MediaWiki API
+returned extracts under its terms using a descriptive contact User-Agent, gzip and requests
+at least two seconds apart, with no parse calls. Production makes no Liquipedia requests.
+A committed identity table remains in the experimental R2 runner, but is not shipped.
+
+OpenDota names ATF `AMMAR_THE_F`, decorates watson and lists six current Yandex members,
+including DM. Production preserves those raw handles and all current members; it does not
+infer a five-player lineup or equate `not_me` with Collapse. Teams match whole names/tags
+or names with the `Team ` or `Team. ` prefix removed. Names must have a match within 180 days,
+and the most recent duplicate wins. This excludes the obsolete Spirit discovery candidates.
+Selected teams follow title order. Handles get priority, then catalogue names explicitly
+in the title, then the title tail, within 350 characters. Outages retain usable stale data
+and retry without renewing timestamps; a cold failure leaves title-only Vocabulary.
+`get_live_match` returns None and Notes use `general`. No core interface or Gate body changes.
+
+The omission counter verifies that no accepted spelling remains unassigned in the chunk.
+Repeated names already assigned to another reference are consumed once: the second Malady
+in chunk 13 and first Timbersaw in chunk 19 remain omissions in the affected arms.
+The strengthened recount preserves all totals above.
+
+Recount offline with `uv run python spikes/dota_counts.py spikes/results/2026-10-14-dota-vocabulary`.
+Verify archived PCM and scratch ledger without paid calls with
+`uv run python spikes/dota_vocabulary.py ~/.local/share/kiroku-spikes/gorgc-session-1 spikes/results/2026-10-14-dota-vocabulary --verify-only`.
+Token counts use `uv run --with tiktoken python spikes/dota_prompt_tokens.py <output-directory>`.
+Use `--arms` only for unfinished arms in the same output directory. The scratch-ledger
+check includes every recorded arm in this experiment and retains previous spend. Existing
+recording files are never overwritten.
+
+Limits: this is a name audit, not WER. It covers one recording, one run per arm, mixed
+caster/streamer speech and current roster data. The reference comes from reading outputs,
+so names missed by every original arm are invisible. The frozen reference does not score
+new unaligned R1/R2 names. It does not measure item accuracy, general recognition quality,
+or the reliability of roster membership. Live picks, Steam APIs and a Dota Notes schema
+remain for later slices.

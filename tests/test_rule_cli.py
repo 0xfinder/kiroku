@@ -215,7 +215,11 @@ def test_bad_input_is_a_one_line_error(kiroku: Callable[..., Any]) -> None:
 
 def test_unavailable_pack_warns_when_adding_editing_or_enabling_a_rule(
     kiroku: Callable[..., Any],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from kiroku.cli import PACK_FACTORIES
+
+    monkeypatch.delitem(PACK_FACTORIES, "dota")
     added = kiroku("add", "x", "Q?", "--pack", "dota")
     assert added.exit_code == 0 and "PACK_NOT_LIVE: dota is unavailable" in added.stderr
     assert "PACK_NOT_LIVE" in kiroku("enable", "x").stderr

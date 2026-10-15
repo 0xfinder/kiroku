@@ -1,0 +1,37 @@
+{
+  "batchcomplete": "",
+  "query": {
+    "normalized": [
+      {
+        "from": "CHIRA_JUNIOR",
+        "to": "CHIRA JUNIOR"
+      }
+    ],
+    "pages": {
+      "125193": {
+        "pageid": 125193,
+        "ns": 0,
+        "title": "ATF",
+        "extract": "Ammar \"ATF\" Al-Assaf (born April  3, 2005) is a  Jordanian player who is currently  playing for  Team Yandex."
+      },
+      "139101": {
+        "pageid": 139101,
+        "ns": 0,
+        "title": "CHIRA JUNIOR",
+        "extract": "Ilya \"CHIRA_JUNIOR\" Chirtsov (born January 21, 2005) is a  Russian player who is currently  playing for  Team Yandex."
+      },
+      "120264": {
+        "pageid": 120264,
+        "ns": 0,
+        "title": "Malady",
+        "extract": "Arman \"Malady\" Orazbayev (also known as Maladych) (born October 23, 2000) is a  Kazakhstani player who is currently  playing for  Team Yandex."
+      },
+      "128289": {
+        "pageid": 128289,
+        "ns": 0,
+        "title": "Watson",
+        "extract": "Alimzhan \"watson\" Islambekov (also known as \u533b\u8005watson`) (born April 30, 2002) is a  Kazakhstani player who is currently  playing for  Team Yandex."
+      }
+    }
+  }
+}
