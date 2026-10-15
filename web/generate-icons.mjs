@@ -1,8 +1,10 @@
-// Run from web/: npm run icons. Sharp rasterizes the repository's vector source.
+// Run from web/: npm run icons. Sharp rasterizes the repository's vector source
+// and copies it to static/favicon.svg for the browser tab.
 import sharp from 'sharp';
-import { readFile, mkdir } from 'node:fs/promises';
+import { copyFile, mkdir, readFile } from 'node:fs/promises';
 const source = await readFile('../assets/icon.svg');
 await mkdir('static/icons', { recursive: true });
+await copyFile('../assets/icon.svg', 'static/favicon.svg');
 for (const [name, size] of [
   ['icon-192', 192],
   ['icon-512', 512],
