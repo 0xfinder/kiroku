@@ -546,3 +546,19 @@ respective arms. Recounting keeps all 50 references and totals unchanged (30/15/
 15/16 oracle), with no new paid calls. A blanket name-absence check would incorrectly reuse
 those other occurrences. The current live items response has no whitespace-only name; a
 clearly marked regression sentinel supplements the recorded item projection.
+
+## D38. The orulon.com landing page moved to 0xfinder/orulon
+
+2026-10-15. The landing page was built in this repository because kiroku needed it,
+but it is not kiroku: it has no build step, its publisher is independent of the
+notebook, and its tests never touch a database. The static `site/` tree,
+`deploy/site.sh`, the publisher tests and the Playwright screenshot tool now live in
+`0xfinder/orulon`, together with the Vite build they replaced in that repository's
+history.
+
+Publishing is unchanged: `deploy/site.sh` extracts `HEAD:site` into
+`/srv/orulon/releases/<timestamp>-<sha>` and flips `current` atomically, now from a
+`~/orulon` checkout on sakura. The page keeps the original Orulon mark (that
+repository's first favicon) as its tab and header image; kiroku keeps
+`assets/icon.svg`, the app favicon and the PWA icons. This repository deletes its
+copy so the two trees cannot drift.
