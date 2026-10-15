@@ -85,4 +85,7 @@
     </section>
   {:else}{#key page.url.pathname + page.url.search}{@render children()}{/key}{/if}
 </main>
-<footer>Listen closely. Keep what matters.</footer>
+<footer>
+  <span>Listen closely. Keep what matters.</span>
+  <a href="https://orulon.com">More esports projects on Orulon ↗</a>
+</footer>
