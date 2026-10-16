@@ -131,8 +131,13 @@ class JevGate:
                 log.warning("Jev HTTP %d; retrying", status)
                 continue
             if status >= 400:
-                # Our request is wrong. Retrying can't help, and nothing was billed.
-                raise GateBadResponse(f"jev HTTP {status}: {response.text[:200]}")
+                # Our request is wrong. Retrying can't help, and a direct 4xx bills
+                # nothing. Dispatches lost earlier in this evaluate may bill, so keep
+                # their estimates on the failure.
+                raise GateBadResponse(
+                    f"jev HTTP {status}: {response.text[:200]}",
+                    self._lost_costs(request.purpose, estimate, maybe_billed),
+                )
             try:
                 return parse_answer(response.json(), request, maybe_billed, latency_ms)
             except (ValueError, KeyError, TypeError) as e:

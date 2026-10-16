@@ -27,13 +27,13 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
-from kiroku import archive, sessions, transcript
+from kiroku import archive, ledger, sessions, transcript
 from kiroku.archive import ArchiveUnreadable
 from kiroku.audio import BYTES_PER_SAMPLE, SAMPLES_PER_MS, AudioBlock, AudioEvent
 from kiroku.budget import BudgetGuard
 from kiroku.db import Pool
 from kiroku.sessions import Channel, Leg
-from kiroku.transcriber import Context, Transcriber
+from kiroku.transcriber import Context, Transcriber, TranscriberAuthError
 
 log = logging.getLogger(__name__)
 
@@ -189,6 +189,12 @@ async def run(
                 async for result in transcriber.transcribe(audio, context):
                     await transcript.commit(pool, session_id, transcriber.name, result)
                     on_commit()
+            except TranscriberAuthError as e:
+                # A refusal itself bills nothing, but dispatches lost before it may.
+                # Record their estimates exactly once, then fail out: the caller logs
+                # the run and every transcribed gap stays covered.
+                await ledger.record_session_costs(pool, session_id, e.costs)
+                raise
             except ArchiveUnreadable as e:
                 log.warning("session %d: %s; the gap stays", session_id, e)
         if stopping.is_set():

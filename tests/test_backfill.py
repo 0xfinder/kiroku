@@ -9,9 +9,15 @@ import itertools
 import shutil
 import subprocess
 import sys
-from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
+from collections.abc import (
+    AsyncGenerator,
+    AsyncIterator,
+    Awaitable,
+    Callable,
+)
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path, PurePosixPath
 
 import httpx
@@ -20,13 +26,15 @@ from psycopg import AsyncConnection
 
 from kiroku import archive, backfill, sessions, transcript
 from kiroku.archive import ArchiveUnreadable, LengthUnknown
+from kiroku.audio import AudioEvent
 from kiroku.backfill import Gap, find_gaps, sealed_end
 from kiroku.budget import Budget, Caps, Unlimited
 from kiroku.config import Secret
 from kiroku.db import Pool, open_pool
+from kiroku.ledger import AudioSeconds, CostEntry, Purpose
 from kiroku.sessions import Channel, Leg, claim_channels
 from kiroku.source import Capture, Online, Probe, StreamlinkSource, StreamMeta, ffmpeg_command
-from kiroku.transcriber import Result, Transcriber
+from kiroku.transcriber import Context, Result, Transcriber, TranscriberAuthError
 from kiroku.transcriber.groq import GroqTranscriber
 from kiroku.watch import Services, SessionRun
 from tests.fakes.speech import speechlike, wav
@@ -449,3 +457,53 @@ async def test_a_cancelled_stop_does_not_leave_backfill_running(
         current = asyncio.current_task()
         left = [t for t in asyncio.all_tasks() - before if t is not current and not t.done()]
         assert left == [], "tasks outlived their SessionRun"
+
+
+class _AuthFailTranscriber:
+    """A transcriber that refuses everything with the estimate of an earlier loss."""
+
+    name = NAME
+
+    def __init__(self, costs: tuple[CostEntry, ...]) -> None:
+        self._costs = costs
+
+    async def transcribe(
+        self, audio: AsyncIterator[AudioEvent], context: Context
+    ) -> AsyncIterator[Result]:
+        # The archive read was never touched: the refusal comes before the first block.
+        raise TranscriberAuthError("Groq rejected the API key (HTTP 401)", self._costs)
+        yield  # unreachable: this only makes the body an async generator.
+
+
+async def test_an_auth_failure_in_backfill_records_its_estimate_and_the_gap_stays(
+    pool: Pool, channel: Channel, conn: AsyncConnection, tmp_path: Path
+) -> None:
+    session = await _crashed_leg(pool, channel, tmp_path, 20)
+    await backfill.seal_open_legs(pool, session, NAME, tmp_path)
+    estimate = CostEntry(
+        "groq",
+        "whisper-large-v3-turbo",
+        Purpose.TRANSCRIBE,
+        AudioSeconds(Decimal(10)),
+        Decimal("0.000111"),
+        0,
+    )
+    with pytest.raises(TranscriberAuthError):
+        await backfill.run(
+            pool,
+            session,
+            _AuthFailTranscriber((estimate,)),
+            tmp_path,
+            lambda: "",
+            Budget(pool, Caps()).guard(session),
+        )
+
+    cur = await conn.execute(
+        "SELECT count(*), sum(usd) FROM cost_ledger "
+        "WHERE session_id = %s AND purpose = 'transcribe'",
+        [session],
+    )
+    assert await cur.fetchone() == (1, Decimal("0.000111"))
+    # The rejected speech is still a gap of the same shape, so a restart backfills it.
+    gap = (await backfill.gaps(pool, session, NAME))[0]
+    assert (gap.start_ms, gap.end_ms) == (5_000, 20_000)
