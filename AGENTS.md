@@ -73,6 +73,23 @@ uv run ruff check && uv run ruff format --check && uv run pyright && uv run pyte
 - The alert pipeline is a fixed sequence of steps, not an agent (D5). Agents are reserved for the Q&A path.
 - Tests replay recorded audio and transcript fixtures (e.g. `spikes/results/`), never live streams. Write E2E tests for observable behaviour, including failure paths.
 
+### Rule-to-enforcement map
+
+Every rule above has one enforcement site. Run the full contract sweep with
+`uv run python tests/contracts/check_mutations.py` (same command in CI); the detailed
+map with entry points and commands lives in `docs/change-paths.md`.
+
+| Rule | Enforced by |
+| --- | --- |
+| Core must not import a Pack; only `cli.py` injects | Ruff `TID251` on `kiroku.packs` (`pyproject.toml`) |
+| Terminal paid exits keep uncertain-dispatch estimates | `tests/test_paid_exits.py` + contract cases `jev-terminal-4xx...`, `whisper-terminal-400...`, `-auth...` |
+| Primary Gate auth costs stay idempotent, Windows stay ungated | `tests/test_gating.py` + contract case `gate-auth-error-still-records-its-costs` |
+| A cancelled Notes write pays nothing later | `tests/test_notes.py` + contract case `notes-durable-cancellation` (replays `a27ce78`) |
+| Historical backlog never inherits live context or Pack | `tests/test_notes.py::test_previous_is_recent...` + contract case `historical-backlog...` |
+| Source teardown reaps with `communicate()`, never `wait()` | `tests/test_source.py` teardown lanes (real ffmpeg, paused reader) |
+| Recorded request bodies stay canonical | replay tests: `test_alert_replay.py`, `test_gate_replay.py`, `test_notes.py` fixture replay |
+| Table-owner writes, owner-guarded reads | `tests/test_web_auth.py` structural route test; web browser acceptance for `labels`/`rules`/`dry_run` |
+
 ## Secrets
 
 - API keys live in `~/.config/kiroku/secrets.env` (mode 600, outside the repo), as `JEV_API_KEY`, `GROQ_API_KEY`, `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`. Muse (Meta) and Anthropic keys are still pending.

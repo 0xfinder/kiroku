@@ -28,6 +28,7 @@ jobs:
       - run: uv run pyright
       - run: docker compose up -d --wait
       - run: uv run pytest
+      - run: uv run python tests/contracts/check_mutations.py
       - run: npx playwright install --with-deps chromium
         working-directory: web
       - run: npm run e2e

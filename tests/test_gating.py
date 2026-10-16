@@ -330,6 +330,24 @@ async def test_a_wrong_key_stops_the_gate_but_writes_nothing(
     assert await rows(conn, "SELECT count(*) FROM gate_window") == [(2,)]
 
 
+async def test_an_auth_error_through_a_terminal_window_still_records_its_costs(
+    pool: Pool, session: int, conn: AsyncConnection
+) -> None:
+    """The failed paid Window leaves ungated progress but its estimate reaches the ledger."""
+    await two_rules(pool)
+    await speak(pool, session, 0, 90, "one", "two")
+    cost = CostEntry("fake", "1", Purpose.GATE, Tokens(100), Decimal("0.000005"), 1)
+    gate = FakeGate(GateAuthError("Jev rejected the API key (HTTP 401)", (cost,)))
+    async with asyncio.timeout(10):
+        await loop(pool, session, gate).run()  # returns by itself; the session is off
+    assert len(gate.requests) == 1
+    assert await rows(conn, "SELECT count(*) FROM gate_window") == [(0,)]
+    assert await rows(conn, "SELECT count(*), sum(usd) FROM cost_ledger") == [(1, cost.usd)]
+    # A restart with the key fixed gates the backlog from the start (nothing consumed).
+    await gate_once(pool, session, FakeGate(0.3), ended=True)
+    assert await rows(conn, "SELECT count(*) FROM gate_window") == [(2,)]
+
+
 async def test_a_rule_cannot_name_state_fields(pool: Pool) -> None:
     # Only the Gate's wrapper points Jev at `new` and `context`.
     with pytest.raises(rules.RuleError, match="backticks"):
