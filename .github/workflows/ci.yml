@@ -10,6 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The contract runner replays pinned historical functions (`git show <sha>`).
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
@@ -28,6 +31,7 @@ jobs:
       - run: uv run pyright
       - run: docker compose up -d --wait
       - run: uv run pytest
+      - run: uv run python tests/contracts/check_mutations.py
       - run: npx playwright install --with-deps chromium
         working-directory: web
       - run: npm run e2e
