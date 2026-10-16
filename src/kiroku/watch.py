@@ -25,7 +25,7 @@ from pathlib import Path
 
 import psycopg
 
-from kiroku import backfill, gating, labels, segments, sessions, transcript
+from kiroku import backfill, gating, labels, ledger, segments, sessions, transcript
 from kiroku.alerting import AlertWorker
 from kiroku.archive import LengthUnknown
 from kiroku.audio import BYTES_PER_SAMPLE, SAMPLES_PER_MS, AudioBlock, AudioEvent, LegEnded
@@ -39,7 +39,7 @@ from kiroku.notify import Notifier
 from kiroku.pack import LiveContext, Pack, PackSelector
 from kiroku.sessions import Channel
 from kiroku.source import Capture, NotLive, Online, Probe, ProbeFailed, Source, StreamMeta
-from kiroku.transcriber import Context, Transcriber
+from kiroku.transcriber import Context, Transcriber, TranscriberAuthError
 
 log = logging.getLogger(__name__)
 
@@ -570,11 +570,18 @@ class SessionRun:
 
     async def _transcribe(self, previous_text: str) -> None:
         context = Context(self._vocabulary, self._guard, previous_text)
-        async for result in self._transcriber.transcribe(self._events(), context):
-            await transcript.commit(self._pool, self.session_id, self._transcriber.name, result)
-            self._notes_wake()
-            if self._gate_loop is not None:
-                self._gate_loop.wake()
+        try:
+            async for result in self._transcriber.transcribe(self._events(), context):
+                await transcript.commit(self._pool, self.session_id, self._transcriber.name, result)
+                self._notes_wake()
+                if self._gate_loop is not None:
+                    self._gate_loop.wake()
+        except TranscriberAuthError as e:
+            # A refusal itself bills nothing, but dispatches lost before it may. Record
+            # their estimates exactly once, then stop: speech that was not transcribed
+            # stays recoverable.
+            await ledger.record_session_costs(self._pool, self.session_id, e.costs)
+            raise
 
     def _stream(self) -> dict[str, JSON]:
         """What the Gate is told about the stream: `context.stream`."""

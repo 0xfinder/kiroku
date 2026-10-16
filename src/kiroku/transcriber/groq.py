@@ -32,9 +32,8 @@ from kiroku import groq_http
 from kiroku.audio import BYTES_PER_SAMPLE, SAMPLE_RATE, AudioBlock, AudioEvent, ms
 from kiroku.budget import BudgetGuard, OverBudget
 from kiroku.config import Secret
-from kiroku.errors import KirokuError
 from kiroku.ledger import AudioSeconds, CostEntry, Purpose
-from kiroku.transcriber import Context, Result, Utterance
+from kiroku.transcriber import Context, Result, TranscriberAuthError, Utterance
 from kiroku.transcriber.chunker import Chunk, ChunkPolicy, SilenceChunker
 
 log = logging.getLogger(__name__)
@@ -50,10 +49,6 @@ PROMPT_TAIL_CHARS = 400  # Whisper reads at most 224 prompt tokens
 BACKGROUND_INTERVAL_S = 10.0
 NO_SPEECH_DROP = 0.6  # Whisper's own heuristic: drop a segment above this no_speech_prob
 LOGPROB_DROP = -1.0  # ...when its avg_logprob is also below this
-
-
-class GroqAuthError(KirokuError):
-    """401/403: the key is wrong. Stops `kiroku watch` instead of skipping every chunk."""
 
 
 class GroqTranscriber:
@@ -234,7 +229,10 @@ class GroqTranscriber:
             latency_ms = int((time.monotonic() - started) * 1000)
             status = response.status_code
             if status in (401, 403):
-                raise GroqAuthError(f"Groq rejected the API key (HTTP {status})")
+                raise TranscriberAuthError(
+                    f"Groq rejected the API key (HTTP {status})",
+                    uncertain_costs(start_ms, end_ms, maybe_billed),
+                )
             if status == 429 or status >= 500:
                 attempt += 1
                 wait = retry_delay(status, response.headers, attempt)
@@ -245,10 +243,12 @@ class GroqTranscriber:
                     await self._sleep(wait)
                 continue
             if status >= 400:
-                # Bad audio or a malformed request: retrying cannot help, and nothing was
-                # billed. Commit an empty span so the session moves on.
+                # Bad audio or a malformed request: retrying cannot help, and a direct 4xx
+                # bills nothing. Dispatches lost earlier in this chunk may bill, so the
+                # empty span keeps their conservative estimate; it commits exactly once.
                 log.error("Groq HTTP %d for chunk at %d ms: %s", status, start_ms, response.text)
-                return Result(start_ms, end_ms, (), None), ""
+                lost = uncertain_costs(start_ms, end_ms, maybe_billed)
+                return Result(start_ms, end_ms, (), lost[0] if lost else None), ""
             utterances, text = to_utterances(start_ms, end_ms, response.json())
             seconds, usd = billed(end_ms - start_ms)
             # Over-report rather than under-report: Budget caps trust the ledger.
@@ -288,6 +288,24 @@ def billed(duration_ms: int) -> tuple[Decimal, Decimal]:
     """Groq bills max(duration, 10 s) at $0.04 per audio hour. Returns (seconds, usd)."""
     seconds = max(Decimal(duration_ms) / 1000, MIN_BILLED_SECONDS)
     return seconds, (seconds * USD_PER_AUDIO_HOUR / 3600).quantize(Decimal("0.000001"))
+
+
+def uncertain_costs(start_ms: int, end_ms: int, maybe_billed: int) -> tuple[CostEntry, ...]:
+    """What dispatches lost before a terminal refusal may have billed: the chunk's own
+    billing estimate, once per lost dispatch. Over-report, never under."""
+    if not maybe_billed:
+        return ()
+    seconds, usd = billed(end_ms - start_ms)
+    return (
+        CostEntry(
+            PROVIDER,
+            MODEL,
+            Purpose.TRANSCRIBE,
+            AudioSeconds(seconds * maybe_billed),
+            usd * maybe_billed,
+            0,
+        ),
+    )
 
 
 def retry_delay(status: int | None, headers: Mapping[str, str], attempt: int) -> float:

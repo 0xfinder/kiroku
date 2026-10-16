@@ -18,10 +18,12 @@ from kiroku.db import Pool, SchemaOutOfDate, connect, open_pool
 from kiroku.ledger import AudioSeconds, CostEntry, Purpose
 from kiroku.sessions import Channel, UnsealedLeg, claim_channels
 from kiroku.source import Capture, Online, Probe, StreamMeta
-from kiroku.transcriber import Result, Utterance
-from kiroku.transcriber.groq import GroqTranscriber
+from kiroku.transcriber import Result, TranscriberAuthError, Utterance
+from kiroku.transcriber.groq import GroqTranscriber, billed
 from kiroku.watch import Services, SessionRun
 from tests.fakes.speech import speechlike
+
+CHUNK_MS = 12_000  # speechlike(12) is exactly one voiced chunk (see test_groq.py)
 
 T0 = datetime(2026, 10, 11, 12, 0, tzinfo=UTC)
 A = StreamMeta("broadcast-a", "title", "Dota 2")
@@ -265,6 +267,41 @@ class _DyingSource:
         yield _DyingCapture(self._pcm)
 
 
+class _PatientCapture:
+    """Feeds one block, then waits for its stop signal: capture outlives the
+    transcription failure, so the auth error is the only task error."""
+
+    def __init__(self, pcm: bytes) -> None:
+        self._pcm = pcm
+        self._done = asyncio.Event()
+
+    @property
+    def pcm(self) -> AsyncIterator[bytes]:
+        return self._read()
+
+    async def _read(self) -> AsyncIterator[bytes]:
+        yield self._pcm
+        await self._done.wait()
+
+    async def stop_input(self) -> None:
+        self._done.set()
+
+
+class _PatientSource:
+    platform = "twitch"
+    login = "gorgc"
+
+    def __init__(self, pcm: bytes) -> None:
+        self._pcm = pcm
+
+    async def probe(self) -> Probe:
+        return Online(A)
+
+    @asynccontextmanager
+    async def capture(self, archive: Path) -> AsyncGenerator[Capture]:
+        yield _PatientCapture(self._pcm)
+
+
 async def test_stop_after_a_capture_failure_still_drains(
     pool: Pool, channel: Channel, conn: AsyncConnection, tmp_path: Path
 ) -> None:
@@ -288,6 +325,59 @@ async def test_stop_after_a_capture_failure_still_drains(
 
     cur = await conn.execute("SELECT max(audio_end_ms) FROM transcript_span")
     assert await cur.fetchone() == (20_000,)
+
+
+async def test_auth_after_a_lost_dispatch_records_one_estimate_and_keeps_the_speech(
+    pool: Pool, channel: Channel, conn: AsyncConnection, tmp_path: Path
+) -> None:
+    """The live consumer records the uncertain estimate exactly once on the auth
+    failure, and the chunk that was rejected stays a recoverable gap."""
+    pcm, _ = speechlike(12, seed=10)
+    dispatches = 0
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        nonlocal dispatches
+        dispatches += 1
+        if dispatches == 1:
+            raise httpx.ReadTimeout("response lost", request=request)
+        return httpx.Response(401, json={"error": "invalid api key"})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as http:
+        session = await sessions.open_session(pool, channel, A, T0)
+        services = Services(
+            pool,
+            GroqTranscriber(http, Secret("gsk_test"), sleep=lambda _: asyncio.sleep(0)),
+            tmp_path,
+            Budget(pool, Caps()),
+            None,
+        )
+        run = SessionRun(services, channel, _PatientSource(pcm), session, A)
+        await run.start()
+
+        async def any_leg() -> bool:
+            return bool(await sessions.legs(pool, session))
+
+        async with asyncio.timeout(10):
+            while True:
+                if await any_leg():
+                    break
+                await asyncio.sleep(0.05)
+        # Transcription is paced by leg ends: stopping the leg flushes the buffered
+        # chunk, its retry hits the auth error, and the run stops with it.
+        async with asyncio.timeout(30):
+            with pytest.raises(TranscriberAuthError):
+                await run.stop()
+
+    # Exactly one receipt, at the chunk's own estimate; the rejected audio is still a
+    # gap for a later backfill.
+    cur = await conn.execute(
+        "SELECT count(*), sum(usd) FROM cost_ledger "
+        "WHERE session_id = %s AND purpose = 'transcribe'",
+        [session],
+    )
+    _, usd = billed(CHUNK_MS)
+    assert await cur.fetchone() == (1, usd)
+    assert await transcript.spans(pool, session, NAME) == []
 
 
 async def test_transcript_commit_ids_follow_visibility_order(

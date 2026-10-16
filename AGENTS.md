@@ -69,6 +69,7 @@ uv run ruff check && uv run ruff format --check && uv run pyright && uv run pyte
 - Cooldown is per Rule and Channel; Novelty is per Rule, Channel and Game key. Suppressed rows extend the coarse Game chain but never restart Cooldown.
 - Groq JSON calls share quota admission and rate-limit pauses. Expire cached request counts at the provider reset time; otherwise a Gate Fallback can remain refused after the daily quota resets.
 - Every paid call (transcription, Jev, LLM) goes through the provider interface and writes a Cost ledger row.
+- Uncertain dispatch costs survive terminal non-auth 4xx and auth exits (exit matrix in `tests/test_paid_exits.py`): a direct refusal bills nothing, one conservative estimate is retained per lost dispatch, and a retry-success total is never changed. `TranscriberAuthError` carries its required immutable `costs`; the consumer records them exactly once via `ledger.record_session_costs` before propagating, and the rejected speech stays recoverable.
 - The alert pipeline is a fixed sequence of steps, not an agent (D5). Agents are reserved for the Q&A path.
 - Tests replay recorded audio and transcript fixtures (e.g. `spikes/results/`), never live streams. Write E2E tests for observable behaviour, including failure paths.
 

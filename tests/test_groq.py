@@ -11,10 +11,9 @@ from kiroku.audio import AudioBlock, AudioEvent, LegEnded
 from kiroku.budget import OverBudget, Refusal, Unlimited
 from kiroku.config import Secret
 from kiroku.ledger import AudioSeconds
-from kiroku.transcriber import Context, Result
+from kiroku.transcriber import Context, Result, TranscriberAuthError
 from kiroku.transcriber.groq import (
     BACKGROUND_INTERVAL_S,
-    GroqAuthError,
     GroqTranscriber,
     billed,
     retry_delay,
@@ -118,8 +117,10 @@ async def test_rate_limit_waits_and_resends_the_same_audio() -> None:
 async def test_bad_key_stops_with_an_auth_error() -> None:
     fake = FakeGroq([httpx.Response(401, json={"error": "invalid api key"})])
     pcm, _ = speechlike(12, seed=4)
-    with pytest.raises(GroqAuthError):
+    with pytest.raises(TranscriberAuthError) as e:
         await _collect(_transcriber(fake), AudioBlock(0, pcm))
+    # A direct refusal bills nothing: the required costs tuple is empty.
+    assert e.value.costs == ()
 
 
 async def test_rejected_audio_commits_an_empty_unbilled_span() -> None:

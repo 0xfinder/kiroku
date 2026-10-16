@@ -14,7 +14,22 @@ from typing import Protocol
 
 from kiroku.audio import AudioEvent
 from kiroku.budget import BudgetGuard
+from kiroku.errors import KirokuError
 from kiroku.ledger import CostEntry
+
+
+class TranscriberAuthError(KirokuError):
+    """401/403 from a transcription provider: the key is wrong.
+
+    The immutable `costs` are dispatches that were sent and lost before the refusal; they
+    may bill anyway, so the consumer records them exactly once before it stops. Speech
+    that was not transcribed stays recoverable.
+    """
+
+    def __init__(self, reason: str, costs: tuple[CostEntry, ...]) -> None:
+        super().__init__(reason)
+        self.reason = reason
+        self.costs = costs
 
 
 @dataclass(frozen=True, slots=True)
