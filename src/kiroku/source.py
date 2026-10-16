@@ -236,15 +236,25 @@ def ffmpeg_command(ffmpeg: str, archive: Path) -> list[str]:
 
 
 async def _stop(proc: asyncio.subprocess.Process, *, grace_s: float) -> None:
-    """Wait briefly for a clean exit, then SIGTERM, then SIGKILL the process group."""
-    if proc.returncode is not None:
+    """Wait briefly for a clean exit, then SIGTERM, then SIGKILL the process group.
+
+    A child with a PIPE stdout is reaped with communicate(), never wait(): the PCM
+    reader may have stopped, and on Python 3.12 wait() also waits for the stdout
+    transport to close, which that unread pipe never does. communicate() drains it to
+    EOF, and nobody needs the drained bytes after teardown. A child whose stdout is
+    redirected to a file descriptor has no transport to stall, so it keeps wait()'s
+    kill ordering untouched.
+    """
+    if proc.returncode is not None and proc.stdout is not None:
+        await proc.communicate()
         return
+    reap = proc.communicate if proc.stdout is not None else proc.wait
     for sig, wait_s in ((None, grace_s), (signal.SIGTERM, grace_s), (signal.SIGKILL, None)):
         if sig is not None:
             with contextlib.suppress(ProcessLookupError):
                 os.killpg(proc.pid, sig)
         try:
-            await asyncio.wait_for(proc.wait(), wait_s)
+            await asyncio.wait_for(reap(), wait_s)
             return
         except TimeoutError:
             continue
