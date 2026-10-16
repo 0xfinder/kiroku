@@ -35,7 +35,7 @@ build-backend = "uv_build"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-extend-exclude = ["spikes"]
+extend-exclude = ["spikes", "tests/contracts/fixtures"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC", "TID", "RUF"]
@@ -50,6 +50,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC", "TID", "RUF"]
 
 [tool.pyright]
 include = ["src", "tests"]
+exclude = ["tests/contracts/fixtures"]
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
 venvPath = "."

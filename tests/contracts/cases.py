@@ -33,20 +33,24 @@ class Case:
     plugin_code: str | None = field(default=None)
 
 
-DURABLE_PLUGIN = """\
-\"\"\"pytest plugin for the historical Notes durable mutation: replay a27ce78's function.\"\"\"\n
+DURABLE_PLUGIN = '''"""Pinned replay of a27ce78's Notes durable function."""
 
 import ast
 import linecache
-import subprocess
+from pathlib import Path
 
 import kiroku.notes as notes
 
 
-def pytest_configure() -> None:
-    source = subprocess.check_output(
-        ["git", "show", "a27ce78:src/kiroku/notes.py"], text=True
+def pytest_configure(config) -> None:
+    fixture = (
+        Path(str(config.rootpath))
+        / "tests"
+        / "contracts"
+        / "fixtures"
+        / "notes_durable_a27ce78.py"
     )
+    source = fixture.read_text()
     tree = ast.parse(source)
     function = next(
         n
@@ -62,7 +66,7 @@ def pytest_configure() -> None:
         filename,
     )
     exec(compile(isolated, filename, "exec"), notes.__dict__)
-"""
+'''
 
 # Recorded source snippets, hoisted to module level for exactness and line length.
 JEV_TERMINAL_OLD = (

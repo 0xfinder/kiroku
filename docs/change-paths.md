@@ -33,7 +33,8 @@ uv run python tests/contracts/check_mutations.py --list # what is enforced
 ## Adding a case
 
 Register it in `tests/contracts/cases.py` only when all three exist: a passing control on
-current code, a textual mutation (or a pinned historical replay) that reproduces the
-historical defect, and a focused test whose failure IS the intended mismatch. The mutation
-must apply to a fresh scratch copy; never to the active checkout; a patch whose source no
-longer matches fails as stale so no stale case can silently expire.
+current code, a textual mutation (or a pinned historical replay, stored verbatim under
+`tests/contracts/fixtures/`) that reproduces the historical defect, and a focused test
+whose failure IS the intended mismatch. The mutation must apply to a fresh scratch copy;
+never to the active checkout; a patch whose source no longer matches fails as stale so no
+stale case can silently expire.
