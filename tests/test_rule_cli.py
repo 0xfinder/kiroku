@@ -8,6 +8,7 @@ from typing import Any, LiteralString, cast
 
 import httpx
 import pytest
+from click import unstyle
 from typer.testing import CliRunner
 
 from kiroku import sessions
@@ -41,8 +42,7 @@ def kiroku(database_url: str) -> Callable[..., Any]:
         "KIROKU_DATABASE_URL": database_url,
         "KIROKU_SECRETS_FILE": "/x",
         "JEV_API_KEY": "k",
-        # Typer's error panel is coloured on CI (GITHUB_ACTIONS), and colour codes split the
-        # option names the assertions look for.
+        # Keep captured output readable; Typer may already have cached terminal styling.
         "NO_COLOR": "1",
         "FORCE_COLOR": "",
         "GITHUB_ACTIONS": "",
@@ -207,7 +207,7 @@ def test_bad_input_is_a_one_line_error(kiroku: Callable[..., Any]) -> None:
     ]:
         result = kiroku(*args)
         assert result.exit_code == 2, (args, result.output)
-        assert message in result.stderr, (args, result.stderr)
+        assert message in unstyle(result.stderr), (args, result.stderr)
         assert "Traceback" not in result.output
     scoped = kiroku("add", "x", "Q?", "--pack", "league")
     assert scoped.exit_code == 0 and scoped.stderr == ""
