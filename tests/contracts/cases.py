@@ -222,7 +222,7 @@ CASES: tuple[Case, ...] = (
     ),
     Case(
         name="live-pcm-is-bounded-during-provider-pause",
-        owner="kiroku.transcriber.groq.GroqTranscriber.transcribe enqueue",
+        owner="kiroku.transcriber.queued.ChunkedTranscriber.transcribe enqueue",
         invariant=(
             "A paused provider retains only bounded live PCM; eviction releases live "
             "admission on resume and cancellation, while Backfill stays lossless."
@@ -236,7 +236,7 @@ CASES: tuple[Case, ...] = (
         ),
         patches=(
             Patch(
-                file="src/kiroku/transcriber/groq.py",
+                file="src/kiroku/transcriber/queued.py",
                 old=(
                     "                while room is None and backlog_ms > "
                     "self._max_backlog_ms and chunks.qsize() > 1:"

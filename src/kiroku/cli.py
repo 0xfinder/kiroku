@@ -12,11 +12,12 @@ import contextlib
 import logging
 import shutil
 import signal
-from collections.abc import Awaitable, Callable, Generator
-from contextlib import contextmanager
+from collections.abc import AsyncGenerator, Awaitable, Callable, Generator
+from contextlib import asynccontextmanager, contextmanager
 from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 from typing import Annotated
 
 import httpx
@@ -24,7 +25,7 @@ import typer
 
 from kiroku import alerting, backfill, dry_run, notes, rules, sessions
 from kiroku.budget import Budget
-from kiroku.config import ConfigError, SecretName, Settings
+from kiroku.config import ConfigError, SecretName, Settings, TranscriptionProvider
 from kiroku.db import Pool, connect, open_pool
 from kiroku.db.migrate import migrate, new_migration
 from kiroku.errors import KirokuError
@@ -41,6 +42,8 @@ from kiroku.packs.league.data import PUBLIC_WEBSITE_KEY
 from kiroku.rules import Rule
 from kiroku.sessions import claim_channels
 from kiroku.source import StreamlinkSource, ToolMissing
+from kiroku.transcriber import Transcriber, fluid_assets
+from kiroku.transcriber.fluid import FluidTranscriber
 from kiroku.transcriber.groq import GroqTranscriber
 from kiroku.watch import vocabulary, watch
 
@@ -53,6 +56,8 @@ alert_app = typer.Typer(no_args_is_help=True, help="Recent Alerts and suppressio
 app.add_typer(alert_app, name="alert")
 notes_app = typer.Typer(no_args_is_help=True, help="Rolling Notes timeline and dataset.")
 app.add_typer(notes_app, name="notes")
+transcriber_app = typer.Typer(no_args_is_help=True, help="Local transcription models.")
+app.add_typer(transcriber_app, name="transcriber")
 
 PACK_FACTORIES: dict[str, Callable[[httpx.AsyncClient, Settings], Pack]] = {
     DotaPack.name: lambda http, settings: DotaPack(http, settings.data_dir),
@@ -103,6 +108,47 @@ def _log_to_stderr() -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
+def _fluid_directory(settings: Settings) -> Path:
+    return settings.fluid_model_dir or settings.data_dir / "models" / "fluid-speech-mini"
+
+
+@transcriber_app.command("install-fluid")
+def install_fluid(
+    directory: Annotated[
+        Path | None, typer.Option(help="Override the configured model directory.")
+    ] = None,
+) -> None:
+    """Download the pinned Fluid Speech Mini weights and verify every checksum."""
+    with _user_errors():
+        destination = directory or _fluid_directory(Settings.load())
+        try:
+            with httpx.Client(timeout=60) as http:
+                fluid_assets.install(http, destination)
+        except (httpx.HTTPError, OSError) as error:
+            raise KirokuError(f"Fluid model installation failed: {error}") from error
+        typer.echo(f"Fluid Speech Mini by FluidVoice installed at {destination}")
+
+
+@asynccontextmanager
+async def _open_transcriber(
+    settings: Settings, provider: TranscriptionProvider, http: httpx.AsyncClient
+) -> AsyncGenerator[Transcriber]:
+    if provider == TranscriptionProvider.GROQ:
+        yield GroqTranscriber(http, settings.secrets.require(SecretName.GROQ))
+        return
+    directory = _fluid_directory(settings)
+    await asyncio.to_thread(fluid_assets.verify, directory)
+    transcriber = FluidTranscriber.local(directory, settings.fluid_threads)
+    try:
+        await transcriber.start()
+        logging.getLogger(__name__).info(
+            "Fluid Speech Mini: local English ASR, no Vocabulary/previous-text prompting"
+        )
+        yield transcriber
+    finally:
+        await transcriber.close()
+
+
 @app.command("watch")
 def watch_command(
     channels: Annotated[list[str], typer.Argument(help="Twitch logins, e.g. gorgc caedrel")],
@@ -114,6 +160,10 @@ def watch_command(
     no_alerts: Annotated[
         bool, typer.Option("--no-alerts", help="Gate without Telegram Alerts or Labels.")
     ] = False,
+    transcriber_provider: Annotated[
+        TranscriptionProvider | None,
+        typer.Option("--transcriber", help="Transcription provider; overrides KIROKU_TRANSCRIBER."),
+    ] = None,
 ) -> None:
     """Watch channels, store a live transcript while they stream, and gate it against the
     active Rules. Runs until stopped."""
@@ -131,7 +181,9 @@ def watch_command(
         main = asyncio.current_task()
         assert main is not None
         asyncio.get_running_loop().add_signal_handler(signal.SIGTERM, main.cancel)
-        groq_key = settings.secrets.require(SecretName.GROQ)
+        provider = transcriber_provider or settings.transcriber
+        needs_groq = provider == TranscriptionProvider.GROQ or not no_gate or not no_notes
+        groq_key = settings.secrets.require(SecretName.GROQ) if needs_groq else None
         jev_key = None if no_gate else settings.secrets.require(SecretName.JEV)
         telegram_key = (
             None if no_alerts or no_gate else settings.secrets.require(SecretName.TELEGRAM)
@@ -146,12 +198,12 @@ def watch_command(
             open_pool(settings.database_url) as pool,  # refuses a stale schema first
             claim_channels(settings.database_url, "twitch", channels) as claimed,
             httpx.AsyncClient(timeout=60) as http,
+            _open_transcriber(settings, provider, http) as transcriber,
         ):
             sources = [(c, StreamlinkSource(c.login)) for c in claimed]
             packs = [factory(http, settings) for factory in PACK_FACTORIES.values()]
             budget = Budget(pool, settings.caps)
-            llm = GroqLLM(http, groq_key)
-            transcriber = GroqTranscriber(http, groq_key)
+            llm = GroqLLM(http, groq_key) if groq_key is not None else None
             notifier = (
                 TelegramNotifier(http, telegram_key, chat_id)
                 if telegram_key is not None and chat_id is not None
@@ -159,7 +211,7 @@ def watch_command(
             )
             alerts = (
                 alerting.AlertWorker(pool, [c.id for c in claimed], llm, notifier, budget)
-                if notifier is not None
+                if notifier is not None and llm is not None
                 else None
             )
             await watch(
@@ -169,7 +221,7 @@ def watch_command(
                 settings.data_dir,
                 budget=budget,
                 gate=FallbackGate(JevGate(http, jev_key, give_up_s=20), LLMGate(llm))
-                if jev_key
+                if jev_key and llm is not None
                 else None,
                 alerts=alerts,
                 notes=notes.NotesWorker(
@@ -181,7 +233,7 @@ def watch_command(
                     packs,
                     gated=not no_gate,
                 )
-                if not no_notes
+                if not no_notes and llm is not None
                 else None,
                 notifier=notifier,
                 database_url=settings.database_url,
@@ -203,6 +255,10 @@ def backfill_command(
     session: Annotated[
         int | None, typer.Option(help="Session id. Default: the channel's latest session.")
     ] = None,
+    transcriber_provider: Annotated[
+        TranscriptionProvider | None,
+        typer.Option("--transcriber", help="Transcription provider; overrides KIROKU_TRANSCRIBER."),
+    ] = None,
 ) -> None:
     """Transcribe the gaps a crash left in a session's transcript, from its audio archive.
 
@@ -214,10 +270,12 @@ def backfill_command(
     _log_to_stderr()
 
     async def run(settings: Settings) -> None:
-        key = settings.secrets.require(SecretName.GROQ)
         async with (
             open_pool(settings.database_url) as pool,
             httpx.AsyncClient(timeout=60) as http,
+            _open_transcriber(
+                settings, transcriber_provider or settings.transcriber, http
+            ) as transcriber,
         ):
             found_channel = await sessions.find_channel(pool, "twitch", channel)
             found = (
@@ -226,7 +284,6 @@ def backfill_command(
             if found_channel is None or found is None:
                 which = f"session {session}" if session is not None else "session"
                 raise KirokuError(f"no {which} found for {channel}")
-            transcriber = GroqTranscriber(http, key)
             data_dir = settings.data_dir
             await backfill.seal_open_legs(
                 pool, found.id, transcriber.name, data_dir, unless_watched=found_channel

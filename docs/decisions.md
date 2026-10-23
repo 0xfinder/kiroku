@@ -573,3 +573,19 @@ The current request keeps its original audio across retries. At least the newest
 queued chunk survives, even with a configured tail shorter than one chunk.
 Evicted voiced chunks release live quota admission immediately. Background Backfill
 continues to use backpressure without dropping audio.
+
+## D40. Optional local Fluid Speech Mini transcription (issue #48)
+
+2026-10-23. Groq remains the default; watch and Backfill can select the pinned
+English Fluid Speech Mini ONNX model. One CPU subprocess per watch shares model
+memory and serializes inference across channels. Live speech goes ahead of
+Backfill; the D39 producer queue is shared by both providers. Killing a worker
+bounds shutdown even if native inference hangs. Local results have no paid Cost.
+Notes, Gate Fallback and Extraction retain their existing paid providers.
+
+The adapted greedy TDT decoder has no Vocabulary or previous-text prompt input.
+Whisper's conditioning cannot simply be forwarded. We ship no automatic text
+replacement or game-specific fine tuning. Approximate token emission positions,
+grouped by sentence punctuation, provide audio-clock Utterances; simultaneous
+starts are merged. A distinct versioned provider identity keeps these results
+separate from Whisper. See `docs/fluid.md` for switching caveats and attribution.
