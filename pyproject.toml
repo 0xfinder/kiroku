@@ -20,6 +20,9 @@ dependencies = [
 [project.scripts]
 kiroku = "kiroku.cli:main"
 
+[project.optional-dependencies]
+fluid = ["onnxruntime==1.31.0", "numpy>=2.0,<3"]
+
 [dependency-groups]
 dev = [
     "ruff>=0.8",

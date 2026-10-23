@@ -108,3 +108,5 @@ kiroku watch caedrel gorgc
 5. **Distillation:** train a small open model on the Notes dataset kiroku already collects, and compare its quality and cost.
 
 The full plan is in [PLAN.md](PLAN.md).
+
+Local English CPU transcription is also available with [Fluid Speech Mini](docs/fluid.md).

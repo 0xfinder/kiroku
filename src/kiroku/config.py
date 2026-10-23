@@ -43,6 +43,11 @@ class ConfigError(KirokuError):
     pass
 
 
+class TranscriptionProvider(StrEnum):
+    GROQ = "groq"
+    FLUID = "fluid"
+
+
 @dataclass(frozen=True, slots=True)
 class Secret:
     """An API key. `repr` and `str` never show the value; `reveal()` is greppable."""
@@ -94,6 +99,9 @@ class Settings:
     lolesports_api_key: str | None = None  # public website key override; not a Secret
 
     oidc: OIDC | None = None
+    transcriber: TranscriptionProvider = TranscriptionProvider.GROQ
+    fluid_model_dir: Path | None = None
+    fluid_threads: int = 2
 
     @classmethod
     def load(cls, env: Mapping[str, str] | None = None) -> Settings:
@@ -142,7 +150,21 @@ class Settings:
                 owner,
                 public_url,
             )
+        try:
+            transcriber = TranscriptionProvider(env.get("KIROKU_TRANSCRIBER", "groq"))
+            threads = int(env.get("KIROKU_FLUID_THREADS", "2"))
+            if not 1 <= threads <= 32:
+                raise ValueError
+        except ValueError:
+            raise ConfigError(
+                "KIROKU_TRANSCRIBER must be groq or fluid; KIROKU_FLUID_THREADS must be 1-32"
+            ) from None
         return cls(
+            transcriber=transcriber,
+            fluid_model_dir=Path(env["KIROKU_FLUID_MODEL_DIR"]).expanduser()
+            if env.get("KIROKU_FLUID_MODEL_DIR")
+            else None,
+            fluid_threads=threads,
             oidc=oidc,
             database_url=env.get("KIROKU_DATABASE_URL", DEFAULT_DATABASE_URL),
             data_dir=Path(env.get("KIROKU_DATA_DIR", DEFAULT_DATA_DIR)).expanduser(),
