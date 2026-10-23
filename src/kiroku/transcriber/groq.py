@@ -101,6 +101,18 @@ class GroqTranscriber:
                     self._add_live(1)
                 backlog_ms += _duration_ms(chunk)
                 chunks.put_nowait(chunk)
+                # Bound retained PCM even while the consumer is sleeping on a 429.
+                # Keep the newest chunk if it alone exceeds the configured tail.
+                while room is None and backlog_ms > self._max_backlog_ms and chunks.qsize() > 1:
+                    skipped = chunks.get_nowait()
+                    assert skipped is not None  # only produce's finally enqueues the sentinel
+                    backlog_ms -= _duration_ms(skipped)
+                    done_live(skipped)
+                    log.warning(
+                        "Groq backlog over %d ms; skipping chunk at %d ms",
+                        self._max_backlog_ms,
+                        ms(skipped.start_sample),
+                    )
 
         def done_live(chunk: Chunk) -> None:
             nonlocal live_pending
@@ -132,15 +144,6 @@ class GroqTranscriber:
                 if room is not None:
                     room.release()
                 backlog_ms -= _duration_ms(chunk)
-                # Live only in effect: a background stream's backpressure keeps this at 0.
-                if backlog_ms > self._max_backlog_ms:
-                    log.warning(
-                        "Groq backlog over %d ms; skipping chunk at %d ms",
-                        self._max_backlog_ms,
-                        ms(chunk.start_sample),
-                    )
-                    done_live(chunk)
-                    continue
                 if not chunk.voiced:
                     yield Result(ms(chunk.start_sample), ms(chunk.end_sample), (), None)
                     continue

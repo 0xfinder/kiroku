@@ -562,3 +562,14 @@ Publishing is unchanged: `deploy/site.sh` extracts `HEAD:site` into
 repository's first favicon) as its tab and header image; kiroku keeps
 `assets/icon.svg`, the app favicon and the PWA icons. This repository deletes its
 copy so the two trees cannot drift.
+
+## D39. Evict live transcription backlog as audio arrives (issue #46)
+
+2026-10-23. The live Groq producer enforces its 30-minute PCM tail when enqueuing,
+including while the consumer waits through a provider pause. Checking only after
+the consumer wakes allowed an entire broadcast to remain in RAM. Eviction leaves
+transcript gaps for archive Backfill; it never creates empty finalized spans.
+The current request keeps its original audio across retries. At least the newest
+queued chunk survives, even with a configured tail shorter than one chunk.
+Evicted voiced chunks release live quota admission immediately. Background Backfill
+continues to use backpressure without dropping audio.

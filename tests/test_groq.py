@@ -12,6 +12,7 @@ from kiroku.budget import OverBudget, Refusal, Unlimited
 from kiroku.config import Secret
 from kiroku.ledger import AudioSeconds
 from kiroku.transcriber import Context, Result, TranscriberAuthError
+from kiroku.transcriber.chunker import ChunkPolicy
 from kiroku.transcriber.groq import (
     BACKGROUND_INTERVAL_S,
     GroqTranscriber,
@@ -121,6 +122,77 @@ async def test_bad_key_stops_with_an_auth_error() -> None:
         await _collect(_transcriber(fake), AudioBlock(0, pcm))
     # A direct refusal bills nothing: the required costs tuple is empty.
     assert e.value.costs == ()
+
+
+@pytest.mark.parametrize("cancel", [False, True])
+async def test_live_audio_memory_stays_bounded_while_rate_limited(cancel: bool) -> None:
+    import tracemalloc
+
+    paused = asyncio.Event()
+    captured = asyncio.Event()
+    release = asyncio.Event()
+    fake = FakeGroq([httpx.Response(429, headers={"retry-after": "86400"})])
+    pcm, _ = speechlike(2, seed=3)
+
+    async def sleep(_: float) -> None:
+        paused.set()
+        await release.wait()
+
+    async def capture() -> AsyncIterator[AudioEvent]:
+        yield AudioBlock(0, pcm)
+        await paused.wait()
+        for i in range(1, 40):
+            yield AudioBlock(i * 32_000, pcm)
+        captured.set()
+        await release.wait()
+        yield LegEnded()
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(fake)) as http:
+        t = GroqTranscriber(
+            http,
+            Secret("k"),
+            policy=ChunkPolicy(min_ms=1_000, max_ms=1_000, forced_window_ms=100),
+            max_backlog_ms=4_000,
+            background_interval_s=0,
+            sleep=sleep,
+        )
+
+        async def collect() -> list[Result]:
+            return [r async for r in t.transcribe(capture(), Context(lambda: "", Unlimited()))]
+
+        tracemalloc.start()
+        task = asyncio.create_task(collect())
+        try:
+            await asyncio.wait_for(captured.wait(), 5)
+            retained, _ = tracemalloc.get_traced_memory()
+            # 80 seconds of PCM is 2.56 MB; keep only a four-second tail,
+            # the current request, chunker buffers and transport bookkeeping.
+            assert retained < 500_000, f"paused transcription retains {retained} bytes"
+        finally:
+            tracemalloc.stop()
+            if cancel:
+                task.cancel()
+            release.set()
+            if cancel:
+                with pytest.raises(asyncio.CancelledError):
+                    await asyncio.wait_for(task, 5)
+                results = []
+            else:
+                results = await asyncio.wait_for(task, 5)
+
+        # Evicted voiced chunks must release admission on completion and cancellation.
+        background = t.transcribe(
+            _events(AudioBlock(0, pcm)), Context(lambda: "", Unlimited(), background=True)
+        )
+        async with asyncio.timeout(5):
+            backfilled = [r async for r in background]
+        assert backfilled[-1].end_ms == 2_000
+
+    if not cancel:
+        assert len(fake.requests) >= 3
+        assert _without_boundary(fake.requests[0]) == _without_boundary(fake.requests[1])
+        assert results[0].start_ms == 0 and results[-1].end_ms == 80_000
+        assert all(r.start_ms >= 76_000 for r in results[1:])
 
 
 async def test_rejected_audio_commits_an_empty_unbilled_span() -> None:
